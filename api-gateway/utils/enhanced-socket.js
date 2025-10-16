@@ -38,7 +38,7 @@ class SocketManager {
         this.io = socketIO(httpServer, {
             cors: corsOptions,
             transports: ['websocket', 'polling'],
-            pingTimeout: 60000,
+            pingTimeout: 600000,
             pingInterval: 25000,
             upgradeTimeout: 10000,
             maxHttpBufferSize: 1e6, // 1MB

@@ -1,43 +1,6 @@
 const SubscribedUser = require("../models/SubscribedUser");
 const { handleError } = require('../utils/error');
-const { sendEmail } = require("../utils/emails/sendEmail")
-
-// Helper function to find subscribedUser by ID
-const findSubscribedUserById = async (id, res, selectFields = '') => {
-    try {
-        const subscribedUser = await SubscribedUser.findById(id).select(selectFields);
-        if (!subscribedUser) return res.status(404).json({ message: 'No subscribed user found!' });
-        return subscribedUser;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to validate request body
-const validateRequestBody = (body, requiredFields) => {
-    for (const field of requiredFields) {
-        if (!body[field]) {
-            return `Please fill all fields: ${requiredFields.join(', ')}`;
-        }
-    }
-    return null;
-};
-
-// Helper function to send subscription email
-const sendSubscriptionEmail = (subscriber) => {
-    const clientURL = process.env.NODE_ENV === 'production' ?
-        process.env.DOMAIN_URL : process.env.LOCAL_DOMAIN_URL;
-
-    sendEmail(
-        subscriber.email,
-        "Thank you for subscribing to Quiz-Blog!",
-        {
-            name: subscriber.name,
-            unsubscribeLink: `${clientURL}/unsubscribe`
-        },
-        "./template/subscribe.handlebars"
-    );
-};
+const { validateRequiredFields, sendSubscriptionEmail } = require("../utils/helpers")
 
 exports.getSubscribedUsers = async (req, res) => {
     try {
@@ -50,17 +13,24 @@ exports.getSubscribedUsers = async (req, res) => {
 };
 
 exports.getOneSubscribedUser = async (req, res) => {
-    const subscribedUser = await findSubscribedUserById(req.params.id, res, '-__v');
-    if (subscribedUser) res.status(200).json(subscribedUser);
+    try {
+        const subscribedUser = await SubscribedUser.findById(req.params.id).select('name email createdAt');
+        if (!subscribedUser) return res.status(404).json({ message: 'No subscribed user found!' });
+        return res.status(200).json(subscribedUser);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.createSubscribedUser = async (req, res) => {
+
     const { name, email } = req.body;
 
-    const validationError = validateRequestBody(req.body, ['name', 'email']);
-    if (validationError) {
-        return res.status(400).json({ message: validationError });
-    }
+    // Validation
+    validateRequiredFields([
+        { name: 'name', value: name },
+        { name: 'email', value: email },
+    ]);
 
     try {
         const subscriber = await SubscribedUser.findOne({ email });
@@ -85,9 +55,6 @@ exports.createSubscribedUser = async (req, res) => {
 
 exports.updateSubscribedUser = async (req, res) => {
     try {
-        const subscribedUser = await findSubscribedUserById(req.params.id, res, '-__v');
-        if (!subscribedUser) return;
-
         const updatedSubscribedUser = await SubscribedUser.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedSubscribedUser);
     } catch (error) {
@@ -97,13 +64,13 @@ exports.updateSubscribedUser = async (req, res) => {
 
 exports.deleteSubscribedUser = async (req, res) => {
     try {
-        const subscribedUser = await findSubscribedUserById(req.params.id, res, '-__v');
+        const subscribedUser = await SubscribedUser.findById(req.params.id);
         if (!subscribedUser) return;
 
-        const removedSubscribedUser = await SubscribedUser.deleteOne({ _id: req.params.id });
-        if (removedSubscribedUser.deletedCount === 0) return res.status(500).json({ message: 'Could not delete subscribed user, try again!' });
+        const removedSubscribedUser = await subscribedUser.deleteOne();
+        if (removedSubscribedUser.deletedCount === 0) return handleError(res, 'Something went wrong while deleting!');
 
-        res.status(200).json({ message: "Deleted successfully!" });
+        res.status(200).json(subscribedUser);
     } catch (err) {
         handleError(res, err);
     }

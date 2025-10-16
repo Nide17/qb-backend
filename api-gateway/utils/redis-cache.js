@@ -26,10 +26,10 @@ class RedisCacheManager {
                 retryDelayOnFailover: 0,
                 maxRetriesPerRequest: 0,
                 lazyConnect: true,
-                connectTimeout: 2000,
-                commandTimeout: 2000,
+                connectTimeout: 20000,
+                commandTimeout: 20000,
                 enableOfflineQueue: false,
-                maxLoadingTimeout: 2000,
+                maxLoadingTimeout: 20000,
             });
 
             this.redis.on('connect', () => {

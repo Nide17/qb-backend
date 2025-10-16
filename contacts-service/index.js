@@ -2,38 +2,19 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
+const os = require('os')
+const process = require('process')
 const { createServer } = require("http")
 const { Server } = require("socket.io")
 const dotenv = require('dotenv')
 const contactsSocketManager = require('./utils/enhanced-socket')
-const { notFoundHandler, globalErrorHandler } = require('./utils/error')
+const { handleError } = require('./utils/error')
+const { corsOptions } = require('./utils/helpers')
 
 // Config
 dotenv.config()
 const app = express()
 const httpServer = createServer(app)
-
-// Utils
-const allowList = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:5008',
-];
-
-const corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin || allowList.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.log(origin + ' is not allowed by CORS');
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    preflightContinue: false,
-    optionsSuccessStatus: 200,
-    maxAge: 3600
-};
 
 // Middlewares
 app.use(cors(corsOptions))
@@ -45,23 +26,62 @@ app.use("/api/broadcasts", require('./routes/broadcasts'))
 app.use("/api/chat-rooms", require('./routes/chat-rooms'))
 app.use("/api/room-messages", require('./routes/room-messages'))
 
-
 // home route
 app.get('/', (req, res) => { res.send('Welcome to QB contacts API') })
-
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
     try {
         const dbStatus = mongoose.connection.readyState === 1;
+        const db = mongoose.connection.db;
+
+        // ✅ Await the stats
+        const stats = await db.stats();
+
         res.json({
             service: 'contacts-service',
             status: 'healthy',
             database: dbStatus ? 'connected' : 'disconnected',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime()
+            dbStats: {
+                name: db.databaseName,
+                collections: stats.collections,
+                objects: stats.objects,
+                dataSize: stats.dataSize,
+                storageSize: stats.storageSize,
+                indexSize: stats.indexSize,
+            },
+
+            // --- System Information ---
+            system: {
+                os: os.type(),
+                platform: os.platform(),
+                architecture: os.arch(),
+                cpus: os.cpus().length,
+                totalMemory: os.totalmem(),
+                freeMemory: os.freemem(),
+                timestamp: new Date().toISOString(),
+                uptime: os.uptime(),
+                nodeVersion: process.version,
+                env: process.env.NODE_ENV || 'development'
+            },
+
+            // --- Process Information ---
+            process: {
+                execPath: process.execPath,
+                execArgv: process.execArgv,
+                cwd: process.cwd(),
+                argv: process.argv,
+                uptime: process.uptime(),
+                pid: process.pid,
+                title: process.title,
+                platform: process.platform,
+                memoryUsage: process.memoryUsage(),
+                cpuUsage: process.cpuUsage(),
+            }
         });
     } catch (error) {
+        console.error('Error in /health route:', error);
+
         res.status(503).json({
             service: 'contacts-service',
             status: 'unhealthy',
@@ -71,30 +91,46 @@ app.get('/health', async (req, res) => {
     }
 });
 
-// Handle 404 errors
-app.use(notFoundHandler())
-
-// Global error handler
-app.use(globalErrorHandler())
+// Handle errors: takes res, err, status
+app.use((err, req, res, next) => handleError(res, err))
 
 // Database connection and server start
 mongoose
     .connect(process.env.MONGODB_URI)
-    .then(() => {
-        httpServer.listen(process.env.PORT || 5008, () => {
-            console.log(`Contacts service is running on port ${process.env.PORT || 5008}, and MongoDB is connected`)
-            
+    .then(async (conn) => {
+        httpServer.listen(process.env.PORT || 5008, async () => {
+            const db = conn.connection.db
+            console.log(`Contacts service is running on port ${process.env.PORT || 5008}, and MongoDB ${db.databaseName} is connected`)
+
             // Initialize Socket.io with enhanced contacts functionality
             const io = new Server(httpServer, {
                 cors: corsOptions,
                 transports: ['websocket', 'polling']
             });
-            
+
             contactsSocketManager.initialize(io);
             console.log('🔌 Enhanced contacts socket manager initialized');
         })
     })
     .catch((err) => {
-        console.error('Failed to connect to MongoDB', err)
-        process.exit(1)
+        console.error('Failed to connect to MongoDB:', err)
     })
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('Received SIGTERM, shutting down gracefully...');
+    await mongoose.connection.close();
+    app.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', async () => {
+    console.log('Received SIGINT, shutting down gracefully...');
+    await mongoose.connection.close();
+    app.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});

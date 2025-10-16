@@ -1,5 +1,5 @@
 const express = require("express")
-const { get50NewUsers, getAllUsers, getUsersWithImage, getUsersWithSchool, getUsersWithLevel, getUsersWithFaculty, getUsersWithInterests, getUsersWithAbout, getTop100Quizzing, getTop100Downloaders, getTop20Quizzes, getQuizzesStats, getTop20Notes, getNotesStats, getQuizCategoriesStats, getNotesCategoriesStats, getDailyUserRegistration, getDashboardStats, updateDashboardStats, getLiveAnalytics, clearStatsCache, getSystemMetrics, getDatabaseMetrics, getPerformanceMetrics } = require("../controllers/statistics")
+const { get50NewUsers, getAllUsers, getUsersWithImage, getUsersWithSchool, getUsersWithLevel, getUsersWithFaculty, getUsersWithInterests, getUsersWithAbout, getTop10QuizzingUsers, getTop10Downloaders, getTop10Quizzes, getTop10Notes, getDailyUserRegistration, getDashboardStats, updateDashboardStats, getLiveAnalytics, clearStatsCache, getSystemMetrics } = require("../controllers/statistics")
 const { authRole } = require("../middlewares/auth")
 
 const router = express.Router()
@@ -12,14 +12,10 @@ router.get("/users-with-level", authRole(['Admin', 'SuperAdmin']), getUsersWithL
 router.get("/users-with-faculty", authRole(['Admin', 'SuperAdmin']), getUsersWithFaculty)
 router.get("/users-with-interests", authRole(['Admin', 'SuperAdmin']), getUsersWithInterests)
 router.get("/users-with-about", authRole(['Admin', 'SuperAdmin']), getUsersWithAbout)
-router.get("/top-100-quizzing", getTop100Quizzing)
-router.get("/top-100-downloaders", authRole(['Admin', 'SuperAdmin']), getTop100Downloaders)
-router.get("/top-20-quizzes", authRole(['Admin', 'SuperAdmin']), getTop20Quizzes)
-router.get("/quizzes-stats", authRole(['Admin', 'SuperAdmin']), getQuizzesStats)
-router.get("/top-20-notes", authRole(['Admin', 'SuperAdmin']), getTop20Notes)
-router.get("/notes-stats", authRole(['Admin', 'SuperAdmin']), getNotesStats)
-router.get("/quiz-categories-stats", authRole(['Admin', 'SuperAdmin']), getQuizCategoriesStats)
-router.get("/notes-categories-stats", authRole(['Admin', 'SuperAdmin']), getNotesCategoriesStats)
+router.get("/top-10-quizzing-users", getTop10QuizzingUsers)
+router.get("/top-10-quizzes", authRole(['Admin', 'SuperAdmin']), getTop10Quizzes)
+router.get("/top-10-downloaders", authRole(['Admin', 'SuperAdmin']), getTop10Downloaders)
+router.get("/top-10-notes", authRole(['Admin', 'SuperAdmin']), getTop10Notes)
 router.get("/daily-user-registration", authRole(['Admin', 'SuperAdmin']), getDailyUserRegistration)
 
 // New enhanced endpoints
@@ -28,9 +24,7 @@ router.post("/update-dashboard-stats", authRole(['Admin', 'SuperAdmin']), update
 router.get("/live-analytics", authRole(['Admin', 'SuperAdmin']), getLiveAnalytics)
 router.delete("/clear-cache", authRole(['SuperAdmin']), clearStatsCache)
 
-// System performance endpoints
+// System endpoints
 router.get("/system-metrics", authRole(['Admin', 'SuperAdmin']), getSystemMetrics)
-router.get("/database-metrics", authRole(['Admin', 'SuperAdmin']), getDatabaseMetrics)
-router.get("/performance-metrics", authRole(['Admin', 'SuperAdmin']), getPerformanceMetrics)
 
 module.exports = router

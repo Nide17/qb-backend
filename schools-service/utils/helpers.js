@@ -1,0 +1,32 @@
+const axios = require('axios');
+
+// Helper function to call other services
+const callService = async (url, timeout = 20000) => {
+
+    if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
+
+    try {
+        const response = await axios.get(url, {
+            timeout: timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
+            headers: { 'Content-Type': 'application/json' }
+        });
+        return response.data;
+    } catch (err) {
+        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
+        return null;
+    }
+};
+
+// Generalized helper function to validate required fields
+const validateRequiredFields = (fields) => {
+    for (const field of fields) {
+        if (!field.value) {
+            throw new Error(`Missing required field: ${field.name}`);
+        }
+    }
+};
+
+module.exports = {
+    callService,
+    validateRequiredFields,
+};

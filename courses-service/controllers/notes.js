@@ -1,80 +1,83 @@
 const Notes = require("../models/Notes");
 const { handleError } = require('../utils/error');
-
-// Helper function to find notes by ID
-const findNotesById = async (id, res, selectFields = '') => {
-    try {
-        let notes = await Notes.findById(id).select(selectFields)
-            .populate('course chapter courseCategory', 'title');
-        if (!notes) return res.status(404).json({ message: 'No notes found!' });
-
-        notes = await notes.populateQuizzes();
-        return notes;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
+const { findNotesById, populateUser, validateRequiredFields } = require('../utils/helpers');
 
 // Helper function to find notes with optional limit
 const findNotes = async (query, res, limit = 0) => {
     try {
         let notesQuery = Notes.find(query).sort({ createdAt: -1 })
-            .select('title description notes_file chapter course courseCategory quizzes createdAt')
+            .select('title description notes_file chapter course courseCategory quizzes uploaded_by slug createdAt')
             .populate('course chapter courseCategory', 'title');
+
         if (limit > 0) notesQuery = notesQuery.limit(limit);
+
         let notes = await notesQuery;
         if (!notes) return res.status(204).json({ message: 'No notes found!' });
 
+        // Populate user details for each note
         notes = await Promise.all(notes.map(async (note) => {
-            if (note.quizzes && note.quizzes.length > 0) {
-                await note.populateQuizzes();
+            if (note.uploaded_by) {
+                const user = await populateUser(note.uploaded_by);
+                note = note.toObject ? note.toObject() : note;
+                note.uploaded_by = user;
             }
             return note;
         }));
+
         return notes;
     } catch (err) {
-        return handleError(res, err);
+        handleError(res, err);
     }
 };
 
 exports.getNotes = async (req, res) => {
-    const notes = await findNotes({}, res);
-    if (notes) res.status(200).json(notes);
+
+    try {
+        const notes = await findNotes({}, res);
+        if (notes) res.status(200).json(notes);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getLimitedNotes = async (req, res) => {
-    const limit = parseInt(req.query.limit) || 5;
-    const notes = await findNotes({}, res, limit);
-    if (notes) res.status(200).json(notes);
+
+    try {
+        const limit = parseInt(req.query.limit) || 5;
+        const notes = await findNotes({}, res, limit);
+        if (notes) res.status(200).json(notes);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getNotesByCategory = async (req, res) => {
-    const notes = await findNotes({ courseCategory: req.params.id }, res);
-    if (notes) res.status(200).json(notes);
+    try {
+        const notes = await findNotes({ courseCategory: req.params.id }, res);
+        if (notes) res.status(200).json(notes);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getNotesByChapter = async (req, res) => {
-    const notes = await findNotes({ chapter: req.params.id }, res);
-    if (notes) res.status(200).json(notes);
-};
-
-exports.getOneNotes = async (req, res) => {
     try {
-        const id = req.params.id;
-        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
-
-        let notes = await Notes.findOne(query)
-            .select('title description notes_file chapter course courseCategory quizzes createdAt')
-            .populate('course chapter courseCategory', 'title');
-        if (!notes) return res.status(404).json({ message: 'No notes found!' });
-
-        notes = await notes.populateQuizzes();
-        res.status(200).json(notes);
-    }
-    catch (err) {
+        const notes = await findNotes({ chapter: req.params.id }, res);
+        if (notes) res.status(200).json(notes);
+    } catch (err) {
         handleError(res, err);
     }
-}
+};
+
+// Updated getOneNotes to use findNotesById
+exports.getOneNotes = async (req, res) => {
+    try {
+        const notes = await findNotesById(req.params.id, res, 'title description notes_file chapter course courseCategory quizzes slug uploaded_by');
+        res.status(200).json(notes)
+    } catch (err) {
+        handleError(res, err);
+    }
+};
 
 exports.createNotes = async (req, res) => {
     const { title, description } = req.body;
@@ -118,6 +121,7 @@ exports.createNotes = async (req, res) => {
     }
 };
 
+// Updated updateNotes to use findNotesById
 exports.updateNotes = async (req, res) => {
     try {
         const notes = await findNotesById(req.params.id, res);
@@ -159,33 +163,20 @@ exports.removeQuizFromNotes = async (req, res) => {
     }
 };
 
+// Updated deleteNotes to use findNotesById
 exports.deleteNotes = async (req, res) => {
     try {
-        const notes = await Notes.findById(req.params.id);
-        if (!notes) return res.status(404).json({ message: 'Notes not found!' });
+        const notes = await findNotesById(req.params.id, res);
+        if (!notes) return;
 
-        const params = {
-            Bucket: process.env.S3_BUCKET || config.get('S3Bucket'),
-            Key: notes.notes_file.split('/').pop()
-        };
+        // Delete associated quizzes
+        await Notes.updateOne(
+            { _id: notes._id },
+            { $pull: { quizzes: { $exists: true } } }
+        );
 
-        s3Config.deleteObject(params, (err, data) => {
-            if (err) {
-                handleError(res, err);
-                console.log(err, err.stack);
-            } else {
-                console.log(params.Key + ' deleted from ' + params.Bucket);
-            }
-        });
-
-        // API Call to delete Download from downloads service
-        const downloadServiceUrl = `${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/by-notes/${notes._id}`;
-        const response = await axios.delete(downloadServiceUrl);
-        if (response.status !== 200) return res.status(500).json({ message: 'Could not delete download, try again!' });
-
-        const removedNotes = await Notes.deleteOne({ _id: req.params.id });
-        if (!removedNotes) return res.status(500).json({ message: 'Could not delete notes, try again!' });
-
+        // Delete this notes entry
+        await Notes.deleteOne({ _id: req.params.id });
         res.status(200).json({ message: `Deleted!` });
     } catch (err) {
         handleError(res, err);

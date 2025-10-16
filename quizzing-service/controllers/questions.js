@@ -1,57 +1,12 @@
 const Question = require("../models/Question");
-const Quiz = require("../models/Quiz");
-const { S3 } = require("@aws-sdk/client-s3");
 const { handleError } = require('../utils/error');
+const { validateRequiredFields, updateQuizQuestions, deleteImageFromS3 } = require('../utils/helpers');
 
-// AWS S3 Configuration
-const s3Config = new S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    Bucket: process.env.S3_BUCKET,
-    region: process.env.AWS_REGION,
-});
-
-// Helper function to find question by ID
-const findQuestionById = async (id, res, selectFields = '') => {
-    try {
-        const question = await Question.findById(id).select(selectFields).populate('category quiz');
-        if (!question) return res.status(404).json({ message: 'No question found!' });
-        return question;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to delete image from S3
-const deleteImageFromS3 = async (imageUrl) => {
-    if (!imageUrl) return;
-    const params = {
-        Bucket: process.env.S3_BUCKET,
-        Key: imageUrl.split('/').pop(),
-    };
-    return new Promise((resolve, reject) => {
-        s3Config.deleteObject(params, (err, data) => {
-            if (err) {
-                console.log(err, err.stack);
-                reject(err);
-            } else {
-                console.log(params.Key + ' deleted!');
-                resolve(data);
-            }
-        });
-    });
-};
-
-// Helper function to update quiz questions
-const updateQuizQuestions = async (quizId, questionId, action) => {
-    const update = action === 'add' ? { $addToSet: { questions: questionId } } : { $pull: { questions: questionId } };
-    await Quiz.updateOne({ _id: quizId }, update);
-};
 
 exports.getQuestions = async (req, res) => {
-    
+
     try {
-        const questions = await Question.find().sort({ createdAt: -1 }).populate('category quiz');
+        const questions = await Question.find().sort({ creation_date: -1 }).populate('category quiz');
         if (!questions) return res.status(404).json({ message: 'No questions found!' });
         res.status(200).json(questions);
     } catch (err) {
@@ -60,8 +15,13 @@ exports.getQuestions = async (req, res) => {
 };
 
 exports.getOneQuestion = async (req, res) => {
-    const question = await findQuestionById(req.params.id, res);
-    if (question) res.status(200).json(question);
+    try {
+        const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
+        if (!question) return res.status(404).json({ message: 'Question not found!' });
+        res.status(200).json(question);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.createQuestion = async (req, res) => {
@@ -70,18 +30,21 @@ exports.createQuestion = async (req, res) => {
 
     // Parse answer options from frontend
     const answers = answerOptions.map(a => JSON.parse(a));
-
-    // Simple validation
-    if (!questionText && !qnImage) {
-        return res.status(400).json({ message: 'Question text or Image is required!' });
-    } else if (!questionText || !quiz || !category || !answerOptions || !duration) {
-        return res.status(400).json({ message: 'Please fill all fields' });
-    }
-
     try {
-        let qtn = await Question.findOne({ questionText });
 
-        if (qtn) {
+        // Validate required fields
+        validateRequiredFields([
+            { name: 'questionText', value: questionText },
+            { name: 'quiz', value: quiz },
+            { name: 'category', value: category },
+            { name: 'answerOptions', value: answerOptions },
+            { name: 'duration', value: duration }
+        ]);
+
+        // Check for duplicate questionText
+        let existingQtn = await Question.findOne({ questionText });
+
+        if (existingQtn) {
             return res.status(400).json({ message: 'A question with same name already exists!' });
         }
 
@@ -100,7 +63,7 @@ exports.createQuestion = async (req, res) => {
         // Update the Quiz on Question creation
         await updateQuizQuestions(quiz, savedQuestion._id, 'add');
 
-        if (!savedQuestion) return res.status(500).json({ message: 'Could not save question, try again!' });
+        if (!savedQuestion) return handleError(res, 'Something went wrong during creation!');
 
         res.status(200).json(savedQuestion);
     } catch (err) {
@@ -169,11 +132,11 @@ exports.deleteQuestion = async (req, res) => {
         await updateQuizQuestions(question.quiz, question._id, 'remove');
 
         // Delete the question
-        const removedQuestion = await Question.deleteOne({ _id: req.params.id });
+        const removedQuestion = await question.deleteOne();
 
-        if (!removedQuestion) return res.status(500).json({ message: 'Could not delete question, try again!' });
+        if (removedQuestion.deletedCount === 0) return handleError(res, 'Something went wrong while deleting!');
 
-        res.status(200).json({ message: "Deleted successfully!" });
+        res.status(200).json(question);
     } catch (err) {
         handleError(res, err);
     }

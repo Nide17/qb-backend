@@ -1,55 +1,55 @@
 const BlogPostsView = require("../../models/blog-posts/BlogPostsView");
 const scheduledReportMessage = require('./scheduledReport');
-const { S3 } = require("@aws-sdk/client-s3");
 const { handleError } = require('../../utils/error');
-
-const s3Config = new S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    Bucket: process.env.S3_BUCKET,
-    region: process.env.AWS_REGION
-});
+const { populateUser, s3Config } = require('../../utils/helpers');
 
 // SCHEDULED REPORT MESSAGE
 scheduledReportMessage();
 
-// Helper function to find blogPostsView by ID
-const findBlogPostsViewById = async (id, res, selectFields = '') => {
-    try {
-        let blogPostsView = await BlogPostsView.findById(id).select(selectFields);
-        if (!blogPostsView) return res.status(404).json({ message: 'No blogPostsView found!' });
-
-        blogPostsView = await blogPostsView.populateViewer();
-        return blogPostsView;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
 exports.getBlogPostsViews = async (req, res) => {
     try {
-        let blogPostsViews = await BlogPostsView.find().sort({ createdAt: -1 });
-        if (!blogPostsViews) return res.status(204).json({ message: 'No blogPostsViews found!' });
+        let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
+        if (!blogPostsViews) return res.status(204).json({ message: 'No blog Posts Views found!' });
 
-        blogPostsViews = await Promise.all(blogPostsViews.map(async (post) => await post.populateViewer()));
-        res.status(200).json(blogPostsViews);
+        let blogPostsViewsObj = blogPostsViews.map(view => view?.toObject ? view.toObject() : view);
+        blogPostsViewsObj = await Promise.all(blogPostsViewsObj?.map(async view => {
+            if (view.viewer) {
+                view.viewer = await populateUser(view.viewer);
+            }
+            return view;
+        }));
+
+        res.status(200).json(blogPostsViewsObj);
     } catch (err) {
         handleError(res, err);
     }
 };
 
 exports.getOneBlogPostsView = async (req, res) => {
-    let blogPostsView = await findBlogPostsViewById(req.params.id, res);
-    if (blogPostsView) res.status(200).json(blogPostsView);
+    try {
+        let blogPostsView = await BlogPostsView.findById(req.params.id);
+
+        if (!blogPostsView) return res.status(404).json({ message: 'Blog Post View not found!' });
+        res.status(200).json(blogPostsView);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getRecentTenViews = async (req, res) => {
     try {
-        let blogPostsViews = await BlogPostsView.find({ postCategory: req.params.id }).sort({ createdAt: -1 }).limit(10);
-        if (!blogPostsViews) return res.status(404).json({ message: 'No blogPostsViews found!' });
+        let recentTenViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).limit(10).select('-__v');
+        if (!recentTenViews) return res.status(404).json({ message: '10 blog posts views not found!' });
 
-        blogPostsViews = await Promise.all(blogPostsViews.map(async (post) => await post.populateViewer()));
-        res.status(200).json(blogPostsViews);
+        let recentTenViewsObj = recentTenViews.map(view => view?.toObject ? view.toObject() : view);
+        recentTenViewsObj = await Promise.all(recentTenViewsObj?.map(async view => {
+            if (view.viewer) {
+                view.viewer = await populateUser(view.viewer);
+            }
+            return view;
+        }));
+
+        res.status(200).json(recentTenViewsObj);
     } catch (err) {
         handleError(res, err);
     }
@@ -66,7 +66,7 @@ exports.createBlogPostsView = async (req, res) => {
         const newBlogPostView = new BlogPostsView({ blogPost, viewer, device, country });
         const savedBlogPost = await newBlogPostView.save();
 
-        if (!savedBlogPost) throw Error('Something went wrong during creation! File size should not exceed 1MB');
+        if (!savedBlogPost) return res.status(503).json({ message: 'Something went wrong during creation! File size should not exceed 1MB' });
 
         res.status(200).json({
             _id: savedBlogPost._id,
@@ -96,7 +96,7 @@ exports.updateBlogPostsView = async (req, res) => {
 exports.deleteBlogPostsView = async (req, res) => {
     try {
         const blogPost = await BlogPostsView.findById(req.params.id);
-        if (!blogPost) throw Error('BlogPost is not found!');
+        if (!blogPost) return res.status(404).json({ message: 'BlogPost not found!' });
 
         if (blogPost.post_image) {
             const params = {
@@ -118,9 +118,9 @@ exports.deleteBlogPostsView = async (req, res) => {
 
         const removedBlogPost = await blogPost.deleteOne();
 
-        if (!removedBlogPost) throw Error('Something went wrong while deleting!');
+        if (!removedBlogPost) return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
-        res.status(200).json({ message: 'Deleted successfully!' });
+        res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);
     }

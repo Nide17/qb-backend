@@ -1,70 +1,13 @@
-const axios = require("axios");
 const QuestionComment = require("../models/QuestionComment");
 const { handleError } = require('../utils/error');
-
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL;
-const QUIZZING_SERVICE_URL = process.env.QUIZZING_SERVICE_URL;
-
-// Helper function to populate sender and quiz fields
-const populateSenderAndQuiz = async (questionComment) => {
-    try {
-        const [senderResult, questionResult, quizResult] = await Promise.allSettled([
-            questionComment.sender ? axios.get(`${USERS_SERVICE_URL}/api/users/${questionComment.sender}`, { 
-                headers: { 'x-internal-service': 'true' }
-            }) : Promise.resolve(null),
-            questionComment.question ? axios.get(`${QUIZZING_SERVICE_URL}/api/questions/${questionComment.question}`, { 
-                headers: { 'x-internal-service': 'true' }
-            }) : Promise.resolve(null),
-            questionComment.quiz ? axios.get(`${QUIZZING_SERVICE_URL}/api/quizzes/${questionComment.quiz}`, { 
-                headers: { 'x-internal-service': 'true' }
-            }) : Promise.resolve(null)
-        ]);
-
-        questionComment = questionComment.toObject();
-        questionComment.sender = senderResult.status === 'fulfilled' && senderResult.value ? senderResult.value.data : null;
-        questionComment.question = questionResult.status === 'fulfilled' && questionResult.value ? questionResult.value.data : null;
-        questionComment.quiz = quizResult.status === 'fulfilled' && quizResult.value ? quizResult.value.data : null;
-
-        return questionComment;
-    } catch (error) {
-        console.log('Error populating sender and quiz:', error.message);
-        return questionComment.toObject ? questionComment.toObject() : questionComment;
-    }
-};
-
-// Helper function to find questionComment by ID
-const findQuestionCommentById = async (id, res, selectFields = '') => {
-    try {
-        let questionComment = await QuestionComment.findById(id).select(selectFields);
-        if (!questionComment) return res.status(404).json({ message: 'No questionComment found!' });
-
-        questionComment = await populateSenderAndQuiz(questionComment);
-
-        return questionComment;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to update questionComment status
-const updateQuestionCommentStatus = async (id, status, res) => {
-    try {
-        const questionComment = await QuestionComment.findById(id);
-        if (!questionComment) return res.status(404).json({ message: 'QuestionComment not found!' });
-
-        const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(id, { status }, { new: true });
-        res.status(200).json(updatedQuestionComment);
-    } catch (error) {
-        handleError(res, error);
-    }
-};
+const { populateSenderAndQuiz } = require('../utils/helpers');
 
 exports.getQuestionsComments = async (req, res) => {
     try {
         let questionComments = await QuestionComment.find();
 
         for (let i = 0; i < questionComments.length; i++) {
-            questionComments[i] = await populateSenderAndQuiz(questionComments[i]);
+            questionComments[i] = await populateSenderAndQuiz(questionComments[i], 'questionComment');
         }
 
         res.status(200).json(questionComments);
@@ -122,11 +65,14 @@ exports.getCommentsByQuestion = async (req, res) => {
 };
 
 exports.getOneQuestionComment = async (req, res) => {
-    let questionComment = await findQuestionCommentById(req.params.id, res);
-
-    questionComment = await populateSenderAndQuiz(questionComment);
-
-    res.status(200).json(questionComment);
+    try {
+        let questionComment = await QuestionComment.findById(req.params.id).select('comment sender question quiz status createdAt updatedAt');
+        if (!questionComment) return res.status(404).json({ message: 'No questionComment found!' });
+        questionComment = await populateSenderAndQuiz(questionComment) || questionComment;
+        res.status(200).json(questionComment);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getCommentsByQuiz = async (req, res) => {
@@ -174,13 +120,20 @@ exports.createQuestionComment = async (req, res) => {
     }
 };
 
-exports.approveQuestionsComment = async (req, res) => {
-    await updateQuestionCommentStatus(req.params.id, 'Approved', res);
-};
+exports.approveRejectComment = async (req, res) => {
 
-exports.rejectQuestionsComment = async (req, res) => {
-    await updateQuestionCommentStatus(req.params.id, 'Rejected', res);
-};
+    let commentID = req.params.id;
+
+    try {
+        const questionComment = await QuestionComment.findById(commentID);
+        if (!questionComment) return res.status(404).json({ message: 'QuestionComment not found!' });
+
+        const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(commentID, { status: req.body.status }, { new: true });
+        res.status(200).json(updatedQuestionComment);
+    } catch (error) {
+        handleError(res, error);
+    }
+}
 
 exports.updateQuestionComment = async (req, res) => {
     try {

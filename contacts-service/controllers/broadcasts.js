@@ -1,48 +1,6 @@
-const axios = require('axios');
 const Broadcast = require("../models/Broadcast");
-const { sendEmail } = require("../utils/emails/sendEmail");
 const { handleError } = require('../utils/error');
-
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL
-
-// Helper function to find broadcast by ID
-const findBroadcastById = async (id, res, selectFields = '') => {
-    try {
-        const broadcast = await Broadcast.findById(id).select(selectFields);
-        if (!broadcast) return res.status(404).json({ message: 'No broadcast found!' });
-        return broadcast;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to send emails
-const sendEmails = (recipients, title, message, clientURL) => {
-    recipients.forEach((recipient, index) => {
-        setTimeout(() => {
-            sendEmail(
-                recipient.email,
-                title,
-                {
-                    name: recipient.name,
-                    message: message,
-                    unsubscribeLink: `${clientURL}/unsubscribe`
-                },
-                "./template/broadcast.handlebars"
-            );
-        }, 2000 * index);
-    });
-};
-
-// Helper function to fetch data from API
-const fetchData = async (url, res) => {
-    try {
-        const response = await axios.get(url);
-        return response.data;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
+const { findBroadcastById, validateRequiredFields, notifyAdmins, sendEmails, callService } = require('../utils/helpers');
 
 exports.getBroadcasts = async (req, res) => {
     try {
@@ -54,35 +12,39 @@ exports.getBroadcasts = async (req, res) => {
 };
 
 exports.getOneBroadcast = async (req, res) => {
-    const broadcast = await findBroadcastById(req.params.id, res);
-    if (!broadcast) return;
-
-    let sent_by = null;
-    if (broadcast.sent_by) {
-        sent_by = await fetchData(`${USERS_SERVICE_URL}/api/users/${broadcast.sent_by}`, res);
+    try {
+        const broadcast = await findBroadcastById(req.params.id, res);
+        if (broadcast) res.status(200).json(broadcast);
+    } catch (error) {
+        handleError(res, error);
     }
-    res.status(200).json({ ...broadcast._doc, sent_by });
 };
 
 exports.createBroadcast = async (req, res) => {
     const { title, sent_by, message } = req.body;
 
-    if (!title || !sent_by || !message) {
-        return res.status(400).json({ message: 'Please fill required fields' });
-    }
-
-    const clientURL = process.env.NODE_ENV === 'production' ? 'https://quizblog.rw' : 'http://localhost:5173';
-
     try {
+        // Validation
+        validateRequiredFields([
+            { name: 'title', value: title },
+            { name: 'sent_by', value: sent_by },
+            { name: 'message', value: message }
+        ]);
+
+        const clientURL = process.env.NODE_ENV === 'production' ? 'https://quizblog.rw' : 'http://localhost:5173';
+
         const newBroadcast = new Broadcast({ title, sent_by, message });
         const savedBroadcast = await newBroadcast.save();
-        if (!savedBroadcast) throw Error('Something went wrong during creation!');
+        if (!savedBroadcast) return res.status(503).json({ message: 'Something went wrong during creation!' });
 
-        const subscribers = await fetchData(`${USERS_SERVICE_URL}/api/subscribed-users`, res);
-        const allUsers = await fetchData(`${USERS_SERVICE_URL}/api/users`, res);
+        const subscribers = await callService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`, res);
+        const allUsers = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, res);
 
         sendEmails(subscribers, title, message, clientURL);
         sendEmails(allUsers, title, message, clientURL);
+
+        // Notify admins using the generalized utility function
+        await notifyAdmins(newBroadcast);
 
         res.status(200).json({
             _id: savedBroadcast._id,

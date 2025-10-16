@@ -1,5 +1,5 @@
 const express = require("express")
-const { getQuestionsComments, getPaginatedComments, getPendingComments, getOneQuestionComment, getCommentsByQuiz, getCommentsByQuestion, createQuestionComment, updateQuestionComment, approveQuestionsComment, rejectQuestionsComment, deleteQuestionComment } = require("../controllers/questions-comments")
+const { getQuestionsComments, getPaginatedComments, getPendingComments, getOneQuestionComment, getCommentsByQuiz, getCommentsByQuestion, createQuestionComment, approveRejectComment, deleteQuestionComment } = require("../controllers/questions-comments")
 const { auth, authRole } = require("../middlewares/auth")
 
 const router = express.Router()
@@ -16,9 +16,7 @@ router.get("/:id", getOneQuestionComment)
 router.post("/", auth, createQuestionComment)
 
 // PUT routes
-router.put("/approve/:id/", authRole(['Admin', 'SuperAdmin']), approveQuestionsComment)
-router.put("/reject/:id/", authRole(['Admin', 'SuperAdmin']), rejectQuestionsComment)
-router.put("/:id", authRole(['Admin', 'SuperAdmin']), updateQuestionComment)
+router.put("/approve-reject/:id/", authRole(['Admin', 'SuperAdmin']), approveRejectComment)
 
 // DELETE routes
 router.delete("/:id", authRole(['Admin', 'SuperAdmin']), deleteQuestionComment)

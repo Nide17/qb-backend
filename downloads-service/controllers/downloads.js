@@ -1,117 +1,60 @@
 const axios = require('axios');
 const Download = require("../models/Download");
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL;
-const COURSES_SERVICE_URL = process.env.COURSES_SERVICE_URL;
+const { populateDownload, validateRequiredFields } = require('../utils/helpers');
+const { handleError } = require('../../contacts-service/utils/error');
 
-// Helper function to fetch related data for a download with error handling
-const fetchDownloadDetails = async (download) => {
-    try {
-        // Use timeout to prevent hanging requests
-        const axiosConfig = { 
-            headers: { 'x-internal-service': 'true' },
-            timeout: 5000 // 5 second timeout
-        };
-
-        const [notesResult, courseResult, chapterResult, userResult] = await Promise.allSettled([
-            download.notes ? axios.get(`${COURSES_SERVICE_URL}/api/notes/${download.notes}`, axiosConfig)
-                .catch(() => null) : Promise.resolve(null),
-            download.course ? axios.get(`${COURSES_SERVICE_URL}/api/courses/${download.course}`, axiosConfig)
-                .catch(() => null) : Promise.resolve(null),
-            download.chapter ? axios.get(`${COURSES_SERVICE_URL}/api/chapters/${download.chapter}`, axiosConfig)
-                .catch(() => null) : Promise.resolve(null),
-            download.downloaded_by ? axios.get(`${USERS_SERVICE_URL}/api/users/${download.downloaded_by}`, axiosConfig)
-                .catch(() => null) : Promise.resolve(null)
-        ]);
-
-        return {
-            ...download,
-            notes: notesResult.status === 'fulfilled' && notesResult.value?.data ? notesResult.value.data : null,
-            course: courseResult.status === 'fulfilled' && courseResult.value?.data ? courseResult.value.data : null,
-            chapter: chapterResult.status === 'fulfilled' && chapterResult.value?.data ? chapterResult.value.data : null,
-            downloaded_by: userResult.status === 'fulfilled' && userResult.value?.data ? userResult.value.data : null
-        };
-    } catch (error) {
-        console.log('Error fetching download details:', error.message);
-        return {
-            ...download,
-            notes: download.notes ? { _id: download.notes } : null,
-            course: download.course ? { _id: download.course } : null,
-            chapter: download.chapter ? { _id: download.chapter } : null,
-            downloaded_by: download.downloaded_by ? { _id: download.downloaded_by } : null
-        };
-    }
-};
-
-// Helper function to process downloads in batches to prevent memory overload
-const processBatchedDownloads = async (downloads, batchSize = 10) => {
-    const results = [];
-    for (let i = 0; i < downloads.length; i += batchSize) {
-        const batch = downloads.slice(i, i + batchSize);
-        const batchResults = await Promise.all(batch.map(fetchDownloadDetails));
-        results.push(...batchResults);
-        
-        // Small delay between batches to prevent overwhelming the system
-        if (i + batchSize < downloads.length) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-    }
-    return results;
-};
 
 exports.getDownloads = async (req, res) => {
+
     try {
+        // Pagination - ENFORCE pagination to prevent memory exhaustion
+        const totalPages = await Download.countDocuments({});
+        var PAGE_SIZE = 20;
+        var pageNo = parseInt(req.query.pageNo || "1");
+        var query = {};
 
-    const totalPages = await Download.countDocuments({});
-    var PAGE_SIZE = 20;
-    var pageNo = parseInt(req.query.pageNo || "0");
-    var query = {};
+        query.limit = PAGE_SIZE;
+        query.skip = PAGE_SIZE * (pageNo - 1);
 
-    query.limit = PAGE_SIZE;
-    query.skip = PAGE_SIZE * (pageNo - 1);
+        let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();
 
-    let downloads = pageNo > 0 ?
-        await Download.find({}, {}, query).sort({ createdAt: -1 }).lean() :
-        await Download.find().sort({ createdAt: -1 }).lean();
+        if (!downloads || downloads.length === 0) {
+            return res.status(204).json({ message: 'No downloads found!' });
+        }
 
-    if (!downloads) {
-        return res.status(204).json({ error: 'No downloads exist' });
-    }
+        if (req.query?.stats === 'true') {
+            console.log("Returning only stats: ", totalDownloads)
+            return res.status(200).json(totalDownloads)
+        }
 
-    // Use batched processing to prevent memory overload
-    const result = await processBatchedDownloads(downloads);
+        // Populate downloads
+        for (let i = 0; i < downloads.length; i++) {
+            downloads[i] = await populateDownload(downloads[i]);
+        }
 
-    if (pageNo > 0) {
-        return res.status(200).json({
+        res.status(200).json({
             totalPages: Math.ceil(totalPages / PAGE_SIZE),
-            downloads: result
+            page: pageNo,
+            pageSize: PAGE_SIZE,
+            totalDownloads,
+            downloads
         });
-    } else {
-        return res.status(200).json({ downloads: result });
-    }
     } catch (error) {
         console.log('Error getting downloads:', error.message);
-        res.status(500).json({ error: 'Failed to get downloads' });
+        handleError(res, error);
     }
 };
 
-exports.getDownloadsForNotesCreator = async (req, res) => {
+exports.getOneDownload = async (req, res) => {
     try {
-        let downloads = await Download.find({}).lean();
-
-        if (!downloads) {
-            return res.status(404).json({ error: 'No downloads exist' });
+        let download = await Download.findById(req.params.id).lean();
+        if (!download) {
+            return res.status(404).json({ error: 'Download not found!' });
         }
-
-        // Use batched processing and filter
-        const result = await processBatchedDownloads(downloads);
-        const downloadsForNotes = result.filter(download => 
-            download.notes && download.notes.creator === req.user._id
-        );
-
-        res.status(200).json({ downloads: downloadsForNotes });
+        res.stats(200).json(download)
     } catch (error) {
-        console.log('Error getting downloads for notes creator:', error.message);
-        res.status(500).json({ error: 'Failed to get downloads for notes creator' });
+        console.log('Error getting download:', error.message);
+        handleError(res, error);
     }
 };
 
@@ -123,11 +66,14 @@ exports.getDownloadsByUser = async (req, res) => {
             return res.status(404).json({ error: 'No downloads found for this user' });
         }
 
-        const result = await processBatchedDownloads(downloads);
-        res.status(200).json(result);
+        // Populate downloads
+        for (let i = 0; i < downloads.length; i++) {
+            downloads[i] = await populateDownload(downloads[i]);
+        }
+        res.status(200).json(downloads);
     } catch (error) {
         console.log('Error getting downloads by user:', error.message);
-        res.status(500).json({ error: 'Failed to get downloads by user' });
+        handleError(res, error);
     }
 };
 
@@ -136,10 +82,14 @@ exports.createDownload = async (req, res) => {
         const { notes, chapter, course, courseCategory, downloaded_by } = req.body;
         var now = new Date();
 
-        // Simple validation
-        if (!notes || !course || !courseCategory || !downloaded_by) {
-            return res.status(400).json({ message: 'Please enter all fields' });
-        }
+        // Validation
+        validateRequiredFields([
+            { name: 'notes', value: notes },
+            { name: 'chapter', value: chapter },
+            { name: 'course', value: course },
+            { name: 'courseCategory', value: courseCategory },
+            { name: 'downloaded_by', value: downloaded_by }
+        ]);
 
         const recentDownExist = await Download.find({ downloaded_by }, {}, { sort: { 'createdAt': -1 } });
 
@@ -164,7 +114,7 @@ exports.createDownload = async (req, res) => {
 
         const savedDownload = await newDownload.save();
         if (!savedDownload) {
-            return res.status(500).json({ error: 'Something went wrong during creation!' });
+            return res.status(400).json({ error: 'Something went wrong during creation!' });
         }
 
         res.status(200).json({
@@ -177,7 +127,7 @@ exports.createDownload = async (req, res) => {
         });
     } catch (error) {
         console.log('Error creating download:', error.message);
-        res.status(500).json({ error: 'Failed to create download' });
+        res.status(500).json({ error: 'Failed to create download.' });
     }
 };
 
@@ -190,7 +140,7 @@ exports.deleteDownload = async (req, res) => {
 
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
         if (removedDownload.deletedCount === 0) {
-            return res.status(500).json({ error: 'Something went wrong while deleting!' });
+            return res.status(400).json({ error: 'Something went wrong while deleting!' });
         }
 
         res.status(200).json({ message: "Deleted successfully!" });
@@ -215,22 +165,21 @@ exports.getTopUsersByDownloads = async (req, res) => {
         }
 
         const userIds = topDownloadersData.map(d => d._id.toString());
-        
+
         try {
             // Fetch user details            
-            const usersResponse = await axios.post(`${USERS_SERVICE_URL}/api/users/batch`, 
-                { userIds }, 
-                { 
+            const usersResponse = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`,
+                { userIds },
+                {
 
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'x-internal-service': 'true' 
+                    headers: {
+                        'Content-Type': 'application/json'
                     }
                 }
             );
-            
+
             const users = usersResponse.data.users || [];
-            
+
             const topDownloaders = topDownloadersData.map(downloadData => {
                 const user = users.find(u => u._id === downloadData._id.toString()) || {};
                 return {
@@ -249,7 +198,7 @@ exports.getTopUsersByDownloads = async (req, res) => {
             console.error('Error response status:', userError.response?.status);
             console.error('Error response data:', userError.response?.data);
             console.error('Full error:', userError);
-            
+
             // Return data without user details if API call fails
             const topDownloaders = topDownloadersData.map(downloadData => ({
                 _id: downloadData._id,
@@ -271,16 +220,16 @@ exports.getDatabaseStats = async (req, res) => {
     try {
         const db = Download.db;
         const collection = db.collection('downloads');
-        
+
         // Get document count and estimate sizes using sampling approach
         const documentCount = await collection.countDocuments();
         const sampleDocs = await collection.find({}).limit(50).toArray();
-        const avgDocSize = sampleDocs.length > 0 ? 
+        const avgDocSize = sampleDocs.length > 0 ?
             sampleDocs.reduce((sum, doc) => sum + JSON.stringify(doc).length, 0) / sampleDocs.length : 0;
         const estimatedDataSize = documentCount * avgDocSize;
         const estimatedStorageSize = Math.round(estimatedDataSize * 1.2);
         const estimatedIndexSize = Math.round(estimatedDataSize * 0.1);
-        
+
         // Get additional aggregated data
         const pipeline = [
             {
@@ -309,7 +258,7 @@ exports.getDatabaseStats = async (req, res) => {
                 }
             }
         ];
-        
+
         const aggregatedStats = await collection.aggregate(pipeline).toArray();
         const downloadStats = aggregatedStats[0] || {};
 

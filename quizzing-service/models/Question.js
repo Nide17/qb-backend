@@ -46,6 +46,10 @@ const QuestionSchema = new Schema({
     last_updated_by: {
         type: Schema.Types.ObjectId,
     },
+    creation_date: {
+        type: Date,
+        default: Date.now
+    },
     duration: {
         type: Number,
         required: true,
@@ -55,7 +59,7 @@ const QuestionSchema = new Schema({
         type: String,
         required: true,
     },
-}, { timestamps: true })
+})
 
 QuestionSchema.pre("validate", function (next) {
     const question = this

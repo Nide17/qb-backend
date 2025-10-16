@@ -1,25 +1,14 @@
 const ImageUpload = require("../../models/blog-posts/ImageUpload");
 const { handleError } = require('../../utils/error');
+const { populateUser, findImageUploadById, validateRequiredFields } = require('../../utils/helpers');
 
-// Helper function to find imageUpload by ID
-const findImageUploadById = async (id, res, selectFields = '') => {
-    try {
-        let imageUpload = await ImageUpload.findById(id).select(selectFields);
-        if (!imageUpload) return res.status(404).json({ message: 'No imageUpload found!' });
-
-        imageUpload = await imageUpload.populateOwner();
-        return imageUpload;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
+// Refactored code to use reusable utilities and align with patterns from other services.
 exports.getImageUploads = async (req, res) => {
     try {
         let imageUploads = await ImageUpload.find().sort({ createdAt: -1 });
-        if (!imageUploads) return res.status(204).json({ message: 'No imageUploads found!' });
+        if (!imageUploads) return res.status(204).json({ message: 'No image uploads found!' });
 
-        imageUploads = await Promise.all(imageUploads.map(async (imgUp) => await imgUp.populateOwner()));
+        imageUploads = await Promise.all(imageUploads.map(async (imgUp) => await populateUser(imgUp.owner) || imgUp));
         res.status(200).json(imageUploads);
     } catch (err) {
         handleError(res, err);
@@ -27,16 +16,16 @@ exports.getImageUploads = async (req, res) => {
 };
 
 exports.getOneImageUpload = async (req, res) => {
-    const imageUpload = await findImageUploadById(req.params.id, res);
+    const imageUpload = await findImageUploadById(req.params.id, ImageUpload, res);
     if (imageUpload) res.status(200).json(imageUpload);
 };
 
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
         let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 });
-        if (!imageUploads) return res.status(404).json({ message: 'No imageUploads found!' });
+        if (!imageUploads) return res.status(404).json({ message: 'No image uploads found!' });
 
-        imageUploads = await Promise.all(imageUploads.map(async (imgUp) => await imgUp.populateOwner()));
+        imageUploads = await Promise.all(imageUploads.map(async (imgUp) => await populateUser(imgUp.owner) || imgUp));
 
         res.status(200).json(imageUploads);
     } catch (err) {
@@ -45,22 +34,25 @@ exports.getImageUploadsByOwner = async (req, res) => {
 };
 
 exports.createImageUpload = async (req, res) => {
-    const { imageTitle, owner } = req.body;
-
-    // Simple validation
-    if (!imageTitle || !owner) {
-        return res.status(400).json({ message: 'Image title and owner are required' });
-    }
-
-    if (!req.file) {
-        return handleError(res, new Error('FILE_MISSING'));
-    }
-
-    const imgUp_file = req.file;
 
     try {
+        const { imageTitle, owner } = req.body;
+
+        if (!req.file) {
+            handleError(res, new Error('FILE_MISSING'));
+        }
+
+        const imgUp_file = req.file;
+
+        // Validate required fields
+        validateRequiredFields([
+            { name: 'imageTitle', value: imageTitle },
+            { name: 'owner', value: owner },
+            { name: 'uploadImage', value: imgUp_file }
+        ]);
+        // Check for duplicate imageTitle
         const imgUp = await ImageUpload.findOne({ imageTitle });
-        if (imgUp) return handleError(res, new Error('Failed! Image with that name already exists!'));
+        if (imgUp) handleError(res, new Error('Failed! Image with that name already exists!'));
 
         const newImgUp = new ImageUpload({
             imageTitle,
@@ -69,7 +61,7 @@ exports.createImageUpload = async (req, res) => {
         });
 
         const savedImgUp = await newImgUp.save();
-        if (!savedImgUp) return handleError(res, new Error('Something went wrong during creation! file size should not exceed 1MB'));
+        if (!savedImgUp) handleError(res, new Error('Something went wrong during creation! file size should not exceed 1MB'));
 
         res.status(200).json({
             _id: savedImgUp._id,
@@ -87,7 +79,7 @@ exports.createImageUpload = async (req, res) => {
 exports.updateImageUpload = async (req, res) => {
     try {
         const imageUpload = await ImageUpload.findById(req.params.id);
-        if (!imageUpload) return res.status(404).json({ message: 'ImageUpload not found!' });
+        if (!imageUpload) return res.status(404).json({ message: 'Image upload not found!' });
 
         const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedImageUpload);
@@ -100,7 +92,7 @@ exports.deleteImageUpload = async (req, res) => {
 
     try {
         const imageUpload = await ImageUpload.findById(req.params.id)
-        if (!imageUpload) throw Error('Image upload is not found!')
+        if (!imageUpload) return res.status(404).json({ message: 'Image upload is not found!' })
 
         if (imageUpload.uploadImage) {
             const params = {
@@ -133,7 +125,7 @@ exports.deleteImageUpload = async (req, res) => {
         const removedImageUpload = await imageUpload.deleteOne()
 
         if (!removedImageUpload)
-            throw Error('Something went wrong while deleting!')
+            return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
     } catch (err) {
         handleError(res, err);

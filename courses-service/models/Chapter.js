@@ -21,7 +21,7 @@ const ChapterSchema = new Schema({
     },
     courseCategory: {
         type: Schema.Types.ObjectId,
-        ref: 'Category'
+        ref: 'CourseCategory'
     },
     created_by: {
         type: Schema.Types.ObjectId,

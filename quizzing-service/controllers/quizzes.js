@@ -1,184 +1,75 @@
-const axios = require('axios');
 const Quiz = require("../models/Quiz");
 const Category = require("../models/Category");
 const Question = require("../models/Question");
 const { handleError } = require('../utils/error');
-const mongoose = require('mongoose');
-
-// Simple validation helper
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL;
-
-// Helper function to call other services
-const callService = async (url) => {
-    try {
-        const response = await axios.get(url, { 
-            headers: { 'Content-Type': 'application/json' }
-        });
-        return response.data?.data || response.data;
-    } catch (error) {
-        // Enhanced error logging with more context
-        const errorDetails = {
-            url,
-            service: 'quizzing-service',
-            timestamp: new Date().toISOString(),
-            errorType: error.code || error.name || 'Unknown',
-            message: error.message,
-            statusCode: error.response?.status,
-            responseData: error.response?.data
-        };
-        
-        // Log different error types with appropriate levels
-        if (error.code === 'ECONNREFUSED') {
-            console.error('🔴 SERVICE DOWN - Target service not responding:', errorDetails);
-        } else if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND') {
-            console.error('🔴 CONNECTION ERROR - Network issue:', errorDetails);
-        } else if (error.code === 'ECONNABORTED') {
-            console.warn('⏱️  TIMEOUT - Service took too long to respond:', errorDetails);
-        } else {
-            console.warn('⚠️  SERVICE CALL FAILED:', errorDetails);
-        }
-        
-        return null;
-    }
-};
-
-// Simple population function for users
-const populateUser = async (userId) => {
-    if (!userId) return null;
-    const userData = await callService(`${USERS_SERVICE_URL}/api/users/${userId}`);
-    return userData ? {
-        _id: userData._id,
-        name: userData.name,
-        email: userData.email
-    } : { _id: userId, name: 'Unknown User' };
-};
-
-// Populate single quiz
-const populateQuiz = async (quiz) => {
-    if (!quiz) return quiz;
-    
-    // Convert to plain object to avoid mongoose issues
-    const plainQuiz = quiz.toObject ? quiz.toObject() : quiz;
-    
-    if (plainQuiz.created_by) {
-        plainQuiz.created_by = await populateUser(plainQuiz.created_by);
-    }
-    
-    if (plainQuiz.last_updated_by) {
-        plainQuiz.last_updated_by = await populateUser(plainQuiz.last_updated_by);
-    }
-    
-    return plainQuiz;
-};
-
-// Populate array of quizzes
-const populateQuizzes = async (quizzes) => {
-    if (!quizzes || quizzes.length === 0) return quizzes;
-    
-    // Convert to plain objects to avoid mongoose issues
-    const plainQuizzes = quizzes.map(quiz => quiz.toObject ? quiz.toObject() : quiz);
-    
-    for (let quiz of plainQuizzes) {
-        if (quiz.created_by) {
-            quiz.created_by = await populateUser(quiz.created_by);
-        }
-        
-        if (quiz.last_updated_by) {
-            quiz.last_updated_by = await populateUser(quiz.last_updated_by);
-        }
-    }
-    
-    return plainQuizzes;
-};
-
-// Helper function to find quiz by ID
-const findQuizById = async (id, res, selectFields = '') => {
-
-    if (!isValidObjectId(id)) {
-        console.log('\n\nInvalid quiz ID');
-        return res.status(400).json({ message: 'Invalid quiz ID' });
-    }
-
-    try {
-        let quiz = await Quiz.findById(id).select(selectFields)
-            .populate('category questions');
-
-        if (!quiz) return res.status(404).json({ message: 'No quiz found!' });
-
-        // Populate user data using simple direct calls
-        quiz = await populateQuiz(quiz);
-
-        console.log('\n\nQuiz found:', quiz);
-        return quiz;
-    } catch (err) {
-        console.log('\n\nError finding quiz:', err.message);
-        return handleError(res, err);
-    }
-};
-
-// Helper function to get quizzes with pagination
-const getQuizzesWithPagination = async (query, pageNo, pageSize, res) => {
-
-    const skip = pageSize * (pageNo - 1);
-    try {
-        const totalQuizzes = await Quiz.countDocuments(query);
-        let quizzes = await Quiz.find(query)
-            .sort({ creation_date: -1 })
-            .populate('category questions')
-            .limit(pageSize)
-            .skip(skip);
-
-        if (!quizzes.length) {
-            return res.status(204).json({ message: 'No quizzes found!' });
-        }
-
-        // Populate user data using simple direct calls
-        quizzes = await populateQuizzes(quizzes);
-
-        res.status(200).json({
-            totalPages: Math.ceil(totalQuizzes / pageSize),
-            quizzes
-        });
-    } catch (err) {
-        handleError(res, err);
-    }
-};
+const { callService, populateQuiz, populateQuizzes } = require('../utils/helpers');
 
 exports.getQuizzes = async (req, res) => {
-    const limit = parseInt(req.query.limit);
-    const skip = parseInt(req.query.skip) || 0;
 
     try {
-        let quizzes = await Quiz.find({})
-            .sort({ creation_date: -1 })
-            .populate('category questions')
-            .limit(limit)
-            .skip(skip);
+        // If limit & skip are defined
+        let limit = parseInt(req.query.limit);
+        let skip = parseInt(req.query.skip) || 0;
 
-        if (!quizzes.length) {
-            return res.status(204).json({ message: 'No quizzes found!' });
+        if (limit) {
+            let limitedQuizzes = await Quiz.find({})
+                .sort({ creation_date: -1 })
+                .populate('category questions')
+                .limit(limit)
+                .skip(skip);
+
+            if (!limitedQuizzes.length) {
+                return res.status(204).json({ message: 'No quizzes found!' });
+            }
+
+            // Populate user data using simple direct calls
+            limitedQuizzes = await populateQuizzes(limitedQuizzes);
+            res.status(200).json(limitedQuizzes);
         }
-        
-        // Populate user data using simple direct calls
-        quizzes = await populateQuizzes(quizzes);
-        
-        res.status(200).json(quizzes);
+        else {
+
+            // If limit & skip undefined: Pagination - ENFORCE pagination to prevent memory exhaustion
+            const totalQuizzes = await Quiz.countDocuments({})
+            var PAGE_SIZE = 20
+            var pageNo = parseInt(req.query.pageNo || "1") // Default to at most 1 page to avoid mem leak
+            var query = {}
+
+            // Always enforce pagination - never load all quizzes
+            query.limit = PAGE_SIZE
+            query.skip = PAGE_SIZE * (pageNo - 1)
+
+            // Always use pagination to prevent memory exhaustion
+            let paginatedQuizzes = await Quiz.find({}, {}, query).populate('category questions').sort({ creation_date: -1 }).lean();
+
+            if (!paginatedQuizzes || paginatedQuizzes.length === 0) {
+                return res.status(204).json({
+                    message: 'No quizzes found'
+                });
+            }
+
+            if (req.query?.stats === 'true') {
+                console.log("Returning only stats: ", totalQuizzes)
+                return res.status(200).json(totalQuizzes)
+            }
+
+            if (!paginatedQuizzes.length) {
+                return res.status(204).json({ message: 'No quizzes found!' });
+            }
+
+            // Populate user data using simple direct calls
+            paginatedQuizzes = await populateQuizzes(paginatedQuizzes);
+
+            return res.status(200).json({
+                totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
+                currentPage: pageNo,
+                pageSize: PAGE_SIZE,
+                totalQuizzes,
+                quizzes: paginatedQuizzes
+            });
+        }
     } catch (err) {
         handleError(res, err);
     }
-};
-
-exports.getPaginatedQuizzes = async (req, res) => {
-    const PAGE_SIZE = 12;
-    const pageNo = parseInt(req.query.pageNo || "1");
-
-    const query = req.user && req.user.role === 'Creator'
-        ? { created_by: req.user._id }
-        : {};
-
-    await getQuizzesWithPagination(query, pageNo, PAGE_SIZE, res);
 };
 
 exports.getOneQuiz = async (req, res) => {
@@ -187,7 +78,7 @@ exports.getOneQuiz = async (req, res) => {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
 
-        const quiz = await Quiz.findOne(query).populate('category questions');
+        const quiz = await Quiz.findOne(query).populate('category questions', '_id title questions slug created_by');
         if (!quiz) {
             return res.status(404).json({ message: `Quiz with id ${id} not found` });
         }
@@ -235,6 +126,25 @@ exports.getQuizzesByNotes = async (req, res) => {
     }
 };
 
+exports.getBatchedQuizzes = async (req, res) => {
+    try {
+        const ids = req.body.quizIds;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'No quiz IDs provided!' });
+        }
+
+        const quizzes = await Quiz.find({ _id: { $in: ids } })
+            .populate('category questions');
+        if (!quizzes.length) {
+            return res.status(204).json({ message: 'No quizzes found!' });
+        }
+
+        res.status(200).json(quizzes);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
 exports.createQuiz = async (req, res) => {
     const { title, description, category, created_by } = req.body;
 
@@ -268,7 +178,7 @@ exports.notifying = async (req, res) => {
         let subscribers = [];
 
         try {
-            const { data } = await axios.get(`${USERS_SERVICE_URL}/api/subscribed-users`);
+            const { data } = await callService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
             subscribers = data;
         } catch (error) {
             console.error('Error fetching subscribers:', error.message);
@@ -299,7 +209,7 @@ exports.notifying = async (req, res) => {
 
 exports.updateQuiz = async (req, res) => {
     try {
-        const quiz = await findQuizById(req.params.id, res);
+        const quiz = await Quiz.findById(req.params.id);
         if (!quiz) return;
 
         Object.assign(quiz, req.body);
@@ -323,7 +233,7 @@ exports.updateQuiz = async (req, res) => {
 
 exports.addVidLink = async (req, res) => {
     try {
-        const quiz = await findQuizById(req.params.id, res);
+        const quiz = await Quiz.findById(req.params.id)
         if (!quiz) return;
 
         quiz.video_links.push(req.body);
@@ -337,7 +247,7 @@ exports.addVidLink = async (req, res) => {
 
 exports.deleteQuiz = async (req, res) => {
     try {
-        const quiz = await findQuizById(req.params.id, res);
+        const quiz = await Quiz.findById(req.params.id);
         if (!quiz) return;
 
         await Category.updateOne(
@@ -360,7 +270,7 @@ exports.deleteVideo = async (req, res) => {
         return res.status(400).json({ message: 'Invalid quiz ID' });
     }
     try {
-        const quiz = await findQuizById(req.body.qID, res);
+        const quiz = await Quiz.findById(req.params.id);
         if (!quiz) return;
 
         quiz.video_links.id(req.body.vId).remove();
@@ -376,25 +286,25 @@ exports.deleteVideo = async (req, res) => {
 exports.getDatabaseStats = async (req, res) => {
     try {
         const db = Quiz.db;
-        
+
         // Get stats for quizzes collection using simpler approach
         const quizzesCollection = db.collection('quizzes');
         const quizzesCount = await quizzesCollection.countDocuments();
         const quizSample = await quizzesCollection.find({}).limit(50).toArray();
-        const avgQuizSize = quizSample.length > 0 ? 
+        const avgQuizSize = quizSample.length > 0 ?
             quizSample.reduce((sum, doc) => sum + JSON.stringify(doc).length, 0) / quizSample.length : 0;
         const estimatedQuizDataSize = quizzesCount * avgQuizSize;
-        
+
         // Get stats for questions collection
         const questionsCollection = db.collection('questions');
         const questionsCount = await questionsCollection.countDocuments().catch(() => 0);
         const estimatedQuestionDataSize = questionsCount * 200; // Estimate
-        
+
         // Get stats for categories collection
         const categoriesCollection = db.collection('categories');
         const categoriesCount = await categoriesCollection.countDocuments().catch(() => 0);
         const estimatedCategoryDataSize = categoriesCount * 100; // Estimate
-        
+
         // Get aggregated quiz data
         const pipeline = [
             {
@@ -414,7 +324,7 @@ exports.getDatabaseStats = async (req, res) => {
                 }
             }
         ];
-        
+
         const aggregatedStats = await quizzesCollection.aggregate(pipeline).toArray();
         const quizStats = aggregatedStats[0] || {};
 

@@ -1,64 +1,7 @@
-const axios = require('axios');
 const ChatRoom = require("../models/ChatRoom");
 const RoomMessage = require("../models/RoomMessage");
 const { handleError } = require('../utils/error');
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL;
-
-// Helper function to find chatRoom by ID
-const findChatRoomById = async (id, res, selectFields = '') => {
-    try {
-        const chatRoom = await ChatRoom.findById(id).select(selectFields);
-        if (!chatRoom) return res.status(404).json({ message: 'No chatRoom found!' });
-        return chatRoom;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to validate request body
-const validateRequestBody = (body, requiredFields) => {
-    for (const field of requiredFields) {
-        if (!body[field]) {
-            throw new Error(`Missing required field: ${field}`);
-        }
-    }
-};
-
-// Helper function to populate users in chat rooms
-const populateUsersInChatRooms = async (chatRooms) => {
-    const userIds = chatRooms.map(room => room.users).flat();
-    const uniqueUserIds = [...new Set(userIds)].filter(id => id);
-
-    try {
-        const userResults = await Promise.allSettled(
-            uniqueUserIds.map(async (userId) => {
-                if (!userId) return null;
-                const response = await axios.get(`${USERS_SERVICE_URL}/api/users/${userId}`, { 
-                    headers: { 'x-internal-service': 'true' }
-                });
-                return response.data;
-            })
-        );
-
-        const usersResponse = userResults
-            .filter(result => result.status === 'fulfilled' && result.value)
-            .map(result => result.value);
-        
-        const usersMap = usersResponse.reduce((acc, user) => {
-            acc[user._id] = user;
-            return acc;
-        }, {});
-
-        chatRooms.forEach(room => {
-            room.users = room.users.map(userId => usersMap[userId]);
-        });
-
-        return chatRooms;
-    } catch (error) {
-        console.log('Error populating users in chat rooms:', error.message);
-        return chatRooms;
-    }
-};
+const { findChatRoomById, validateRequiredFields, notifyAdmins, populateUsersInChatRooms } = require('../utils/helpers');
 
 exports.getChatRooms = async (req, res) => {
     try {
@@ -71,14 +14,21 @@ exports.getChatRooms = async (req, res) => {
 };
 
 exports.getOneChatRoom = async (req, res) => {
-    const chatRoom = await findChatRoomById(req.params.id, res);
-    if (chatRoom) res.status(200).json(chatRoom);
+    try {
+        const chatRoom = await findChatRoomById(req.params.id, res);
+        if (chatRoom) res.status(200).json(chatRoom);
+    } catch (error) {
+        handleError(res, error);
+    }
+
 };
 
 exports.createChatRoom = async (req, res) => {
     try {
-        validateRequestBody(req.body, ['name', 'users']);
         const { name, users } = req.body;
+
+        // Validation
+        validateRequiredFields([{ name: 'name', value: name }, { name: 'users', value: users }]);
 
         const newRoom = new ChatRoom({ name, users });
         const savedRoom = await newRoom.save();
@@ -88,6 +38,9 @@ exports.createChatRoom = async (req, res) => {
                 message: 'Something went wrong during creation!'
             });
         }
+
+        // Notify admins about the new chat room
+        await notifyAdmins(savedRoom);
 
         res.status(200).json({
             _id: savedRoom._id,
@@ -110,8 +63,13 @@ exports.createOpenChatRoom = async (req, res) => {
             return res.status(200).json(chatroom[0]);
         }
 
-        validateRequestBody(req.body, ['users']);
         const { users } = req.body;
+        // Validation
+        validateRequiredFields([{ name: 'name', value: name }, { name: 'users', value: users }]);
+        if (!Array.isArray(users)) {
+            throw new Error('Users must be an array');
+        }
+
         if (users.length < 2) {
             throw new Error('No room users provided');
         }
@@ -122,6 +80,9 @@ exports.createOpenChatRoom = async (req, res) => {
 
         let createdChatroom = await ChatRoom.findById(savedRoom._id);
         createdChatroom = await populateUsersInChatRooms([createdChatroom]);
+
+        // Notify admins about the new open chat room
+        await notifyAdmins(createdChatroom[0]);
 
         res.status(200).json(createdChatroom[0]);
     } catch (err) {

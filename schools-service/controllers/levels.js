@@ -1,22 +1,12 @@
 const Level = require("../models/Level");
 const Faculty = require("../models/Faculty");
 const { handleError } = require('../utils/error');
-
-// Helper function to find level by ID
-const findLevelById = async (id, res, selectFields = '') => {
-    try {
-        const level = await Level.findById(id).select(selectFields).populate('school');
-        if (!level) return res.status(404).json({ message: 'No level found!' });
-        return level;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
+const { validateRequiredFields } = require('../utils/helpers');
 
 exports.getLevels = async (req, res) => {
 
     try {
-        const levels = await Level.find().sort({ createdAt: -1 }).populate('school');
+        const levels = await Level.find().sort({ createdAt: -1 }).populate('school', 'title');
         res.status(200).json(levels);
     } catch (err) {
         handleError(res, err);
@@ -26,7 +16,7 @@ exports.getLevels = async (req, res) => {
 
 exports.getLevelsBySchool = async (req, res) => {
     try {
-        const levels = await Level.find({ school: req.params.id }).sort({ createdAt: -1 }).populate('school');
+        const levels = await Level.find({ school: req.params.id }).sort({ createdAt: -1 }).populate('school', 'title');
         res.status(200).json(levels);
     } catch (err) {
         handleError(res, err);
@@ -34,29 +24,35 @@ exports.getLevelsBySchool = async (req, res) => {
 }
 
 exports.getOneLevel = async (req, res) => {
-    const level = await findLevelById(req.params.id, res, '-__v');
-    if (level) res.status(200).json(level);
+    try {
+        const level = await Level.findById(req.params.id).select('title');
+
+        if (!level) return res.status(404).json({ message: 'Level not found!' });
+        res.status(200).json(level);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.createLevel = async (req, res) => {
 
     const { title, school } = req.body;
 
-    // Simple validation
-    if (!title || !school) {
-        return res.status(400).json({ message: 'Please fill all fields' });
-    }
-
     try {
+
+        // Validation
+        validateRequiredFields([{ name: 'title', value: title }, { name: 'school', value: school }]);
+
+        // Check if level with same title exists in the same school
         const level = await Level.findOne({ title, school });
-        if (level) throw Error('This level already exists in this school!');
+        if (level) return res.status(403).json({ message: 'This level already exists in this school!' });
         const newLevel = new Level({
             title,
             school
         });
 
         const savedLevel = await newLevel.save();
-        if (!savedLevel) throw Error('Something went wrong during creation!');
+        if (!savedLevel) return res.status(503).json({ message: 'Something went wrong during creation!' });
 
         res.status(200).json({
             _id: savedLevel._id,
@@ -84,21 +80,21 @@ exports.updateLevel = async (req, res) => {
 exports.deleteLevel = async (req, res) => {
     try {
         const level = await Level.findById(req.params.id);
-        if (!level) throw Error('Level is not found!')
+        if (!level) return res.status(404).json({ message: 'Level not found!' });
 
         // Delete faculties belonging to this level
         const remFaculty = await Faculty.deleteMany({ level: req.params.id });
 
         if (!remFaculty)
-            throw Error('Something went wrong while deleting!');
+            return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
         // Delete level
-        const removedLevel = await Level.deleteOne({ _id: req.params.id });
+        const removedLevel = await level.deleteOne();
 
-        if (!removedLevel)
-            throw Error('Something went wrong while deleting!');
+        if (removedLevel.deletedCount === 0)
+            return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
-        res.status(200).json({ message: `${level.title} is Deleted!` })
+        res.status(200).json(level);
     } catch (err) {
         handleError(res, err);
     }

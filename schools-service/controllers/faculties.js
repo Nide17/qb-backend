@@ -1,21 +1,11 @@
 const Faculty = require("../models/Faculty");
 const { handleError } = require('../utils/error');
-
-// Helper function to find faculty by ID
-const findFacultyById = async (id, res, selectFields = '') => {
-    try {
-        const faculty = await Faculty.findById(id).select(selectFields).populate('school level');
-        if (!faculty) return res.status(404).json({ message: 'No faculty found!' });
-        return faculty;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
+const { validateRequiredFields } = require('../utils/helpers');
 
 exports.getFaculties = async (req, res) => {
 
     try {
-        const faculties = await Faculty.find().sort({ createdAt: -1 }).populate('school level');
+        const faculties = await Faculty.find().sort({ createdAt: -1 }).populate('school level', 'title');
         res.status(200).json(faculties);
     } catch (err) {
         handleError(res, err);
@@ -25,7 +15,7 @@ exports.getFaculties = async (req, res) => {
 
 exports.getFacultiesByLevel = async (req, res) => {
     try {
-        const faculties = await Faculty.find({ level: req.params.id }).sort({ createdAt: -1 }).populate('school level');
+        const faculties = await Faculty.find({ level: req.params.id }).sort({ createdAt: -1 }).populate('school level', 'title');
         res.status(200).json(faculties);
     } catch (err) {
         handleError(res, err);
@@ -33,22 +23,27 @@ exports.getFacultiesByLevel = async (req, res) => {
 }
 
 exports.getOneFaculty = async (req, res) => {
-    const faculty = await findFacultyById(req.params.id, res, '-__v');
-    if (faculty) res.status(200).json(faculty);
+    try {
+        const faculty = await Faculty.findById(req.params.id).populate('school level', 'title').select('title school level')
+
+        if (!faculty) return res.status(404).json({ message: 'Faculty not found!' });
+        res.status(200).json(faculty);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.createFaculty = async (req, res) => {
 
     const { title, school, level, years } = req.body
 
-    // Simple validation
-    if (!title || !school || !level || !years) {
-        return res.status(400).json({ message: 'Please fill all fields' })
-    }
-
     try {
+        // Validation
+        validateRequiredFields([{ name: 'title', value: title }, { name: 'school', value: school }, { name: 'level', value: level }])
+
+        // Check if faculty with same title exists in the same school level
         const faculty = await Faculty.findOne({ title, school, level })
-        if (faculty) throw Error('Faculty already exists in this school level!')
+        if (faculty) return res.status(403).json({ message: 'Faculty already exists in this school level!' })
 
         const newFaculty = new Faculty({
             title,
@@ -58,7 +53,7 @@ exports.createFaculty = async (req, res) => {
         })
 
         const savedFaculty = await newFaculty.save()
-        if (!savedFaculty) throw Error('Something went wrong during creation!')
+        if (!savedFaculty) return res.status(503).json({ message: 'Something went wrong during creation!' })
 
         res.status(200).json({
             _id: savedFaculty._id,
@@ -88,12 +83,12 @@ exports.updateFaculty = async (req, res) => {
 exports.deleteFaculty = async (req, res) => {
     try {
         const faculty = await Faculty.findById(req.params.id);
-        if (!faculty) throw Error('Faculty is not found!');
+        if (!faculty) return res.status(404).json({ message: 'Faculty not found!' });
 
-        const removedFaculty = await Faculty.deleteOne({ _id: req.params.id });
-        if (!removedFaculty) throw Error('Something went wrong while deleting!');
+        const removedFaculty = await faculty.deleteOne();
+        if (removedFaculty.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
-        res.status(200).json({ message: `${faculty.title} is Deleted!` });
+        res.status(200).json(faculty);
     } catch (err) {
         handleError(res, err);
     }

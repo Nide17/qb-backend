@@ -1,36 +1,15 @@
 const express = require('express')
 const mongoose = require('mongoose')
+const os = require('os')
+const process = require('process')
 const cors = require('cors')
-const { createServer } = require("http");
-const { notFoundHandler, globalErrorHandler } = require('./utils/error')
+const { handleError } = require('./utils/error')
 const dotenv = require('dotenv')
+const { corsOptions } = require('./utils/helpers')
 
 // Config
 dotenv.config()
 const app = express()
-const httpServer = createServer(app)
-
-// Utils
-const allowList = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:5005',
-]
-
-const corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin || allowList.includes(origin)) {
-            callback(null, true)
-        } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    preflightContinue: false,
-    optionsSuccessStatus: 200,
-    maxAge: 3600
-}
 
 // Middlewares
 app.use(cors(corsOptions))
@@ -49,14 +28,55 @@ app.get('/', (req, res) => { res.send('Welcome to QB courses API') })
 app.get('/health', async (req, res) => {
     try {
         const dbStatus = mongoose.connection.readyState === 1;
+        const db = mongoose.connection.db;
+
+        // ✅ Await the stats
+        const stats = await db.stats();
+
         res.json({
             service: 'courses-service',
             status: 'healthy',
             database: dbStatus ? 'connected' : 'disconnected',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime()
+            dbStats: {
+                name: db.databaseName,
+                collections: stats.collections,
+                objects: stats.objects,
+                dataSize: stats.dataSize,
+                storageSize: stats.storageSize,
+                indexSize: stats.indexSize,
+            },
+
+            // --- System Information ---
+            system: {
+                os: os.type(),
+                platform: os.platform(),
+                architecture: os.arch(),
+                cpus: os.cpus().length,
+                totalMemory: os.totalmem(),
+                freeMemory: os.freemem(),
+                timestamp: new Date().toISOString(),
+                uptime: os.uptime(),
+                nodeVersion: process.version,
+                env: process.env.NODE_ENV || 'development'
+            },
+
+            // --- Process Information ---
+            process: {
+                execPath: process.execPath,
+                execArgv: process.execArgv,
+                cwd: process.cwd(),
+                argv: process.argv,
+                uptime: process.uptime(),
+                pid: process.pid,
+                title: process.title,
+                platform: process.platform,
+                memoryUsage: process.memoryUsage(),
+                cpuUsage: process.cpuUsage(),
+            }
         });
     } catch (error) {
+        console.error('Error in /health route:', error);
+
         res.status(503).json({
             service: 'courses-service',
             status: 'unhealthy',
@@ -66,17 +86,34 @@ app.get('/health', async (req, res) => {
     }
 });
 
-// Handle 404 errors
-app.use(notFoundHandler())
-
-// Global error handler
-app.use(globalErrorHandler())
+// Handle errors: takes res, err, status
+app.use((err, req, res, next) => handleError(res, err))
 
 mongoose
     .connect(process.env.MONGODB_URI)
-    .then(() => {
-        httpServer.listen(process.env.PORT || 5005, () => {
-            console.log(`Courses service is running on port ${process.env.PORT || 5005}, and MongoDB is connected`)
+    .then(async (conn) => {
+        app.listen(process.env.PORT || 5005, async () => {
+            const db = conn.connection.db
+            console.log(`Courses service is running on port ${process.env.PORT || 5005}, and MongoDB ${db.databaseName} is connected`)
         })
     })
     .catch((err) => console.log(err))
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('Received SIGTERM, shutting down gracefully...');
+    await mongoose.connection.close();
+    app.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', async () => {
+    console.log('Received SIGINT, shutting down gracefully...');
+    await mongoose.connection.close();
+    app.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});

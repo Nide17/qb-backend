@@ -2,25 +2,7 @@ const School = require("../models/School");
 const Level = require("../models/Level");
 const Faculty = require("../models/Faculty");
 const { handleError } = require('../utils/error');
-
-// Helper function to find school by ID
-const findSchoolById = async (id, res, selectFields = '') => {
-    try {
-        const school = await School.findById(id).select(selectFields);
-        if (!school) return res.status(404).json({ message: 'No school found!' });
-        return school;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to validate school data
-const validateSchoolData = (data) => {
-    const { title, location, website } = data;
-    if (!title || !location || !website) {
-        throw new Error('Please fill all fields');
-    }
-};
+const { validateRequiredFields } = require('../utils/helpers');
 
 exports.getSchools = async (req, res) => {
     try {
@@ -32,15 +14,25 @@ exports.getSchools = async (req, res) => {
 };
 
 exports.getOneSchool = async (req, res) => {
-    const school = await findSchoolById(req.params.id, res, '-__v');
-    if (school) res.status(200).json(school);
-};
+
+    try {
+        let school = await School.findById(req.params.id).select('title');
+        if (!school) return res.status(404).json({ message: 'School not found!' });
+        res.status(200).json(school)
+    } catch (err) {
+        handleError(res, err);
+    }
+}
 
 exports.createSchool = async (req, res) => {
     try {
-        validateSchoolData(req.body);
 
         const { title, location, website } = req.body;
+
+        // Validation
+        validateRequiredFields([{ name: 'title', value: title }]);
+
+        // Check if school with same title exists
         const existingSchool = await School.findOne({ title });
         if (existingSchool) throw new Error('School already exists!');
 
@@ -62,9 +54,6 @@ exports.createSchool = async (req, res) => {
 
 exports.updateSchool = async (req, res) => {
     try {
-        const school = await findSchoolById(req.params.id, res, '-__v');
-        if (!school) return;
-
         const updatedSchool = await School.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedSchool);
     } catch (error) {
@@ -74,18 +63,18 @@ exports.updateSchool = async (req, res) => {
 
 exports.deleteSchool = async (req, res) => {
     try {
-        const schoolToDelete = await findSchoolById(req.params.id, res, '-__v');
-        if (!schoolToDelete) return;
+        const school = await School.findById(req.params.id);
+        if (!school) return res.status(404).json({ message: 'School not found!' });
 
         // Delete levels and faculties belonging to this School
-        await Level.deleteMany({ school: schoolToDelete._id });
-        await Faculty.deleteMany({ school: schoolToDelete._id });
+        await Level.deleteMany({ school: school._id });
+        await Faculty.deleteMany({ school: school._id });
 
         // Delete this school
-        const removedSchool = await School.deleteOne({ _id: req.params.id });
-        if (!removedSchool) throw new Error('Something went wrong while deleting!');
+        const removedSchool = await school.deleteOne();
+        if (removedSchool.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
-        res.status(200).json({ message: `${schoolToDelete.title} is Deleted!` });
+        res.status(200).json(school);
     } catch (err) {
         handleError(res, err);
     }

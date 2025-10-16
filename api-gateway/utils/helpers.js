@@ -56,17 +56,29 @@ const setCachedData = async (key, data, ttl = 300) => {
     }
 };
 
-const makeRequest = async (req, res, serviceName, serviceUrl) => {
+// Helper function to call other services
+const callService = async (url, timeout = 20000) => {
+
+    if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
+
+    try {
+        const response = await axios.get(url, {
+            timeout: timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
+            headers: { 'Content-Type': 'application/json' }
+        });
+        return response.data;
+    } catch (err) {
+        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
+        return null;
+    }
+};
+
+const makeRequest = async (req, serviceName, serviceUrl) => {
     try {
         // Prepare headers, include internal service header if present
         const headers = {
             'x-auth-token': req.header('x-auth-token')
         };
-
-        // Forward internal service header if present (for statistics service calls)
-        if (req.header('x-internal-service')) {
-            headers['x-internal-service'] = req.header('x-internal-service');
-        }
 
         const response = await axios({
             method: req.method,
@@ -82,14 +94,13 @@ const makeRequest = async (req, res, serviceName, serviceUrl) => {
 
         return response;
     } catch (error) {
-        console.log(`Error making ${req.method} request to ${serviceName} with url ${req.originalUrl}:`, error.message);
-        // Don't send response here, let routeToService handle it
+        console.error(`Error making ${req.method} request to ${serviceName} with url ${req.originalUrl}:`, error);
         throw error; // Rethrow the error to be handled by routeToService
     }
 };
 
 const routeToService = (serviceName, serviceUrl) => async (req, res) => {
-    
+
     // Check if response has already been sent
     if (res.headersSent) {
         console.log(`Response already sent for ${serviceName} request`);
@@ -97,7 +108,7 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
     }
 
     try {
-        const response = await makeRequest(req, res, serviceName, serviceUrl);
+        const response = await makeRequest(req, serviceName, serviceUrl);
 
         // Check again before sending response
         if (res.headersSent) {
@@ -109,6 +120,7 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
             // Forward all responses, including 4xx and 5xx status codes
             res.status(response.status).json(response.data);
         } else {
+            console.log(response)
             res.status(502).json({
                 success: false,
                 error: `${serviceName} Service Unavailable`,
@@ -125,20 +137,35 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
             return;
         }
 
-        // Handle network errors and connection issues
-        console.log(`Network error for ${serviceName}:`, error.message);
-        
         try {
-            res.status(502).json({
-                success: false,
-                error: `${serviceName} Service Unavailable`,
-                message: `${serviceName} service is currently unavailable - ${error.message}`,
-                code: 'SERVICE_UNAVAILABLE',
-                service: serviceName,
-                timestamp: new Date().toISOString()
-            });
+
+            if (error.name === 'AggregateError') {
+
+                // Print all errors
+                for (const err of error.cause.errors) {
+                    console.error(`\n\n - Error making ${req.method} request to ${serviceName} with url ${req.originalUrl}:`, err);
+                }
+
+                res.status(502).json({
+                    success: false,
+                    error: `${serviceName} Service Unavailable`,
+                    message: `${serviceName} service is currently unavailable - ${error?.cause?.errors[0]?.message}`,
+                    code: 'SERVICE_UNAVAILABLE',
+                    service: serviceName,
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                res.status(502).json({
+                    success: false,
+                    error: `${serviceName} Service Unavailable`,
+                    message: `${serviceName} service is currently unavailable - ${error?.message}`,
+                    code: 'SERVICE_UNAVAILABLE',
+                    service: serviceName,
+                    timestamp: new Date().toISOString()
+                });
+            }
         } catch (responseError) {
-            console.log(`Failed to send error response for ${serviceName}:`, responseError.message);
+            console.log(`Failed to send error response for ${serviceName}:`, responseError);
         }
     }
 };
@@ -146,6 +173,7 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
 module.exports = {
     makeRequest,
     routeToService,
+    callService,
     getCachedData,
     setCachedData,
     redisCache,

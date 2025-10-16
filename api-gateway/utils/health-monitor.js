@@ -1,5 +1,5 @@
 const os = require('os');
-const axios = require('axios');
+const { callService } = require('./helpers');
 
 /**
  * Health Monitoring and Metrics Collection
@@ -32,7 +32,7 @@ class HealthMonitor {
     recordRequest(responseTime, isError = false) {
         this.metrics.requests++;
         if (isError) this.metrics.errors++;
-        
+
         this.metrics.responseTime.push({
             time: responseTime,
             timestamp: Date.now()
@@ -72,7 +72,6 @@ class HealthMonitor {
             cpu: {
                 user: cpuUsage.user,
                 system: cpuUsage.system,
-                loadAverage: loadAvg,
                 cores: os.cpus().length
             },
             uptime: {
@@ -112,18 +111,17 @@ class HealthMonitor {
     /**
      * Check service health
      */
-    async checkServiceHealth(serviceName, url, timeout = 5000) {
+    async checkServiceHealth(serviceName, url, timeout = 10000) {
         const startTime = Date.now();
-        
+
         try {
-            const response = await axios.get(`${url}/health`, { 
-                timeout,
-                validateStatus: (status) => status < 500
+            const response = await callService(`${url}/health`, {
+                timeout
             });
-            
+
             const responseTime = Date.now() - startTime;
             const isHealthy = response.status === 200;
-            
+
             const healthStatus = {
                 service: serviceName,
                 status: isHealthy ? 'healthy' : 'degraded',
@@ -135,7 +133,7 @@ class HealthMonitor {
 
             this.healthChecks.set(serviceName, healthStatus);
             return healthStatus;
-            
+
         } catch (error) {
             const responseTime = Date.now() - startTime;
             const healthStatus = {
@@ -212,7 +210,7 @@ class HealthMonitor {
         // Calculate overall status
         const unhealthyServices = serviceChecks.filter(s => s.status === 'unhealthy').length;
         const degradedServices = serviceChecks.filter(s => s.status === 'degraded').length;
-        
+
         let overallStatus = 'healthy';
         if (unhealthyServices > 0) {
             overallStatus = 'unhealthy';
@@ -244,8 +242,8 @@ class HealthMonitor {
         const recentMemory = this.metrics.memoryUsage.filter(m => m.timestamp > oneHourAgo);
         const recentCpu = this.metrics.cpuUsage.filter(c => c.timestamp > oneHourAgo);
 
-        const avgResponseTime = recentResponseTimes.length > 0 
-            ? recentResponseTimes.reduce((sum, r) => sum + r.time, 0) / recentResponseTimes.length 
+        const avgResponseTime = recentResponseTimes.length > 0
+            ? recentResponseTimes.reduce((sum, r) => sum + r.time, 0) / recentResponseTimes.length
             : 0;
 
         const avgMemoryUsage = recentMemory.length > 0

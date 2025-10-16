@@ -1,72 +1,12 @@
-const axios = require('axios');
 const Contact = require("../models/Contact");
 const { sendEmail } = require("../utils/emails/sendEmail");
 const { convertFromRaw } = require("draft-js");
 const { stateToHTML } = require("draft-js-export-html");
 const { handleError } = require('../utils/error');
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL;
-
-// Helper function to find contact by ID
-const findContactById = async (id, res, selectFields = '') => {
-    try {
-        const contact = await Contact.findById(id).select(selectFields);
-        if (!contact) return res.status(404).json({ message: 'No contact found!' });
-        return contact;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to send emails to admins
-const notifyAdmins = async (newContact) => {
-    try {
-        // Helper function to safely fetch admin emails with retry on failure
-        const fetchAdminEmails = async () => {
-            try {
-            const response = await axios.get(`${USERS_SERVICE_URL}/api/users/admins-emails`);
-            return response.data;
-            } catch (error) {
-            console.warn(`Failed to fetch admin emails from ${USERS_SERVICE_URL}/api/users/admins-emails:`, error.message);
-            // Retry after 1 minute if failed
-            return new Promise((resolve) => {
-                setTimeout(async () => {
-                try {
-                    const retryResponse = await axios.get(`${USERS_SERVICE_URL}/api/users/admins-emails`);
-                    resolve(retryResponse.data);
-                } catch (retryError) {
-                    console.warn(`Retry failed to fetch admin emails:`, retryError.message);
-                    resolve(null);
-                }
-                }, 60000); // 1 minute
-            });
-            }
-        };
-
-        const adminsEmails = await fetchAdminEmails();
-
-        if (!adminsEmails) {
-            console.warn('No admin emails available for notification');
-            return;
-        }
-
-        adminsEmails.forEach(adm => {
-            try {
-                sendEmail(
-                    adm,
-                    "A new message, someone contacted us!",
-                    { cEmail: newContact.email },
-                    "./template/contactAdmin.handlebars"
-                );
-            } catch (err) {
-                console.error('Error sending email to admin:', err);
-            }
-        });
-    } catch (err) {
-        console.error('Error fetching admin emails:', err);
-    }
-};
+const { findContactById, notifyAdmins } = require('../utils/helpers');
 
 exports.getContacts = async (req, res) => {
+
     // Pagination
     const totalPages = await Contact.countDocuments({});
     const PAGE_SIZE = 10;
@@ -101,8 +41,12 @@ exports.getContactsBySender = async (req, res) => {
 };
 
 exports.getOneContact = async (req, res) => {
-    const contact = await findContactById(req.params.id, res);
-    if (contact) res.status(200).json(contact);
+    try {
+        const contact = await findContactById(req.params.id, res);
+        if (contact) res.status(200).json(contact);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.createContact = async (req, res) => {
@@ -195,15 +139,15 @@ exports.deleteContact = async (req, res) => {
 exports.getDatabaseStats = async (req, res) => {
     try {
         const db = Contact.db;
-        
+
         // Get stats for contacts collection using document sampling approach
         const contactsCollection = db.collection('contacts');
         const contactsCount = await contactsCollection.countDocuments();
         const contactSample = await contactsCollection.find({}).limit(50).toArray();
-        const avgContactSize = contactSample.length > 0 ? 
+        const avgContactSize = contactSample.length > 0 ?
             contactSample.reduce((sum, doc) => sum + JSON.stringify(doc).length, 0) / contactSample.length : 0;
         const estimatedContactDataSize = contactsCount * avgContactSize;
-        
+
         // Get aggregated contact data
         const pipeline = [
             {
@@ -215,7 +159,7 @@ exports.getDatabaseStats = async (req, res) => {
                 }
             }
         ];
-        
+
         const aggregatedStats = await contactsCollection.aggregate(pipeline).toArray();
         const contactStats = aggregatedStats[0] || {};
 

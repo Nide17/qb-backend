@@ -26,6 +26,10 @@ const CategorySchema = new Schema({
   last_updated_by: {
     type: Schema.Types.ObjectId,
   },
+  creation_date: {
+    type: Date,
+    default: Date.now
+  },
   courseCategory: {
     type: Schema.Types.ObjectId,
   },
@@ -33,7 +37,7 @@ const CategorySchema = new Schema({
     type: String,
     required: true,
   },
-}, { timestamps: true })
+})
 
 CategorySchema.pre("validate", function (next) {
   const category = this

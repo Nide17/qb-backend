@@ -1,8 +1,10 @@
 const express = require('express');
 const http = require('http');
-const axios = require('axios');
 const cors = require('cors');
-const { routeToService, setCachedData, getCachedData, redisCache, memoryCache } = require('./utils/helpers');
+const os = require('os')
+const process = require('process')
+const { routeToService, callService, setCachedData, getCachedData, redisCache, memoryCache } = require('./utils/helpers');
+const { handleError } = require('./utils/error');
 const HealthMonitor = require('./utils/health-monitor');
 const socketManager = require('./utils/enhanced-socket');
 require('dotenv').config();
@@ -97,11 +99,11 @@ app.get('/api/aggregated/quiz/:id', async (req, res) => {
 
         // Fetch quiz with all related data
         const [quizRes, categoryRes, questionsRes, commentsRes, scoresRes] = await Promise.allSettled([
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${req.params.id}`),
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/questions`),
-            axios.get(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?quiz=${req.params.id}`),
-            axios.get(`${process.env.SCORES_SERVICE_URL}/api/scores?quiz=${req.params.id}`)
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${req.params.id}`),
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`),
+            callService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?quiz=${req.params.id}`),
+            callService(`${process.env.SCORES_SERVICE_URL}/api/scores?quiz=${req.params.id}`)
         ]);
 
         const quiz = quizRes.status === 'fulfilled' ? quizRes.value.data : null;
@@ -126,7 +128,7 @@ app.get('/api/aggregated/quiz/:id', async (req, res) => {
         res.json(aggregatedData);
     } catch (error) {
         console.error('Error aggregating quiz data:\n', error);
-        res.status(500).json({ error: 'Failed to aggregate quiz data' });
+        handleError(res, error);
     }
 });
 
@@ -149,13 +151,13 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
         if (created_by) queryParams.append('created_by', created_by);
 
         const [quizzesRes, categoriesRes, usersRes] = await Promise.allSettled([
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?${queryParams}`),
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
-            axios.get(`${process.env.USERS_SERVICE_URL}/api/users`)
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?${queryParams}`),
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
+            callService(`${process.env.USERS_SERVICE_URL}/api/users`)
         ]);
 
         if (quizzesRes.status === 'rejected') {
-            return res.status(500).json({ error: 'Failed to fetch quizzes' });
+            handleError(res, quizzesRes.reason);
         }
 
         const quizzes = quizzesRes.value.data;
@@ -185,7 +187,7 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
         res.json(aggregatedData);
     } catch (error) {
         console.error('Error aggregating quizzes data:\n', error);
-        res.status(500).json({ error: 'Failed to aggregate quizzes data' });
+        handleError(res, error);
     }
 });
 
@@ -199,12 +201,12 @@ app.get('/api/aggregated/dashboard', async (req, res) => {
 
         // Fetch dashboard statistics from multiple services
         const [quizzesRes, usersRes, coursesRes, postsRes, scoresRes, feedbacksRes] = await Promise.allSettled([
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
-            axios.get(`${process.env.USERS_SERVICE_URL}/api/users`),
-            axios.get(`${process.env.COURSES_SERVICE_URL}/api/courses`),
-            axios.get(`${process.env.POSTS_SERVICE_URL}/api/blog-posts`),
-            axios.get(`${process.env.SCORES_SERVICE_URL}/api/scores`),
-            axios.get(`${process.env.FEEDBACKS_SERVICE_URL}/api/feedbacks`)
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
+            callService(`${process.env.USERS_SERVICE_URL}/api/users`),
+            callService(`${process.env.COURSES_SERVICE_URL}/api/courses`),
+            callService(`${process.env.POSTS_SERVICE_URL}/api/blog-posts`),
+            callService(`${process.env.SCORES_SERVICE_URL}/api/scores`),
+            callService(`${process.env.FEEDBACKS_SERVICE_URL}/api/feedbacks`)
         ]);
 
         const dashboardData = {
@@ -223,7 +225,7 @@ app.get('/api/aggregated/dashboard', async (req, res) => {
         res.json(dashboardData);
     } catch (error) {
         console.error('Error aggregating dashboard data:\n', error);
-        res.status(500).json({ error: 'Failed to aggregate dashboard data' });
+        handleError(res, error);
     }
 });
 
@@ -237,10 +239,10 @@ app.get('/api/aggregated/user/:id', async (req, res) => {
         }
 
         const [userRes, scoresRes, quizzesRes, commentsRes] = await Promise.allSettled([
-            axios.get(`${process.env.USERS_SERVICE_URL}/api/users/${req.params.id}`),
-            axios.get(`${process.env.SCORES_SERVICE_URL}/api/scores?user=${req.params.id}`),
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?created_by=${req.params.id}`),
-            axios.get(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?user=${req.params.id}`)
+            callService(`${process.env.USERS_SERVICE_URL}/api/users/${req.params.id}`),
+            callService(`${process.env.SCORES_SERVICE_URL}/api/scores?user=${req.params.id}`),
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?created_by=${req.params.id}`),
+            callService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?user=${req.params.id}`)
         ]);
 
         const user = userRes.status === 'fulfilled' ? userRes.value.data : null;
@@ -269,7 +271,7 @@ app.get('/api/aggregated/user/:id', async (req, res) => {
         res.json(aggregatedData);
     } catch (error) {
         console.error('Error aggregating user data:\n', error);
-        res.status(500).json({ error: 'Failed to aggregate user data' });
+        handleError(res, error);
     }
 });
 
@@ -282,9 +284,9 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
         }
 
         const [categoryRes, quizzesRes, questionsRes] = await Promise.allSettled([
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/categories/${req.params.id}`),
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?category=${req.params.id}`),
-            axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/questions`)
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/categories/${req.params.id}`),
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?category=${req.params.id}`),
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`)
         ]);
 
         const category = categoryRes.status === 'fulfilled' ? categoryRes.value.data : null;
@@ -314,7 +316,7 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
         res.json(aggregatedData);
     } catch (error) {
         console.error('Error aggregating category data:\n', error);
-        res.status(500).json({ error: 'Failed to aggregate category data' });
+        handleError(res, error);
     }
 });
 
@@ -334,16 +336,16 @@ app.get('/api/aggregated/search', async (req, res) => {
         const searchPromises = [];
 
         if (!type || type === 'quizzes') {
-            searchPromises.push(axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?search=${query}&pageNo=${page}&limit=${limit}`));
         }
         if (!type || type === 'users') {
-            searchPromises.push(axios.get(`${process.env.USERS_SERVICE_URL}/api/users?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(callService(`${process.env.USERS_SERVICE_URL}/api/users?search=${query}&pageNo=${page}&limit=${limit}`));
         }
         if (!type || type === 'posts') {
-            searchPromises.push(axios.get(`${process.env.POSTS_SERVICE_URL}/api/blog-posts?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(callService(`${process.env.POSTS_SERVICE_URL}/api/blog-posts?search=${query}&pageNo=${page}&limit=${limit}`));
         }
         if (!type || type === 'courses') {
-            searchPromises.push(axios.get(`${process.env.COURSES_SERVICE_URL}/api/courses?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(callService(`${process.env.COURSES_SERVICE_URL}/api/courses?search=${query}&pageNo=${page}&limit=${limit}`));
         }
 
         const results = await Promise.allSettled(searchPromises);
@@ -369,7 +371,7 @@ app.get('/api/aggregated/search', async (req, res) => {
         res.json(aggregatedData);
     } catch (error) {
         console.error('Error performing search:\n', error);
-        res.status(500).json({ error: 'Failed to perform search' });
+        handleError(res, error);
     }
 });
 
@@ -391,7 +393,7 @@ app.get('/api/health', async (req, res) => {
 
     const healthMonitor = new HealthMonitor();
     const healthReport = await healthMonitor.getHealthReport(services);
-    
+
     // Add cache information
     healthReport.cache = {
         redis: {
@@ -409,9 +411,11 @@ app.get('/api/health', async (req, res) => {
 
 // Metrics endpoint
 app.get('/api/metrics', (req, res) => {
+
+    const healthMonitor = new HealthMonitor();
     const metrics = healthMonitor.getMetricsSummary();
     const systemMetrics = healthMonitor.getSystemMetrics();
-    
+
     res.json({
         ...metrics,
         system: systemMetrics,
@@ -430,7 +434,7 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
     console.error('Global error handler:', err.stack);
     console.error('Error details:', err);
-    
+
     // Only send response if headers haven't been sent yet
     if (!res.headersSent) {
         res.status(err.status || 500).json({
@@ -485,15 +489,28 @@ startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    io.close();
+    console.log('Received SIGTERM, shutting down gracefully...');
+    await mongoose.connection.close();
     await redisCache.disconnect();
-    process.exit(0);
+    app.close(() => {
+        console.log('Server closed');
+        io.close();
+        process.exit(0);
+    });
 });
 
 process.on('SIGINT', async () => {
-    console.log('SIGINT received, shutting down gracefully');
-    io.close();
+    console.log('Received SIGINT, shutting down gracefully...');
+    await mongoose.connection.close();
     await redisCache.disconnect();
-    process.exit(0);
+    app.close(() => {
+        console.log('Server closed');
+        io.close();
+        process.exit(0);
+    });
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    process.exit(1);
 });

@@ -5,7 +5,7 @@ const router = express.Router()
 
 // GET routes
 router.get("/", getBlogPostsViews)
-router.get("/post-category/:id", getRecentTenViews)
+router.get("/recent-ten-views", getRecentTenViews)
 router.get("/:id", getOneBlogPostsView)
 
 // POST routes

@@ -1,9 +1,8 @@
-const axios = require('axios')
-const { SendHtmlEmail } = require("../../utils/sendEmail")
+const { sendHtmlEmail } = require("../../utils/sendEmail")
 // const twilioSID = process.env.TWILIO_ACCOUNT_SID
 // const twilioToken = process.env.TWILIO_AUTH_TOKEN
 // const client = require('twilio')(twilioSID, twilioToken)
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL;
+const { callService } = require('../../utils/helpers');
 
 // BlogPostsView Model
 const BlogPostsView = require('../../models/blog-posts/BlogPostsView')
@@ -99,7 +98,7 @@ const sendReport = async (reportMessage, reportMessageEmail, adminsEmails) => {
     //         .then(message => console.log(message.sid))
     //         .catch(error => console.error(error));
     // });
-    adminsEmails && adminsEmails.forEach(admEmail => SendHtmlEmail(admEmail, reportMessageEmail.subject, reportMessageEmail.html));
+    adminsEmails && adminsEmails.forEach(admEmail => sendHtmlEmail(admEmail, reportMessageEmail.subject, reportMessageEmail.html));
 }
 
 const fetchAdminEmails = async () => {
@@ -109,19 +108,16 @@ const fetchAdminEmails = async () => {
 
     while (attempts < maxAttempts) {
         try {
-            const response = await axios.get(`${USERS_SERVICE_URL}/api/users/admins-emails`, { 
-                headers: { 'x-internal-service': 'true' }
-            });
-            
-            if (response.status >= 200 && response.status < 300 && response.data && response.data.emails) {
-                return response.data.emails;
+            const adminEmails = await callService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+
+            if (adminEmails && adminEmails.length > 0) {
+                return adminEmails;
             } else {
-                console.log(`Admin emails fetch returned status ${response.status}`);
                 return [];
             }
         } catch (error) {
             attempts++;
-            console.log(`Failed to fetch admin emails for report (attempt ${attempts}):`, error.message);
+            console.log(`Failed to fetch admin emails for report (attempt ${attempts}):`, error);
             if (attempts < maxAttempts) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
             } else {

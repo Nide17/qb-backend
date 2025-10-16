@@ -1,33 +1,6 @@
-const { S3 } = require("@aws-sdk/client-s3");
 const Advert = require("../models/Advert.js");
 const { handleError } = require("../utils/error");
-
-const s3Config = new S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    Bucket: process.env.S3_BUCKET,
-    region: process.env.AWS_REGION
-});
-
-// Helper function to find advert by ID
-const findAdvertById = async (id, res, selectFields = '') => {
-    try {
-        const advert = await Advert.findById(id).select(selectFields);
-        if (!advert) return res.status(404).json({ message: 'No advert found!' });
-        return advert;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
-
-// Helper function to delete image from S3
-const deleteImageFromS3 = async (imagePath) => {
-    const params = {
-        Bucket: process.env.S3_BUCKET,
-        Key: imagePath.split('/').pop()
-    };
-    return s3Config.deleteObject(params).promise();
-};
+const { deleteImageFromS3, validateRequiredFields, findAdvertById } = require('../utils/helpers');
 
 exports.getAdverts = async (req, res) => {
     try {
@@ -40,8 +13,14 @@ exports.getAdverts = async (req, res) => {
 };
 
 exports.getOneAdvert = async (req, res) => {
-    const advert = await findAdvertById(req.params.id, res);
-    if (advert) res.status(200).json(advert);
+    try {
+        const advert = await Advert.findById(req.params.id);
+
+        if (!advert) return res.status(404).json({ message: 'Advert not found!' });
+        res.status(200).json(advert);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getActiveAdverts = async (req, res) => {
@@ -67,18 +46,21 @@ exports.getCreatedBy = async (req, res) => {
 exports.createAdvert = async (req, res) => {
     const { caption, phone, owner, email, link } = req.body;
 
-    // Simple validation
-    if (!caption || !owner || !email || !phone) {
-        return res.status(400).json({ message: 'Please fill required fields' });
-    }
-
-    if (!req.file) {
-        return handleError(res, new Error('FILE_MISSING'));
-    }
-
-    const ad_file = req.file;
-
     try {
+        // Validate required fields
+        validateRequiredFields([
+            { name: 'caption', value: caption },
+            { name: 'phone', value: phone },
+            { name: 'owner', value: owner },
+            { name: 'email', value: email }
+        ]);
+
+        if (!req.file) {
+            handleError(res, new Error('FILE_MISSING'));
+        }
+
+        const ad_file = req.file;
+
         const newAdvert = new Advert({
             caption,
             phone,
@@ -124,7 +106,7 @@ exports.updateAdvertStatus = async (req, res) => {
         if (!advert) return res.status(404).json({ message: 'Advert not found!' });
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-        res.status(200).json({ advert: updatedAdvert, message: 'Updated successfully!' });
+        res.status(200).json(updatedAdvert);
     } catch (error) {
         handleError(res, error);
     }
@@ -139,10 +121,10 @@ exports.deleteAdvert = async (req, res) => {
             await deleteImageFromS3(advert.advert_image);
         }
 
-        const removedAdvert = await Advert.deleteOne({ _id: req.params.id });
-        if (!removedAdvert) throw new Error('Something went wrong while deleting!');
+        const removedAdvert = await advert.deleteOne();
+        if (removedAdvert.deletedCount === 0) throw new Error('Something went wrong during deletion!');
 
-        res.status(200).json({ message: `${removedAdvert.caption} is Deleted!` });
+        res.status(200).json(advert);
     } catch (err) {
         handleError(res, err);
     }

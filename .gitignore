@@ -46,7 +46,6 @@ build/Release
 .history/
 *.prettierrc
 *.eslintrc.cjs
-*dev-setup.sh
 
 # MongoDB
 *.lock
@@ -97,5 +96,4 @@ npm-debug.log*
 /client/src/components/questions/* copy 3.js*
 /client/src/components/questions/* copy 4.js*
 .eslintcache
-docker-compose.yml
 commands.md

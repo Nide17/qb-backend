@@ -1,177 +1,74 @@
 const axios = require('axios');
-const mongoose = require('mongoose');
 const Score = require("../models/Score");
 const { handleError } = require('../utils/error');
-
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL || 'http://localhost:5001';
-const QUIZZING_SERVICE_URL = process.env.QUIZZING_SERVICE_URL || 'http://localhost:5002';
-
-// Cache for frequently accessed data
-const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Helper function to get cached data
-const getCachedData = (key) => {
-    const cached = cache.get(key);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return cached.data;
-    }
-    cache.delete(key);
-    return null;
-};
-
-// Helper function to set cached data
-const setCachedData = (key, data) => {
-    cache.set(key, { data, timestamp: Date.now() });
-};
-
-// Clear expired cache entries periodically
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of cache.entries()) {
-        if (now - value.timestamp >= CACHE_TTL) {
-            cache.delete(key);
-        }
-    }
-}, CACHE_TTL);
-
-// Simple direct API call helper
-const callService = async (url, timeout = 5000) => {
-    try {
-        const response = await axios.get(url, {
-            timeout,
-            headers: { 'x-internal-service': 'true' }
-        });
-        return response.data;
-    } catch (error) {
-        if (error.response?.status !== 404) {
-            console.error(`Service call failed: ${url}`, error.message);
-        }
-        return null;
-    }
-};
-
-// Simple population function - direct and clear
-const populateScore = async (score) => {
-    if (!score) return score;
-
-    // Create populated score with all original properties
-    const populatedScore = {
-        _id: score._id,
-        id: score.id,
-        marks: score.marks,
-        out_of: score.out_of,
-        questionsAttempted: score.questionsAttempted,
-        percentage: score.percentage,
-        passed: score.passed,
-        test_date: score.test_date,
-        review: score.review,
-        category: score.category,
-        quiz: score.quiz,
-        taken_by: score.taken_by
-    };
-
-    // Populate category if exists
-    if (score.category) {
-        const category = await callService(`${QUIZZING_SERVICE_URL}/api/categories/${score.category}`);
-        if (category) {
-            populatedScore.category = {
-                _id: category._id,
-                title: category.title
-            };
-        }
-    }
-
-    // Populate quiz if exists
-    if (score.quiz) {
-        const quiz = await callService(`${QUIZZING_SERVICE_URL}/api/quizzes/${score.quiz}`);
-        if (quiz) {
-            populatedScore.quiz = {
-                _id: quiz._id,
-                title: quiz.title,
-                slug: quiz.slug,
-                description: quiz.description
-            };
-        }
-    }
-
-    // Populate user if exists
-    if (score.taken_by) {
-        const user = await callService(`${USERS_SERVICE_URL}/api/users/${score.taken_by}`);
-        if (user) {
-            populatedScore.taken_by = {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                image: user.image,
-                role: user.role
-            };
-        }
-    }
-
-    return populatedScore;
-};
-
-// Populate array of scores
-const populateScores = async (scores) => {
-    if (!scores || scores.length === 0) return scores;
-    
-    const populatedScores = [];
-    for (const score of scores) {
-        const populated = await populateScore(score);
-        populatedScores.push(populated);
-    }
-    
-    return populatedScores;
-};
+const { callService, getCachedData, setCachedData, cache, findScoreById, populateScore } = require('../utils/helpers');
 
 exports.getScores = async (req, res) => {
-    // Pagination
-    const totalPages = await Score.countDocuments({})
-    var PAGE_SIZE = 20
-    var pageNo = parseInt(req.query.pageNo || "0")
-    var query = {}
-
-    query.limit = PAGE_SIZE
-    query.skip = PAGE_SIZE * (pageNo - 1)
 
     try {
-        let scores = pageNo > 0 ?
-            await Score.find({}, {}, query).sort({ test_date: -1 }).exec() :
-            await Score.find().sort({ test_date: -1 }).exec();
+        // Pagination - ENFORCE pagination to prevent memory exhaustion
+        const totalScores = await Score.countDocuments({})
+        var PAGE_SIZE = 20
+        var pageNo = parseInt(req.query.pageNo || "1") // Default to at most 1 page to avoid mem leak
+        var query = {}
 
-        if (!scores || scores.length === 0) return res.status(204).json({ message: 'No scores found' });
+        // Always enforce pagination - never load all scores
+        query.limit = PAGE_SIZE
+        query.skip = PAGE_SIZE * (pageNo - 1)
 
-        // Direct population - simple and clear
-        scores = await populateScores(scores);
+        // Always use pagination to prevent memory exhaustion
+        let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
 
-        if (pageNo > 0) {
-            return res.status(200).json({
-                totalPages: Math.ceil(totalPages / PAGE_SIZE),
-                scores
+        if (!scores || scores.length === 0) {
+            return res.status(204).json({
+                message: 'No scores found'
             });
-        } else {
-            return res.status(200).json({ scores });
         }
+
+        if (req.query?.stats === 'true') {
+            console.log("Returning only stats: ", totalScores)
+            return res.status(200).json(totalScores)
+        }
+
+        // Populate scores
+        for (let i = 0; i < scores.length; i++) {
+            scores[i] = await populateScore(scores[i]);
+        }
+
+        return res.status(200).json({
+            totalPages: Math.ceil(totalScores / PAGE_SIZE),
+            currentPage: pageNo,
+            pageSize: PAGE_SIZE,
+            totalScores,
+            scores
+        });
+
     } catch (err) {
+        // Check if this is a memory exhaustion error
+        if (err.message && err.message.includes('JavaScript heap out of memory')) {
+            return res.status(500).json({ message: 'Memory exhaustion error' });
+        }
         handleError(res, err);
     }
 }
 
 exports.getScoresByTaker = async (req, res) => {
+
     let id = req.params.id;
     const cacheKey = `scores_user_${id}`;
 
     try {
         // Check cache first
         let scores = getCachedData(cacheKey);
-        
+
         if (!scores) {
             scores = await Score.find({ taken_by: id }).sort({ test_date: -1 }).exec();
-            if (!scores || scores.length === 0) return res.status(404).json({ message: 'No scores found' });
+            if (!scores || scores.length === 0) return res.status(404).json({ message: 'You have no scores. Take some quizzes!' });
 
-            // Direct population - simple and clear
-            scores = await populateScores(scores);
+            // Populate scores
+            for (let i = 0; i < scores.length; i++) {
+                scores[i] = await populateScore(scores[i]);
+            }
             setCachedData(cacheKey, scores);
         }
 
@@ -183,46 +80,49 @@ exports.getScoresByTaker = async (req, res) => {
 
 exports.getScoresForQuizCreator = async (req, res) => {
     try {
-        let scores = await Score.find().exec();
-        if (!scores) return res.status(404).json({ message: 'No scores found' });
+        // Add pagination to prevent memory exhaustion
+        const PAGE_SIZE = 50; // Larger page size for creators but still limited
+        const pageNo = parseInt(req.query.pageNo || "1");
+        const skip = PAGE_SIZE * (pageNo - 1);
 
-        // Direct population - simple and clear
-        scores = await populateScores(scores);
+        const totalScores = await Score.countDocuments({});
+        let scores = await Score.find().skip(skip).limit(PAGE_SIZE).sort({ test_date: -1 }).exec();
 
-        res.status(200).json(scores);
+        if (!scores || scores.length === 0) {
+            return res.status(404).json({
+                message: 'No scores found',
+                page: pageNo,
+                totalPages: Math.ceil(totalScores / PAGE_SIZE)
+            });
+        }
+
+        // Populate scores
+        for (let i = 0; i < scores.length; i++) {
+            scores[i] = await populateScore(scores[i]);
+        }
+
+        res.status(200).json({
+            totalPages: Math.ceil(totalScores / PAGE_SIZE),
+            currentPage: pageNo,
+            pageSize: PAGE_SIZE,
+            totalScores: totalScores,
+            scores
+        });
     } catch (err) {
-        console.log('Error retrieving scores for quiz creator: ', err);
+        // Check if this is a memory exhaustion error
+        if (err.message && err.message.includes('JavaScript heap out of memory')) {
+            return res.status(500).json({ message: 'Memory exhaustion error' });
+        }
+        console.log('\n\nError retrieving scores for quiz creator: ', err);
         handleError(res, err);
     }
 }
 
 exports.getOneScore = async (req, res) => {
-    let id = req.params.id;
 
     try {
-        let score = await Score.findOne({ id }).exec();
-
-        if (score) {
-            // Direct population - simple and clear
-            score = await populateScore(score);
-        } else {
-            // Validate ObjectId format before querying by _id
-            if (!mongoose.Types.ObjectId.isValid(id)) {
-                return res.status(400).json({ 
-                    success: false,
-                    message: 'Invalid ID format provided',
-                    code: 'INVALID_ID_FORMAT'
-                });
-            }
-            
-            score = await Score.findOne({ _id: id }).exec();
-            if (score) {
-                // Direct population - simple and clear
-                score = await populateScore(score);
-            }
-        }
-
-        if (!score) return res.status(404).json({ message: 'No scores found' });
+        const score = await findScoreById(req.params.id, '');
+        if (!score) return res.status(404).json({ message: 'Score not found!' });
         res.status(200).json(score);
     } catch (err) {
         handleError(res, err);
@@ -232,27 +132,22 @@ exports.getOneScore = async (req, res) => {
 exports.getQuizRanking = async (req, res) => {
     let id = req.params.id;
     const cacheKey = `ranking_${id}`;
-    
+
     try {
         // Check cache first
         let scores = getCachedData(cacheKey);
-        
+
         if (!scores) {
             scores = await Score.find({ quiz: id }).sort({ marks: -1 }).limit(20).exec();
             if (!scores || scores.length === 0) {
                 console.warn(`No scores found for the ${id} quiz`);
-                res.status(404).json({
-                    success: false,
-                    error: 'Scores Not Found',
-                    message: `No scores found for the ${id} quiz`,
-                    code: 'SCORES_NOT_FOUND',
-                    timestamp: new Date().toISOString()
-                });
-                return;
+                return res.status(404).json({ message: 'No scores to display' });
             }
 
-            // Direct population - simple and clear
-            scores = await populateScores(scores);
+            // Populate scores
+            for (let i = 0; i < scores.length; i++) {
+                scores[i] = await populateScore(scores[i]);
+            };
             setCachedData(cacheKey, scores);
         }
 
@@ -264,11 +159,11 @@ exports.getQuizRanking = async (req, res) => {
 
 exports.getPopularQuizzes = async (req, res) => {
     const cacheKey = 'popular_quizzes';
-    
+
     try {
         // Check cache first
         let popularQuizzes = getCachedData(cacheKey);
-        
+
         if (!popularQuizzes) {
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
@@ -285,37 +180,38 @@ exports.getPopularQuizzes = async (req, res) => {
 
             if (topQuizzes.length > 0) {
                 const quizIds = topQuizzes.map(q => q._id);
-                const quizzes = await axios.get(`${QUIZZING_SERVICE_URL}/api/quizzes`, { 
-                    params: { ids: quizIds },
-                });
+                let quizzes = await callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/?ids=${quizIds.join(',')}`);
 
-                popularQuizzes = topQuizzes.map(pq => ({
-                    _id: pq._id,
-                    qTitle: quizzes.data.find(q => q._id === pq._id)?.title || 'Unknown Quiz',
-                    slug: quizzes.data.find(q => q._id === pq._id)?.slug || '',
-                    count: pq.count
-                }));
+                popularQuizzes = topQuizzes.map(pq => {
+                    const quiz = quizzes?.find(q => String(q._id) === String(pq._id));
+                    return {
+                        _id: pq._id,
+                        qTitle: quiz?.title || 'Unknown Quiz',
+                        slug: quiz?.slug || '',
+                        count: pq.count
+                    };
+                });
             } else {
                 popularQuizzes = [];
             }
-            
+
             setCachedData(cacheKey, popularQuizzes);
         }
 
         res.json(popularQuizzes);
     } catch (error) {
-        console.log('Error retrieving popular quizzes: ', error);
+        console.log('\n\nError retrieving popular quizzes: ', error);
         handleError(res, error);
     }
 }
 
 exports.getMonthlyUser = async (req, res) => {
     const cacheKey = 'monthly_user';
-    
+
     try {
         // Check cache first
         let monthlyUserData = getCachedData(cacheKey);
-        
+
         if (!monthlyUserData) {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
@@ -333,12 +229,11 @@ exports.getMonthlyUser = async (req, res) => {
 
             if (monthlyUser.length > 0) {
                 try {
-                    const user = await axios.get(`${USERS_SERVICE_URL}/api/users/${monthlyUser[0]._id}`, {
+                    const user = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${monthlyUser[0]._id}`, 60000);
 
-                    });
-                    monthlyUserData = {
-                        uName: user.data.name,
-                        uPhoto: user.data.image,
+                    monthlyUserData = user && {
+                        uName: user.name,
+                        uPhoto: user.image,
                         count: monthlyUser[0].count
                     };
                 } catch (userError) {
@@ -348,18 +243,19 @@ exports.getMonthlyUser = async (req, res) => {
             } else {
                 monthlyUserData = null;
             }
-            
+
             setCachedData(cacheKey, monthlyUserData);
         }
 
         res.json(monthlyUserData);
     } catch (error) {
-        console.log('Error retrieving monthly user: ', error);
+        console.log('\n\nError retrieving monthly user: ', error);
         handleError(res, error);
     }
 }
 
 exports.createScore = async (req, res) => {
+
     const { id, out_of, category, quiz, review, taken_by } = req.body
     const marks = req.body.marks ? req.body.marks : 0
     var now = new Date()
@@ -409,7 +305,7 @@ exports.createScore = async (req, res) => {
 
             const savedScore = await newScore.save()
 
-            if (!savedScore) return res.status(500).json({ message: 'Could not save score, try again!' })
+            if (!savedScore) return handleError(res, 'Something went wrong during creation!');
 
             // Clear relevant cache entries
             const cacheKeysToDelete = [`scores_user_${taken_by}`, `ranking_${quiz}`, 'popular_quizzes', 'monthly_user'];
@@ -421,7 +317,7 @@ exports.createScore = async (req, res) => {
                     score: savedScore,
                     type: 'new_score'
                 });
-                
+
                 // Broadcast to quiz room for leaderboard updates
                 req.io.to(`quiz-${quiz}`).emit('leaderboard-update', {
                     quizId: quiz,
@@ -460,14 +356,6 @@ exports.createScore = async (req, res) => {
 
 exports.deleteScore = async (req, res) => {
     try {
-        // Validate ObjectId format before querying
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'Invalid ID format provided',
-                code: 'INVALID_ID_FORMAT'
-            });
-        }
 
         //Find the Score to delete by id first
         const score = await Score.findOne({ _id: req.params.id })
@@ -477,9 +365,9 @@ exports.deleteScore = async (req, res) => {
         // Delete the Score
         const removedScore = await Score.deleteOne({ _id: req.params.id })
 
-        if (!removedScore) return res.status(500).json({ message: 'Could not delete score, try again!' });
+        if (!removedScore) return handleError(res, 'Something went wrong while deleting!');
 
-        res.status(200).json(removedScore)
+        res.status(200).json(score)
     }
 
     catch (err) {
@@ -488,140 +376,87 @@ exports.deleteScore = async (req, res) => {
     }
 }
 
-// Get database statistics
+
+// STATISTICS CONTROLLERS
 // Get top users by quiz activity (for statistics service)
-exports.getTopUsersByQuizzes = async (req, res) => {
-    const cacheKey = 'top_users_quizzes';
-    
+exports.getTop10QuizzingUsers = async (req, res) => {
+
+    const cacheKey = 'top_10_quizzing_users';
     try {
         // Check cache first
         let topUsers = getCachedData(cacheKey);
-        
+
         if (!topUsers) {
+
             const topUsersData = await Score.aggregate([
-                { $group: { _id: "$taken_by", totalQuizzes: { $sum: 1 }, totalMarks: { $sum: "$marks" }, avgMarks: { $avg: "$marks" } } },
+                { $group: { _id: "$taken_by", totalQuizzes: { $sum: 1 }, avgMarks: { $avg: "$marks" } } },
                 { $sort: { totalQuizzes: -1 } },
                 { $limit: 10 }
             ]).exec();
 
             if (topUsersData.length > 0) {
+
                 const userIds = topUsersData.map(u => u._id.toString());
-                
-                try {
-                    // Fetch user details
-                    const usersResponse = await axios.post(`${USERS_SERVICE_URL}/api/users/batch`, 
-                        { userIds }, 
-                        {
-                            headers: { 'x-internal-service': 'true' }
-                        }
-                    );
-                    
-                    const users = usersResponse.data.users || [];
-                    
-                    topUsers = topUsersData.map(userData => {
-                        const user = users.find(u => u._id === userData._id.toString()) || {};
-                        return {
-                            _id: userData._id,
-                            name: user.name || 'Unknown User',
-                            email: user.email || '',
-                            image: user.image || '',
-                            totalQuizzes: userData.totalQuizzes,
-                            totalMarks: userData.totalMarks,
-                            avgMarks: Math.round(userData.avgMarks * 10) / 10
-                        };
-                    });
-                } catch (userError) {
-                    console.log('Error fetching user details for top users:', userError);
-                    // Return data without user details if API call fails
-                    topUsers = topUsersData.map(userData => ({
-                        _id: userData._id,
-                        name: 'Unknown User',
-                        email: '',
-                        image: '',
-                        totalQuizzes: userData.totalQuizzes,
-                        totalMarks: userData.totalMarks,
-                        avgMarks: Math.round(userData.avgMarks * 10) / 10
-                    }));
-                }
-            } else {
-                topUsers = [];
+
+                const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, { timeout: 20000, });
+
+                topUsers = topUsersData.map(usr => {
+                    const user = users?.data?.find(u => u._id === usr._id.toString()) || {};
+                    return {
+                        _id: usr._id,
+                        name: user.name || 'Unknown User',
+                        email: user.email || '',
+                        totalQuizzes: usr.totalQuizzes,
+                        avgMarks: Math.round(usr.avgMarks * 10) / 10
+                    };
+                });
+                setCachedData(cacheKey, topUsers);
             }
-            
-            setCachedData(cacheKey, topUsers);
         }
 
         res.json(topUsers);
     } catch (error) {
-        console.log('Error retrieving top users by quizzes:', error);
+        console.log('\n\nError retrieving top users by quizzes:', error);
         handleError(res, error);
     }
 };
 
-exports.getDatabaseStats = async (req, res) => {
+// Get top quizzes by activity (by number of times taken in scores) - for statistics service
+exports.getTop10Quizzes = async (req, res) => {
+    const cacheKey = 'top_10_quizzes';
     try {
-        const db = Score.db;
-        const collection = db.collection('scores');
-        
-        // Get basic document count
-        const documentCount = await collection.countDocuments();
-        
-        // Get estimated document size by sampling
-        const sampleDocs = await collection.find({}).limit(50).toArray();
-        const avgDocSize = sampleDocs.length > 0 ? 
-            sampleDocs.reduce((sum, doc) => sum + JSON.stringify(doc).length, 0) / sampleDocs.length : 0;
-        const estimatedDataSize = documentCount * avgDocSize;
-        
-        // Get aggregated data
-        const pipeline = [
-            {
-                $group: {
-                    _id: null,
-                    totalScores: { $sum: 1 },
-                    avgScore: { $avg: "$score" },
-                    maxScore: { $max: "$score" },
-                    minScore: { $min: "$score" },
-                    recentScores: {
-                        $sum: {
-                            $cond: [
-                                { $gte: ["$takenDate", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)] },
-                                1,
-                                0
-                            ]
-                        }
-                    }
-                }
-            }
-        ];
-        
-        const aggregatedStats = await collection.aggregate(pipeline).toArray();
-        const scoreStats = aggregatedStats[0] || {};
+        // Check cache first
+        let topQuizzes = getCachedData(cacheKey);
 
-        const dbStats = {
-            service: 'scores',
-            timestamp: new Date().toISOString(),
-            documents: documentCount,
-            totalDocuments: documentCount,
-            dataSize: estimatedDataSize,
-            totalDataSize: estimatedDataSize,
-            storageSize: Math.round(estimatedDataSize * 1.2),
-            totalStorageSize: Math.round(estimatedDataSize * 1.2),
-            indexSize: Math.round(estimatedDataSize * 0.1),
-            totalIndexSize: Math.round(estimatedDataSize * 0.1),
-            indexes: 1,
-            avgDocumentSize: avgDocSize,
-            scoreMetrics: {
-                totalScores: scoreStats.totalScores || 0,
-                avgScore: Math.round((scoreStats.avgScore || 0) * 10) / 10,
-                maxScore: scoreStats.maxScore || 0,
-                minScore: scoreStats.minScore || 0,
-                recentScores: scoreStats.recentScores || 0
-            }
-        };
+        if (!topQuizzes) {
 
-        res.status(200).json(dbStats);
+            const topQuizzesData = await Score.aggregate([
+                { $group: { _id: "$quiz", totalTaken: { $sum: 1 } } },
+                { $sort: { totalTaken: -1 } },
+                { $limit: 10 }
+            ]).exec();
+
+            if (topQuizzesData.length > 0) {
+
+                const quizIds = topQuizzesData.map(q => q._id.toString());
+                const quizzes = await axios.post(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/batch`, { quizIds }, { timeout: 20000, });
+
+                topQuizzes = topQuizzesData.map(qz => {
+                    const quiz = quizzes?.data?.find(q => String(q._id) === String(qz._id)) || {};
+                    return {
+                        _id: qz._id,
+                        title: quiz.title || 'Unknown Quiz',
+                        category: quiz.category || 'Uncategorized',
+                        slug: quiz.slug || '',
+                        totalTaken: qz.totalTaken
+                    };
+                });
+                setCachedData(cacheKey, topQuizzes);
+            }
+        }
+        res.json(topQuizzes);
     } catch (error) {
-        console.log('Error getting database stats:', error);
+        console.log('\n\nError retrieving top quizzes:', error);
         handleError(res, error);
     }
 }
-

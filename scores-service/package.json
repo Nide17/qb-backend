@@ -4,8 +4,11 @@
   "description": "Scores service for quiz blog",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "scores": "nodemon index.js"
+    "start": "node --max-old-space-size=512 index.js",
+    "start:prod": "node --max-old-space-size=1024 index.js",
+    "start:dev": "node --max-old-space-size=256 index.js",
+    "scores": "nodemon --max-old-space-size=512 index.js",
+    "scores:memory": "nodemon --max-old-space-size=1024 --inspect index.js"
   },
   "author": "Niyomwungeri Parmenide Ishimwe",
   "license": "MIT",

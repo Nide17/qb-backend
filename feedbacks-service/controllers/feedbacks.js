@@ -1,18 +1,6 @@
 const Feedback = require("../models/Feedback");
 const { handleError } = require('../utils/error');
-
-// Helper function to find feedback by ID
-const findFeedbackById = async (id, res, selectFields = '') => {
-    try {
-        let feedback = await Feedback.findById(id).select(selectFields);
-        if (!feedback) return res.status(404).json({ message: 'No feedback found!' });
-
-        feedback = await feedback.populateDetails();
-        return feedback;
-    } catch (err) {
-        return handleError(res, err);
-    }
-};
+const { populateFeedbackDetails } = require('../utils/helpers');
 
 // Helper function for pagination
 const getPagination = (pageNo, pageSize) => {
@@ -29,7 +17,7 @@ exports.getFeedbacks = async (req, res) => {
     const query = getPagination(pageNo, PAGE_SIZE);
 
     try {
-        const feedbacks = pageNo > 0 ?
+        let feedbacks = pageNo > 0 ?
             await Feedback.find({}, {}, query).sort({ createdAt: -1 }).exec() :
             await Feedback.find().sort({ createdAt: -1 }).exec();
 
@@ -37,15 +25,13 @@ exports.getFeedbacks = async (req, res) => {
             return res.status(204).json({ message: 'No feedbacks found!' });
         }
 
-        const feedbacksWithDetails = await Promise.all(feedbacks.map(async (feedback) => await feedback.populateDetails()));
-
         if (pageNo > 0) {
             res.status(200).json({
-                feedbacks: feedbacksWithDetails,
+                feedbacks: feedbacks,
                 totalPages: Math.ceil(totalPages / PAGE_SIZE)
             });
         } else {
-            res.status(200).json(feedbacksWithDetails);
+            res.status(200).json(feedbacks);
         }
     } catch (err) {
         handleError(res, err);
@@ -53,12 +39,18 @@ exports.getFeedbacks = async (req, res) => {
 };
 
 exports.getOneFeedback = async (req, res) => {
-    const feedback = await findFeedbackById(req.params.id, res);
-    if (feedback) res.status(200).json(feedback);
+    try {
+        let feedback = await Feedback.findById(req.params.id).select('quiz score user comment rating');
+        if (!feedback) return res.status(404).json({ message: 'No feedback found!' });
+
+        feedback = await populateFeedbackDetails(feedback) || feedback;
+        res.status(200).json(feedback);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.createFeedback = async (req, res) => {
-
     try {
         const newFeedback = new Feedback(req.body);
         const savedFeedback = await newFeedback.save();
@@ -70,10 +62,10 @@ exports.createFeedback = async (req, res) => {
 
 exports.updateFeedback = async (req, res) => {
     try {
-        const feedback = await Feedback.findById(req.params.id);
-        if (!feedback) return res.status(404).json({ message: 'Feedback not found!' });
-
         const updatedFeedback = await Feedback.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!updatedFeedback) {
+            return res.status(404).json({ message: 'Feedback not found!' });
+        }
         res.status(200).json(updatedFeedback);
     } catch (error) {
         handleError(res, error);
@@ -83,12 +75,17 @@ exports.updateFeedback = async (req, res) => {
 exports.deleteFeedback = async (req, res) => {
     try {
         const feedback = await Feedback.findById(req.params.id);
-        if (!feedback) throw Error('Feedback not found!');
 
-        const removedFeedback = await Feedback.deleteOne({ _id: req.params.id });
-        if (removedFeedback.deletedCount === 0) throw Error('Something went wrong while deleting!');
+        if (!feedback) {
+            return res.status(404).json({ message: 'Feedback not found!' });
+        }
 
-        res.status(200).json({ message: "Deleted successfully!" });
+        const removedFeedback = await feedback.deleteOne();
+
+        if (removedFeedback.deletedCount === 0) {
+            return res.status(503).json({ message: 'Something went wrong while deleting!' });
+        }
+        res.status(200).json(feedback);
     } catch (err) {
         handleError(res, err);
     }

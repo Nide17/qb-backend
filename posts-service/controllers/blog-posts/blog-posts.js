@@ -1,175 +1,97 @@
-const axios = require('axios');
-const { S3 } = require("@aws-sdk/client-s3")
 const BlogPost = require("../../models/blog-posts/BlogPost.js");
-const { handleError, asyncHandler } = require('../../utils/error');
+const { handleError } = require('../../utils/error');
+const { s3Config, populateBlogPost, populateBlogPosts, validateRequiredFields } = require('../../utils/helpers');
 
-const USERS_SERVICE_URL = process.env.USERS_SERVICE_URL;
+exports.getBlogPosts = async (req, res) => {
 
-const s3Config = new S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    Bucket: process.env.S3_BUCKET,
-    region: process.env.AWS_REGION
-})
-
-// Helper function to call other services
-const callService = async (url) => {
     try {
-        const response = await axios.get(url, { 
-            headers: { 'Content-Type': 'application/json' }
-        });
-        return response.data?.data || response.data;
-    } catch (error) {
-        // Enhanced error logging with more context
-        const errorDetails = {
-            url,
-            service: 'posts-service',
-            timestamp: new Date().toISOString(),
-            errorType: error.code || error.name || 'Unknown',
-            message: error.message,
-            statusCode: error.response?.status,
-            responseData: error.response?.data
-        };
-        
-        // Log different error types with appropriate levels
-        if (error.code === 'ECONNREFUSED') {
-            console.error('🔴 SERVICE DOWN - Target service not responding:', errorDetails);
-        } else if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND') {
-            console.error('🔴 CONNECTION ERROR - Network issue:', errorDetails);
-        } else if (error.code === 'ECONNABORTED') {
-            console.warn('⏱️  TIMEOUT - Service took too long to respond:', errorDetails);
-        } else {
-            console.warn('⚠️  SERVICE CALL FAILED:', errorDetails);
+        let blogPosts = await BlogPost.find().sort({ createdAt: -1 })
+            .populate('postCategory', 'title');
+
+        if (!blogPosts || blogPosts.length === 0) {
+            return res.status(204).json({
+                success: false,
+                error: 'No Blog Posts Found',
+                message: 'No blog posts found',
+                code: 'NO_POSTS_FOUND',
+                timestamp: new Date().toISOString()
+            });
         }
-        
-        return null;
+
+        // Populate creator data for each blog post
+        blogPosts = await populateBlogPosts(res, blogPosts);
+        res.status(200).json(blogPosts);
+    } catch (err) {
+        handleError(res, err);
     }
-};
+}
 
-// Simple population function for users
-const populateUser = async (userId) => {
-    if (!userId) return null;
-    const userData = await callService(`${USERS_SERVICE_URL}/api/users/${userId}`);
-    return userData ? {
-        _id: userData._id,
-        name: userData.name,
-        email: userData.email
-    } : { _id: userId, name: 'Unknown User' };
-};
+exports.getOneBlogPost = async (req, res) => {
 
-// Populate multiple blog posts
-const populateBlogPosts = async (blogPosts) => {
-    if (!blogPosts || blogPosts.length === 0) return blogPosts;
-    
-    // Convert to plain objects to avoid mongoose issues
-    const plainPosts = blogPosts.map(post => post.toObject ? post.toObject() : post);
-    
-    for (let blogPost of plainPosts) {
-        if (blogPost.creator) {
-            blogPost.creator = await populateUser(blogPost.creator);
+    try {
+        const id = req.params.id;
+        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+
+        let blogPost = await BlogPost.findOne(query)
+            .populate('postCategory', 'title');
+
+        if (!blogPost) {
+            return res.status(404).json({
+                success: false,
+                error: 'Blog Post Not Found',
+                message: 'Blog post not found',
+                code: 'BLOG_POST_NOT_FOUND',
+                timestamp: new Date().toISOString()
+            });
         }
-    }
-    return plainPosts;
-};
 
-// Populate single blog post
-const populateBlogPost = async (blogPost) => {
-    if (!blogPost) return blogPost;
-    
-    // Convert to plain object to avoid mongoose issues
-    const plainPost = blogPost.toObject ? blogPost.toObject() : blogPost;
-    
-    if (plainPost.creator) {
-        plainPost.creator = await populateUser(plainPost.creator);
-    }
-    return plainPost;
-};
-
-exports.getBlogPosts = asyncHandler(async (req, res) => {
-    let blogPosts = await BlogPost.find().sort({ createdAt: -1 })
-        .populate('postCategory', 'title');
-    
-    if (!blogPosts || blogPosts.length === 0) {
-        return res.status(204).json({
-            success: false,
-            error: 'No Blog Posts Found',
-            message: 'No blog posts found',
-            code: 'NO_POSTS_FOUND',
+        // Populate creator data for the blog post
+        blogPost = await populateBlogPost(res, blogPost);
+        res.status(200).json({
+            success: true,
+            data: blogPost,
             timestamp: new Date().toISOString()
         });
+    } catch (err) {
+        handleError(res, err);
     }
+}
 
-    // Populate creator data for each blog post
-    blogPosts = await populateBlogPosts(blogPosts);
-    res.status(200).json({
-        success: true,
-        data: blogPosts,
-        count: blogPosts.length,
-        timestamp: new Date().toISOString()
-    });
-});
+exports.getBlogPostsByCategory = async (req, res) => {
 
-exports.getOneBlogPost = asyncHandler(async (req, res) => {
-    const id = req.params.id;
-    const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+    try {
+        const id = req.params.id;
 
-    let blogPost = await BlogPost.findOne(query)
-        .populate('postCategory', 'title');
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                error: 'Bad Request',
+                message: 'Category id not provided',
+                code: 'MISSING_CATEGORY_ID',
+                timestamp: new Date().toISOString()
+            });
+        }
 
-    if (!blogPost) {
-        return res.status(404).json({
-            success: false,
-            error: 'Blog Post Not Found',
-            message: 'Blog post not found',
-            code: 'BLOG_POST_NOT_FOUND',
-            timestamp: new Date().toISOString()
-        });
+        let blogPosts = await BlogPost.find({ postCategory: id }).sort({ createdAt: -1 })
+            .populate('postCategory', 'title');
+
+        if (!blogPosts || blogPosts.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Blog Posts Not Found For This Category',
+                message: 'No blog posts found for this category',
+                code: 'NO_POSTS_IN_CATEGORY',
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // Populate creator data for each blog post
+        blogPosts = await populateBlogPosts(res, blogPosts);
+        res.status(200).json(blogPosts);
+    } catch (err) {
+        handleError(res, err);
     }
-
-    // Populate creator data for the blog post
-    blogPost = await populateBlogPost(blogPost);
-    res.status(200).json({
-        success: true,
-        data: blogPost,
-        timestamp: new Date().toISOString()
-    });
-});
-
-exports.getBlogPostsByCategory = asyncHandler(async (req, res) => {
-    const id = req.params.id;
-
-    if (!id) {
-        return res.status(400).json({
-            success: false,
-            error: 'Bad Request',
-            message: 'Category id not provided',
-            code: 'MISSING_CATEGORY_ID',
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    let blogPosts = await BlogPost.find({ postCategory: id }).sort({ createdAt: -1 })
-        .populate('postCategory', 'title');
-    
-    if (!blogPosts || blogPosts.length === 0) {
-        return res.status(404).json({
-            success: false,
-            error: 'Blog Posts Not Found For This Category',
-            message: 'No blog posts found for this category',
-            code: 'NO_POSTS_IN_CATEGORY',
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    // Populate creator data for each blog post
-    blogPosts = await populateBlogPosts(blogPosts);
-    res.status(200).json({
-        success: true,
-        data: blogPosts,
-        count: blogPosts.length,
-        timestamp: new Date().toISOString()
-    });
-});
+}
 
 exports.getCreatedBy = async (req, res) => {
     try {
@@ -185,12 +107,15 @@ exports.createBlogPost = async (req, res) => {
     const bp_image = req.file ? req.file : null
     const { title, markdown, postCategory, creator, bgColor } = req.body
 
-    // Simple validation
-    if (!title || !markdown || !postCategory || !creator) {
-        return res.status(400).json({ message: 'Please provide all required fields' })
-    }
-
     try {
+        // Validate required fields
+        validateRequiredFields([
+            { name: 'title', value: title },
+            { name: 'markdown', value: markdown },
+            { name: 'postCategory', value: postCategory },
+            { name: 'creator', value: creator }
+        ]);
+
         const newBlogPost = new BlogPost({
             title,
             post_image: bp_image && bp_image.location,
