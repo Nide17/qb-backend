@@ -18,7 +18,7 @@ const callService = async (url, timeout = 20000) => {
 
     try {
         const response = await axios.get(url, {
-            timeout: timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
+            timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
             headers: { 'Content-Type': 'application/json' }
         });
         return response.data;

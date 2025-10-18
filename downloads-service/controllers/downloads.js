@@ -8,7 +8,7 @@ exports.getDownloads = async (req, res) => {
 
     try {
         // Pagination - ENFORCE pagination to prevent memory exhaustion
-        const totalPages = await Download.countDocuments({});
+        const totalDownloads = await Download.countDocuments({});
         var PAGE_SIZE = 20;
         var pageNo = parseInt(req.query.pageNo || "1");
         var query = {};
@@ -33,7 +33,7 @@ exports.getDownloads = async (req, res) => {
         }
 
         res.status(200).json({
-            totalPages: Math.ceil(totalPages / PAGE_SIZE),
+            totalPages: Math.ceil(totalDownloads / PAGE_SIZE),
             page: pageNo,
             pageSize: PAGE_SIZE,
             totalDownloads,

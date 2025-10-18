@@ -1,7 +1,7 @@
 const os = require('os');
 const process = require('process');
 const { handleError } = require('../utils/error');
-const { getCachedData, setCachedData, callService, checkAllServicesHealth } = require('../utils/helpers');
+const { getCachedData, setCachedData, callService } = require('../utils/helpers');
 
 // Enhanced system monitoring
 exports.getSystemMetrics = async (req, res) => {
@@ -11,68 +11,68 @@ exports.getSystemMetrics = async (req, res) => {
         let metrics = getCachedData(cacheKey);
 
         // if (!metrics) {
-            // Get system information
-            const cpuUsage = process.cpuUsage();
-            const memoryUsage = process.memoryUsage();
-            const systemInfo = {
-                platform: os.platform(),
-                arch: os.arch(),
-                cpus: os.cpus().length,
-                totalMemory: os.totalmem(),
-                freeMemory: os.freemem(),
-                uptime: os.uptime(),
-            };
+        // Get system information
+        const cpuUsage = process.cpuUsage();
+        const memoryUsage = process.memoryUsage();
+        const systemInfo = {
+            platform: os.platform(),
+            arch: os.arch(),
+            cpus: os.cpus().length,
+            totalMemory: os.totalmem(),
+            freeMemory: os.freemem(),
+            uptime: os.uptime(),
+        };
 
-            // Get service health status - Monitor all services
-            const services = [
-                { name: 'users-service', url: `${process.env.USERS_SERVICE_URL}` },
-                { name: 'quizzing-service', url: `${process.env.QUIZZING_SERVICE_URL}` },
-                { name: 'posts-service', url: `${process.env.POSTS_SERVICE_URL}` },
-                { name: 'schools-service', url: `${process.env.SCHOOLS_SERVICE_URL}` },
-                { name: 'courses-service', url: `${process.env.COURSES_SERVICE_URL}` },
-                { name: 'scores-service', url: `${process.env.SCORES_SERVICE_URL}` },
-                { name: 'downloads-service', url: `${process.env.DOWNLOADS_SERVICE_URL}` },
-                { name: 'contacts-service', url: `${process.env.CONTACTS_SERVICE_URL}` },
-                { name: 'feedbacks-service', url: `${process.env.FEEDBACKS_SERVICE_URL}` },
-                { name: 'comments-service', url: `${process.env.COMMENTS_SERVICE_URL}` },
-                { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
-            ];
+        // Get service health status - Monitor all services
+        const services = [
+            { name: 'users-service', url: `${process.env.USERS_SERVICE_URL}` },
+            { name: 'quizzing-service', url: `${process.env.QUIZZING_SERVICE_URL}` },
+            { name: 'posts-service', url: `${process.env.POSTS_SERVICE_URL}` },
+            { name: 'schools-service', url: `${process.env.SCHOOLS_SERVICE_URL}` },
+            { name: 'courses-service', url: `${process.env.COURSES_SERVICE_URL}` },
+            { name: 'scores-service', url: `${process.env.SCORES_SERVICE_URL}` },
+            { name: 'downloads-service', url: `${process.env.DOWNLOADS_SERVICE_URL}` },
+            { name: 'contacts-service', url: `${process.env.CONTACTS_SERVICE_URL}` },
+            { name: 'feedbacks-service', url: `${process.env.FEEDBACKS_SERVICE_URL}` },
+            { name: 'comments-service', url: `${process.env.COMMENTS_SERVICE_URL}` },
+            { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
+        ];
 
-            const serviceHealthChecks = await Promise.allSettled(
-                services.map(service =>
-                    callService(`${service.url}/health`, { timeout: 200000 })
-                )
-            );
+        const serviceHealthChecks = await Promise.allSettled(
+            services.map(service =>
+                callService(`${service.url}/health`, { timeout: 200000 })
+            )
+        );
 
-            const serviceHealth = serviceHealthChecks.map((result, index) => ({
-                service: services[index].name,
-                status: result.status === 'fulfilled' && result.value && result.value.status === 'healthy' ? 'healthy' : 'unhealthy',
-                uptime: result.status === 'fulfilled' && result.value && result.value.uptime ? result.value.uptime || 0 : 0
-            }));
+        const serviceHealth = serviceHealthChecks.map((result, index) => ({
+            service: services[index].name,
+            status: result.status === 'fulfilled' && result.value && result.value.status === 'healthy' ? 'healthy' : 'unhealthy',
+            uptime: result.status === 'fulfilled' && result.value && result.value.uptime ? result.value.uptime || 0 : 0
+        }));
 
-            metrics = {
-                timestamp: new Date().toISOString(),
-                system: {
-                    ...systemInfo,
-                    memoryUsagePercent: ((systemInfo.totalMemory - systemInfo.freeMemory) / systemInfo.totalMemory * 100).toFixed(2),
-                    process: {
-                        pid: process.pid,
-                        uptime: process.uptime(),
-                        memoryUsage: {
-                            rss: (memoryUsage.rss / 1024 / 1024).toFixed(2) + ' MB',
-                            heapTotal: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2) + ' MB',
-                            heapUsed: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2) + ' MB',
-                            external: (memoryUsage.external / 1024 / 1024).toFixed(2) + ' MB'
-                        },
-                        cpuUsage: {
-                            user: cpuUsage.user,
-                            system: cpuUsage.system
-                        }
+        metrics = {
+            timestamp: new Date().toISOString(),
+            system: {
+                ...systemInfo,
+                memoryUsagePercent: ((systemInfo.totalMemory - systemInfo.freeMemory) / systemInfo.totalMemory * 100).toFixed(2),
+                process: {
+                    pid: process.pid,
+                    uptime: process.uptime(),
+                    memoryUsage: {
+                        rss: (memoryUsage.rss / 1024 / 1024).toFixed(2) + ' MB',
+                        heapTotal: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2) + ' MB',
+                        heapUsed: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2) + ' MB',
+                        external: (memoryUsage.external / 1024 / 1024).toFixed(2) + ' MB'
+                    },
+                    cpuUsage: {
+                        user: cpuUsage.user,
+                        system: cpuUsage.system
                     }
-                },
-                services: serviceHealth
-            };
-            setCachedData(cacheKey, metrics);
+                }
+            },
+            services: serviceHealth
+        };
+        setCachedData(cacheKey, metrics);
         // }
 
         console.log("metrics: ", metrics)
@@ -93,72 +93,97 @@ exports.getDashboardStats = async (req, res) => {
 
         // if (!stats) {
 
-            const serviceHealth = await checkAllServicesHealth();
+        // Get actual data from working endpoints and count them through API Gateway
+        const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
+            callService(`${process.env.USERS_SERVICE_URL}/api/users`),
+            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
+            callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads`, { stats: true }),
+            callService(`${process.env.SCORES_SERVICE_URL}/api/scores`, { stats: true }),
+        ]);
 
-            // Get actual data from working endpoints and count them through API Gateway
-            const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
-                callService(`${process.env.USERS_SERVICE_URL}/api/users`),
-                callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
-                callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads`, { stats: true }),
-                callService(`${process.env.SCORES_SERVICE_URL}/api/scores`, { stats: true }),
-            ]);
+        // Handle users count with graceful fallback
+        let totalUsers = 0;
+        let usersError = false;
+        if (usersResponse.status === 'fulfilled' && usersResponse.value && usersResponse.value && Array.isArray(usersResponse.value)) {
+            totalUsers = usersResponse.value.length;
+        } else {
+            console.log('Users service unavailable, returning 0');
+            usersError = true;
+        }
 
-            // Handle users count with graceful fallback
-            let totalUsers = 0;
-            let usersError = false;
-            if (usersResponse.status === 'fulfilled' && usersResponse.value && usersResponse.value && Array.isArray(usersResponse.value)) {
-                totalUsers = usersResponse.value.length;
-            } else {
-                console.log('Users service unavailable, returning 0');
-                usersError = true;
+        // Handle quizzes count with graceful fallback
+        let totalQuizzes = 0;
+        let quizzesError = false;
+        if (quizzesResponse.status === 'fulfilled' && quizzesResponse.value && quizzesResponse.value && Array.isArray(quizzesResponse.value)) {
+            totalQuizzes = quizzesResponse.value.length;
+        } else {
+            console.log('Quizzes service unavailable, returning 0');
+            quizzesError = true;
+        }
+
+        // Handle downloads count with graceful fallback
+        let totalDownloads = 0;
+        let downloadsError = false;
+        if (downloadsResponse.status === 'fulfilled' && downloadsResponse.value && downloadsResponse.value) {
+            totalDownloads = downloadsResponse.value;
+        } else {
+            console.log('Downloads service unavailable, returning 0\n');
+            downloadsError = true;
+        }
+
+        // Handle scores count with graceful fallback
+        let totalScores = 0;
+        let scoresError = false;
+        if (scoresResponse.status === 'fulfilled' && scoresResponse.value && scoresResponse.value) {
+            totalScores = scoresResponse.value;
+        } else {
+            console.log('Scores service unavailable, returning 0');
+            scoresError = true;
+        }
+
+        // Get service health status - Monitor all services
+        const services = [
+            { name: 'users-service', url: `${process.env.USERS_SERVICE_URL}` },
+            { name: 'quizzing-service', url: `${process.env.QUIZZING_SERVICE_URL}` },
+            { name: 'posts-service', url: `${process.env.POSTS_SERVICE_URL}` },
+            { name: 'schools-service', url: `${process.env.SCHOOLS_SERVICE_URL}` },
+            { name: 'courses-service', url: `${process.env.COURSES_SERVICE_URL}` },
+            { name: 'scores-service', url: `${process.env.SCORES_SERVICE_URL}` },
+            { name: 'downloads-service', url: `${process.env.DOWNLOADS_SERVICE_URL}` },
+            { name: 'contacts-service', url: `${process.env.CONTACTS_SERVICE_URL}` },
+            { name: 'feedbacks-service', url: `${process.env.FEEDBACKS_SERVICE_URL}` },
+            { name: 'comments-service', url: `${process.env.COMMENTS_SERVICE_URL}` },
+            { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
+        ];
+
+        const serviceHealthChecks = await Promise.allSettled(
+            services.map(service =>
+                callService(`${service.url}/health`, { timeout: 200000 })
+            )
+        );
+
+        const serviceHealth = serviceHealthChecks.map((result, index) => ({
+            service: services[index].name,
+            status: result.status === 'fulfilled' && result.value && result.value.status === 'healthy' ? 'healthy' : 'unhealthy',
+            uptime: result.status === 'fulfilled' && result.value && result.value.uptime ? result.value.uptime || 0 : 0
+        }));
+
+        stats = {
+            totalUsers,
+            totalQuizzes,
+            totalDownloads,
+            totalScores,
+            serviceHealth,
+            lastUpdated: new Date().toISOString(),
+            errors: {
+                usersError,
+                quizzesError,
+                downloadsError,
+                scoresError,
             }
+        };
 
-            // Handle quizzes count with graceful fallback
-            let totalQuizzes = 0;
-            let quizzesError = false;
-            if (quizzesResponse.status === 'fulfilled' && quizzesResponse.value && quizzesResponse.value && Array.isArray(quizzesResponse.value)) {
-                totalQuizzes = quizzesResponse.value.length;
-            } else {
-                console.log('Quizzes service unavailable, returning 0');
-                quizzesError = true;
-            }
-
-            // Handle downloads count with graceful fallback
-            let totalDownloads = 0;
-            let downloadsError = false;
-            if (downloadsResponse.status === 'fulfilled' && downloadsResponse.value && downloadsResponse.value) {
-                totalDownloads = downloadsResponse.value;
-            } else {
-                console.log('Downloads service unavailable, returning 0\n');
-                downloadsError = true;
-            }
-
-            // Handle scores count with graceful fallback
-            let totalScores = 0;
-            let scoresError = false;
-            if (scoresResponse.status === 'fulfilled' && scoresResponse.value && scoresResponse.value) {
-                totalScores = scoresResponse.value;
-            } else {
-                console.log('Scores service unavailable, returning 0');
-                scoresError = true;
-            }
-
-            stats = {
-                totalUsers,
-                totalQuizzes,
-                totalDownloads,
-                totalScores,
-                serviceHealth,
-                lastUpdated: new Date().toISOString(),
-                errors: {
-                    usersError,
-                    quizzesError,
-                    downloadsError,
-                    scoresError,
-                }
-            };
-
-            setCachedData(cacheKey, stats);
+        setCachedData(cacheKey, stats);
         // }
 
         res.json(stats);

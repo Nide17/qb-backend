@@ -20,7 +20,7 @@ const callService = async (url, timeout = 20000) => {
 
     try {
         const response = await axios.get(url, {
-            timeout: timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
+            timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
             headers: { 'Content-Type': 'application/json' }
         });
         return response.data;
@@ -65,9 +65,9 @@ const populateSchoolDetails = async (user) => {
         // Fetch school, level, and faculty details
         if (user.school && user.level && user.faculty) {
             const faculty = await callService(`${process.env.SCHOOLS_SERVICE_URL}/api/faculties/${user.faculty}`);
-            userObj.faculty = {title: faculty?.title};
-            userObj.level = {title: faculty?.level?.title};
-            userObj.school = {title: faculty?.school?.title};
+            userObj.faculty = { title: faculty?.title };
+            userObj.level = { title: faculty?.level?.title };
+            userObj.school = { title: faculty?.school?.title };
         }
         return userObj;
     } catch (error) {

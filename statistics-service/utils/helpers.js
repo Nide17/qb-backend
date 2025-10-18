@@ -7,7 +7,7 @@ const callService = async (url, timeout = 20000) => {
 
     try {
         const response = await axios.get(url, {
-            timeout: timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
+            timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
             headers: { 'Content-Type': 'application/json' }
         });
         return response.data;
@@ -16,7 +16,6 @@ const callService = async (url, timeout = 20000) => {
         return null;
     }
 };
-
 
 // Cache for frequently accessed statistics
 const cache = new Map();
@@ -47,18 +46,4 @@ setInterval(() => {
     }
 }, CACHE_TTL);
 
-// Populate statistics details
-const populateStatisticsDetails = async (res, statistics) => {
-    if (!statistics) return null;
-
-    let statisticsObj = statistics.toObject ? statistics.toObject() : statistics;
-
-    // Example: Populate related data for statistics
-    const relatedData = await callService(`${process.env.RELATED_SERVICE_URL}/api/related/${statistics.relatedId}`);
-
-    statisticsObj.relatedData = relatedData || statistics.relatedData;
-
-    return statisticsObj;
-};
-
-module.exports = { callService, populateStatisticsDetails, getCachedData, setCachedData };
+module.exports = { callService, getCachedData, setCachedData };

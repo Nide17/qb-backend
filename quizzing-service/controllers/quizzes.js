@@ -6,11 +6,14 @@ const { callService, populateQuiz, populateQuizzes } = require('../utils/helpers
 
 exports.getQuizzes = async (req, res) => {
 
+    var pageNo = parseInt(req.query.pageNo)
+
     try {
         // If limit & skip are defined
         let limit = parseInt(req.query.limit);
         let skip = parseInt(req.query.skip) || 0;
 
+        // LIMITED
         if (limit) {
             let limitedQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
@@ -26,12 +29,12 @@ exports.getQuizzes = async (req, res) => {
             limitedQuizzes = await populateQuizzes(limitedQuizzes);
             res.status(200).json(limitedQuizzes);
         }
-        else {
+        // PAGINATED
+        else if (pageNo && pageNo > 0) {
 
             // If limit & skip undefined: Pagination - ENFORCE pagination to prevent memory exhaustion
             const totalQuizzes = await Quiz.countDocuments({})
             var PAGE_SIZE = 20
-            var pageNo = parseInt(req.query.pageNo || "1") // Default to at most 1 page to avoid mem leak
             var query = {}
 
             // Always enforce pagination - never load all quizzes
@@ -66,6 +69,21 @@ exports.getQuizzes = async (req, res) => {
                 totalQuizzes,
                 quizzes: paginatedQuizzes
             });
+
+        }
+        // NO LIMIT AND NO SKIP AT ALL
+        else {
+            let allQuizzes = await Quiz.find({})
+                .sort({ creation_date: -1 })
+                .populate('category questions');
+
+            if (!allQuizzes.length) {
+                return res.status(204).json({ message: 'No quizzes found!' });
+            }
+
+            // Populate user data using simple direct calls
+            // allQuizzes = await populateQuizzes(allQuizzes);
+            res.status(200).json(allQuizzes);
         }
     } catch (err) {
         handleError(res, err);
