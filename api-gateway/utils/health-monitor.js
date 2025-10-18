@@ -111,7 +111,7 @@ class HealthMonitor {
     /**
      * Check service health
      */
-    async checkServiceHealth(serviceName, url, timeout = 10000) {
+    async checkservicesHealth(serviceName, url, timeout = 10000) {
         const startTime = Date.now();
 
         try {
@@ -197,7 +197,7 @@ class HealthMonitor {
 
         // Check all registered services
         for (const [name, url] of Object.entries(services)) {
-            const health = await this.checkServiceHealth(name, url);
+            const health = await this.checkservicesHealth(name, url);
             serviceChecks.push(health);
         }
 

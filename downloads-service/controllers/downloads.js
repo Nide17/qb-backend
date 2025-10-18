@@ -224,7 +224,7 @@ exports.getTop10Notes = async (req, res) => {
                     return {
                         _id: nt._id,
                         title: note.title || 'Unknown Note',
-                        category: note.category || 'Uncategorized',
+                        courseCategory: note.courseCategory || 'Uncategorized',
                         slug: note.slug || '',
                         totalDownloaded: nt.totalDownloaded
                     };

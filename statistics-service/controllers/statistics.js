@@ -38,16 +38,16 @@ exports.getSystemMetrics = async (req, res) => {
             { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
         ];
 
-        const serviceHealthChecks = await Promise.allSettled(
+        const servicesHealthChecks = await Promise.allSettled(
             services.map(service =>
                 callService(`${service.url}/health`, 200000)
             )
         );
 
-        const serviceHealth = serviceHealthChecks.map((result, index) => ({
+        const servicesHealth = servicesHealthChecks.map((result, index) => ({
             service: services[index].name,
-            status: result.status === 'fulfilled' && result.value && result.value.status === 'healthy' ? 'healthy' : 'unhealthy',
-            uptime: result.status === 'fulfilled' && result.value && result.value.uptime ? result.value.uptime || 0 : 0
+            status: result.status === 'fulfilled' && result.value && result?.value?.status === 'healthy' ? 'healthy' : 'unhealthy',
+            uptime: result.status === 'fulfilled' && result.value && result?.value?.uptime ? result?.value?.uptime || 0 : 0
         }));
 
         metrics = {
@@ -70,7 +70,7 @@ exports.getSystemMetrics = async (req, res) => {
                     }
                 }
             },
-            services: serviceHealth
+            services: servicesHealth
         };
         setCachedData(cacheKey, metrics);
         // }
@@ -156,16 +156,19 @@ exports.getDashboardStats = async (req, res) => {
             { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
         ];
 
-        const serviceHealthChecks = await Promise.allSettled(
+        const servicesHealthChecks = await Promise.allSettled(
             services.map(service =>
                 callService(`${service.url}/health`, 200000)
             )
         );
 
-        const serviceHealth = serviceHealthChecks.map((result, index) => ({
+        const servicesHealth = servicesHealthChecks.map((result, index) => ({
             service: services[index].name,
-            status: result.status === 'fulfilled' && result.value && result.value.status === 'healthy' ? 'healthy' : 'unhealthy',
-            uptime: result.status === 'fulfilled' && result.value && result.value.uptime ? result.value.uptime || 0 : 0
+            status: result.status === 'fulfilled' && result.value && result?.value?.status === 'healthy' ? 'healthy' : 'unhealthy',
+            database: result.status === 'fulfilled' && result.value && result?.value?.database,
+            dbStats: result.status === 'fulfilled' && result.value && result?.value?.dbStats,
+            system: result.status === 'fulfilled' && result.value && result?.value?.system,
+            process: result.status === 'fulfilled' && result.value && result?.value?.process,
         }));
 
         stats = {
@@ -173,7 +176,7 @@ exports.getDashboardStats = async (req, res) => {
             totalQuizzes,
             totalDownloads,
             totalScores,
-            serviceHealth,
+            servicesHealth,
             lastUpdated: new Date().toISOString(),
             errors: {
                 usersError,
