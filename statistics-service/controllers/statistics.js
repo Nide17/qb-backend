@@ -40,7 +40,7 @@ exports.getSystemMetrics = async (req, res) => {
 
         const serviceHealthChecks = await Promise.allSettled(
             services.map(service =>
-                callService(`${service.url}/health`, { timeout: 200000 })
+                callService(`${service.url}/health`, 200000)
             )
         );
 
@@ -105,7 +105,7 @@ exports.getDashboardStats = async (req, res) => {
         let totalUsers = 0;
         let usersError = false;
         if (usersResponse.status === 'fulfilled' && usersResponse.value && usersResponse.value && Array.isArray(usersResponse.value)) {
-            totalUsers = usersResponse.value.length;
+            totalUsers = usersResponse?.value?.length;
         } else {
             console.log('Users service unavailable, returning 0');
             usersError = true;
@@ -115,7 +115,7 @@ exports.getDashboardStats = async (req, res) => {
         let totalQuizzes = 0;
         let quizzesError = false;
         if (quizzesResponse.status === 'fulfilled' && quizzesResponse.value && quizzesResponse.value && Array.isArray(quizzesResponse.value)) {
-            totalQuizzes = quizzesResponse.value.length;
+            totalQuizzes = quizzesResponse?.value?.length;
         } else {
             console.log('Quizzes service unavailable, returning 0');
             quizzesError = true;
@@ -158,7 +158,7 @@ exports.getDashboardStats = async (req, res) => {
 
         const serviceHealthChecks = await Promise.allSettled(
             services.map(service =>
-                callService(`${service.url}/health`, { timeout: 200000 })
+                callService(`${service.url}/health`, 200000)
             )
         );
 
@@ -441,7 +441,7 @@ exports.getLiveAnalytics = async (req, res) => {
     try {
         let analytics = getCachedData(cacheKey);
 
-        if (!analytics || analytics.length === 0) {
+        if (!analytics || analytics?.length === 0) {
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -460,9 +460,9 @@ exports.getLiveAnalytics = async (req, res) => {
 
             analytics = {
                 today: {
-                    newUsers: todayUsers.status === 'fulfilled' ? todayUsers.value.length || 0 : 0,
-                    newScores: todayScores.status === 'fulfilled' ? todayScores.value.length || 0 : 0,
-                    newQuizzes: todayDownloads.status === 'fulfilled' ? todayDownloads.value.length || 0 : 0
+                    newUsers: todayUsers.status === 'fulfilled' ? todayUsers?.value?.length || 0 : 0,
+                    newScores: todayScores.status === 'fulfilled' ? todayScores?.value?.length || 0 : 0,
+                    newQuizzes: todayDownloads.status === 'fulfilled' ? todayDownloads?.value?.length || 0 : 0
                 },
                 timestamp: now.toISOString()
             };

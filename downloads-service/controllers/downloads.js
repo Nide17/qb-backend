@@ -180,7 +180,7 @@ exports.getTop10Downloaders = async (req, res) => {
         if (topDownloaders.length > 0) {
 
             const userIds = topDownloaders.map(u => u?._id?.toString());
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, { timeout: 20000, });
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, 200000);
 
             topDownloaders = topDownloaders.map(usr => {
                 const user = users?.data?.find(u => u._id === usr?._id?.toString()) || {};
@@ -217,7 +217,7 @@ exports.getTop10Notes = async (req, res) => {
             if (topNotesData.length > 0) {
 
                 const noteIds = topNotesData.map(note => note?._id?.toString());
-                const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { noteIds }, { timeout: 20000, });
+                const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { noteIds }, 200000);
 
                 topNotes = topNotesData.map(nt => {
                     const note = notes?.data?.find(data => String(data._id) === String(nt._id)) || {};

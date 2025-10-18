@@ -7,6 +7,7 @@ const { callService, populateQuiz, populateQuizzes } = require('../utils/helpers
 exports.getQuizzes = async (req, res) => {
 
     var pageNo = parseInt(req.query.pageNo)
+    const totalQuizzes = await Quiz.countDocuments({})
 
     try {
         // If limit & skip are defined
@@ -27,13 +28,18 @@ exports.getQuizzes = async (req, res) => {
 
             // Populate user data using simple direct calls
             limitedQuizzes = await populateQuizzes(limitedQuizzes);
-            res.status(200).json(limitedQuizzes);
+            res.status(200).json({
+                totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
+                currentPage: pageNo,
+                pageSize: PAGE_SIZE,
+                totalQuizzes,
+                quizzes: limitedQuizzes
+            });
         }
         // PAGINATED
         else if (pageNo && pageNo > 0) {
 
             // If limit & skip undefined: Pagination - ENFORCE pagination to prevent memory exhaustion
-            const totalQuizzes = await Quiz.countDocuments({})
             var PAGE_SIZE = 20
             var query = {}
 
