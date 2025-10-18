@@ -162,8 +162,6 @@ exports.login = async (req, res) => {
             if (!user.current_token || err) {
 
                 const updatedUser = await updateUserToken(user)
-                console.log("updatedUser: ", updatedUser)
-
                 if (!updatedUser) return handleError(res, 'Could not log you in, try again later!')
 
                 res.status(200).json({

@@ -1,14 +1,17 @@
 const axios = require('axios');
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000) => {
+const callService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
     try {
         const response = await axios.get(url, {
             timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            }
         });
         return response.data;
     } catch (err) {
@@ -28,20 +31,56 @@ const validateRequiredFields = (fields) => {
 
 // Helper function to populate related entity details based on download type
 const populateDownload = async (download) => {
+
+    let downloadObj = download.toObject ? download.toObject() : download;
     try {
         let [notes, downloaded_by] = await Promise.all([
-            callService(`${process.env.NOTES_SERVICE_URL}/api/notes/${download.notes}`),
+            callService(`${process.env.COURSES_SERVICE_URL}/api/notes/${download.notes}`),
             callService(`${process.env.USERS_SERVICE_URL}/api/users/${download.downloaded_by}`)
         ]);
-        return { ...download.toObject(), notes, chapter: notes ? notes.chapter : null, course: notes ? notes.course : null, courseCategory: notes ? notes.courseCategory : null, downloaded_by };
+
+        return { ...downloadObj, notes, chapter: notes ? notes.chapter : null, course: notes ? notes.course : null, courseCategory: notes ? notes.courseCategory : null, downloaded_by };
     } catch (err) {
         console.error('Error populating download details:', err.message);
         return download; // Return original download if population fails
     }
 };
 
+
+// Cache for frequently accessed data
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Helper function to get cached data
+const getCachedData = (key) => {
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+    }
+    cache.delete(key);
+    return null;
+};
+
+// Helper function to set cached data
+const setCachedData = (key, data) => {
+    cache.set(key, { data, timestamp: Date.now() });
+};
+
+// Clear expired cache entries periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of cache.entries()) {
+        if (now - value.timestamp >= CACHE_TTL) {
+            cache.delete(key);
+        }
+    }
+}, CACHE_TTL);
+
 module.exports = {
     populateDownload,
     callService,
     validateRequiredFields,
+    getCachedData,
+    setCachedData,
+    cache,
 };

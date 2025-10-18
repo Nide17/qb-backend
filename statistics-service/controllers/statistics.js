@@ -97,8 +97,8 @@ exports.getDashboardStats = async (req, res) => {
         const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
             callService(`${process.env.USERS_SERVICE_URL}/api/users`),
             callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
-            callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads`, { stats: true }),
-            callService(`${process.env.SCORES_SERVICE_URL}/api/scores`, { stats: true }),
+            callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads?filter=stats`),
+            callService(`${process.env.SCORES_SERVICE_URL}/api/scores?filter=stats`),
         ]);
 
         // Handle users count with graceful fallback
@@ -220,15 +220,13 @@ exports.get50NewUsers = async (req, res) => {
     try {
         let users = getCachedData(cacheKey);
 
-        if (!users) {
-            console.log('No Cached users:', users);
-            users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { limit: 50 });
+        if (!users || users.length === 0) {
+            users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?limit=50`);
             setCachedData(cacheKey, users);
+            console.log('Caching users:', users);
         }
 
-        const filteredUsers = users
-
-        res.status(200).json(filteredUsers);
+        res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in get50NewUsers:', err.message);
         res.status(503).json({
@@ -261,9 +259,9 @@ exports.getAllUsers = async (req, res) => {
 
 exports.getUsersWithImage = async (req, res) => {
     try {
-        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { filter: 'image' });
+        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?filter=image`);
 
-        if (!users) return res.status(404).json({ message: 'No users found with that image' });
+        if (!users) return res.status(404).json({ message: 'No users found with images' });
 
         res.status(200).json(users);
     } catch (err) {
@@ -273,7 +271,7 @@ exports.getUsersWithImage = async (req, res) => {
 
 exports.getUsersWithSchool = async (req, res) => {
     try {
-        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { filter: 'school' });
+        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?filter=school`);
 
         if (!users) return res.status(404).json({ message: 'No users found with that school' });
 
@@ -285,7 +283,7 @@ exports.getUsersWithSchool = async (req, res) => {
 
 exports.getUsersWithLevel = async (req, res) => {
     try {
-        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { filter: 'level' });
+        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?filter=level`);
 
         if (!users) return res.status(404).json({ message: 'No users found with that level' });
 
@@ -297,7 +295,7 @@ exports.getUsersWithLevel = async (req, res) => {
 
 exports.getUsersWithFaculty = async (req, res) => {
     try {
-        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { filter: 'faculty' });
+        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?filter=faculty`);
 
         if (!users) return res.status(404).json({ message: 'No users found with that faculty' });
 
@@ -309,7 +307,7 @@ exports.getUsersWithFaculty = async (req, res) => {
 
 exports.getUsersWithYear = async (req, res) => {
     try {
-        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { filter: 'year' });
+        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?filter=year`);
 
         if (!users) return res.status(404).json({ message: 'No users found with that year' });
 
@@ -321,7 +319,7 @@ exports.getUsersWithYear = async (req, res) => {
 
 exports.getUsersWithInterests = async (req, res) => {
     try {
-        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { filter: 'interests' });
+        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?filter=interests`);
 
         if (!users) return res.status(404).json({ message: 'No users found with that interest' });
 
@@ -333,7 +331,7 @@ exports.getUsersWithInterests = async (req, res) => {
 
 exports.getUsersWithAbout = async (req, res) => {
     try {
-        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, { filter: 'about' });
+        const users = await callService(`${process.env.USERS_SERVICE_URL}/api/users?filter=about`);
 
         if (!users) return res.status(404).json({ message: 'No users found with that about' });
 
@@ -350,8 +348,8 @@ exports.getTop10QuizzingUsers = async (req, res) => {
     try {
         let quizStats = getCachedData(cacheKey);
 
-        if (!quizStats) {
-            quizStats = await callService(`${process.env.SCORES_SERVICE_URL}/api/scores`, { stats: true });
+        if (!quizStats || quizStats.length === 0) {
+            quizStats = await callService(`${process.env.SCORES_SERVICE_URL}/api/scores/top-10-quizzing-users`);
 
             if (quizStats) {
                 setCachedData(cacheKey, quizStats);
@@ -368,39 +366,15 @@ exports.getTop10QuizzingUsers = async (req, res) => {
     }
 };
 
-exports.getTop10Downloaders = async (req, res) => {
-    const cacheKey = 'top_10_downloaders';
-
-    try {
-        let downloadStats = getCachedData(cacheKey);
-
-        if (!downloadStats) {
-            console.log('📊 Fetching download statistics...');
-
-            downloadStats = await callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads`, { stats: true });
-
-            setCachedData(cacheKey, downloadStats);
-            console.log('✅ Successfully fetched and cached download statistics');
-        } else {
-            console.log('📦 Returning cached download statistics');
-        }
-
-        res.json(downloadStats);
-    } catch (err) {
-        console.error('💥 Error in getTop10Downloaders:', err.message);
-        handleError(res, err);
-    }
-};
-
 exports.getTop10Quizzes = async (req, res) => {
     const cacheKey = 'top_10_quizzes';
 
     try {
         let quizStatistics = getCachedData(cacheKey);
 
-        if (!quizStatistics) {
+        if (!quizStatistics || quizStatistics.length === 0) {
 
-            quizStatistics = await callService(`${process.env.SCORES_SERVICE_URL}/api/scores`, { stats: true });
+            quizStatistics = await callService(`${process.env.SCORES_SERVICE_URL}/api/scores/top-10-quizzes`);
             setCachedData(cacheKey, quizStatistics);
         }
 
@@ -410,9 +384,33 @@ exports.getTop10Quizzes = async (req, res) => {
     }
 };
 
+exports.getTop10Downloaders = async (req, res) => {
+    const cacheKey = 'top_10_downloaders';
+
+    try {
+        let downloadStats = getCachedData(cacheKey);
+
+        if (!downloadStats || downloadStats.length === 0) {
+            console.log('📊 Fetching download statistics...');
+
+            downloadStats = await callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/top-10-downloaders`, null, req?.header('x-auth-token'));
+
+            setCachedData(cacheKey, downloadStats);
+            console.log('✅ Successfully fetched and cached download statistics');
+            console.log(downloadStats)
+        } else {
+            console.log('📦 Returning cached download statistics');
+        }
+        res.json(downloadStats);
+    } catch (err) {
+        console.error('💥 Error in getTop10Downloaders:', err.message);
+        handleError(res, err);
+    }
+};
+
 exports.getTop10Notes = async (req, res) => {
     try {
-        let top10 = await callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads`, { stats: true });
+        let top10 = await callService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/top-10-notes`, null, req?.header('x-auth-token'));
         res.json(top10);
     } catch (err) {
         handleError(res, err);
@@ -425,7 +423,7 @@ exports.getDailyUserRegistration = async (req, res) => {
     try {
         let dailyReg = getCachedData(cacheKey);
 
-        if (!dailyReg) {
+        if (!dailyReg || dailyReg.length === 0) {
             dailyReg = await callService(`${process.env.USERS_SERVICE_URL}/api/users/daily-user-registration`);
             setCachedData(cacheKey, dailyReg);
         }
@@ -443,7 +441,7 @@ exports.getLiveAnalytics = async (req, res) => {
     try {
         let analytics = getCachedData(cacheKey);
 
-        if (!analytics) {
+        if (!analytics || analytics.length === 0) {
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 

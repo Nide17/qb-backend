@@ -1,8 +1,7 @@
 const axios = require('axios');
 const Download = require("../models/Download");
-const { populateDownload, validateRequiredFields } = require('../utils/helpers');
+const { populateDownload, validateRequiredFields, getCachedData, setCachedData, cache } = require('../utils/helpers');
 const { handleError } = require('../../contacts-service/utils/error');
-
 
 exports.getDownloads = async (req, res) => {
 
@@ -22,10 +21,7 @@ exports.getDownloads = async (req, res) => {
             return res.status(204).json({ message: 'No downloads found!' });
         }
 
-        if (req.query?.stats === 'true') {
-            console.log("Returning only stats: ", totalDownloads)
-            return res.status(200).json(totalDownloads)
-        }
+        if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads)
 
         // Populate downloads
         for (let i = 0; i < downloads.length; i++) {
@@ -58,7 +54,7 @@ exports.getOneDownload = async (req, res) => {
     }
 };
 
-exports.getDownloadsByUser = async (req, res) => {
+exports.getNotesDownloader = async (req, res) => {
     try {
         let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
 
@@ -73,6 +69,27 @@ exports.getDownloadsByUser = async (req, res) => {
         res.status(200).json(downloads);
     } catch (error) {
         console.log('Error getting downloads by user:', error.message);
+        handleError(res, error);
+    }
+};
+
+exports.getCreatorDownloads = async (req, res) => {
+    try {
+        let downloads = await Download.find().lean();
+        if (!downloads || downloads.length === 0) {
+            return res.status(404).json({ error: 'No downloads found for this course' });
+        }
+
+        // Populate downloads
+        for (let i = 0; i < downloads.length; i++) {
+            downloads[i] = await populateDownload(downloads[i]);
+        }
+
+        // Get downloads by creator: i.e notes.uploaded_by
+        downloads = downloads.filter(download => download.notes.uploaded_by === req.params.id);
+        res.status(200).json(downloads);
+    } catch (error) {
+        console.log('Error getting downloads by course:', error.message);
         handleError(res, error);
     }
 };
@@ -151,69 +168,77 @@ exports.deleteDownload = async (req, res) => {
 };
 
 // Get top users by download activity (for statistics service)
-exports.getTopUsersByDownloads = async (req, res) => {
+exports.getTop10Downloaders = async (req, res) => {
     try {
         // Get top downloaders aggregation
-        const topDownloadersData = await Download.aggregate([
+        let topDownloaders = await Download.aggregate([
             { $group: { _id: "$downloaded_by", totalDownloads: { $sum: 1 } } },
             { $sort: { totalDownloads: -1 } },
             { $limit: 10 }
         ]);
 
-        if (topDownloadersData.length === 0) {
-            return res.status(200).json([]);
-        }
+        if (topDownloaders.length > 0) {
 
-        const userIds = topDownloadersData.map(d => d._id.toString());
+            const userIds = topDownloaders.map(u => u?._id?.toString());
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, { timeout: 20000, });
 
-        try {
-            // Fetch user details            
-            const usersResponse = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`,
-                { userIds },
-                {
-
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            const users = usersResponse.data.users || [];
-
-            const topDownloaders = topDownloadersData.map(downloadData => {
-                const user = users.find(u => u._id === downloadData._id.toString()) || {};
+            topDownloaders = topDownloaders.map(usr => {
+                const user = users?.data?.find(u => u._id === usr?._id?.toString()) || {};
                 return {
-                    _id: downloadData._id,
+                    _id: usr._id,
                     name: user.name || 'Unknown User',
                     email: user.email || '',
-                    image: user.image || '',
-                    totalDownloads: downloadData.totalDownloads
+                    totalDownloads: usr.totalDownloads
                 };
             });
-
-            res.status(200).json(topDownloaders);
-        } catch (userError) {
-            console.error('Error fetching user details for top downloaders:');
-            console.error('Error message:', userError.message);
-            console.error('Error response status:', userError.response?.status);
-            console.error('Error response data:', userError.response?.data);
-            console.error('Full error:', userError);
-
-            // Return data without user details if API call fails
-            const topDownloaders = topDownloadersData.map(downloadData => ({
-                _id: downloadData._id,
-                name: 'Unknown User',
-                email: '',
-                image: '',
-                totalDownloads: downloadData.totalDownloads
-            }));
-            res.status(200).json(topDownloaders);
         }
+
+        res.status(200).json(topDownloaders);
     } catch (error) {
         console.log('Error getting top downloaders:', error.message);
         res.status(500).json({ error: 'Failed to get top downloaders' });
     }
 };
+
+exports.getTop10Notes = async (req, res) => {
+    const cacheKey = 'top_10_notes';
+    try {
+        // Check cache first
+        let topNotes = getCachedData(cacheKey);
+
+        if (!topNotes || topNotes.length === 0) {
+
+            const topNotesData = await Download.aggregate([
+                { $group: { _id: "$notes", totalDownloaded: { $sum: 1 } } },
+                { $sort: { totalDownloaded: -1 } },
+                { $limit: 10 }
+            ]).exec();
+
+            if (topNotesData.length > 0) {
+
+                const noteIds = topNotesData.map(note => note?._id?.toString());
+                const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { noteIds }, { timeout: 20000, });
+
+                topNotes = topNotesData.map(nt => {
+                    const note = notes?.data?.find(data => String(data._id) === String(nt._id)) || {};
+                    return {
+                        _id: nt._id,
+                        title: note.title || 'Unknown Note',
+                        category: note.category || 'Uncategorized',
+                        slug: note.slug || '',
+                        totalDownloaded: nt.totalDownloaded
+                    };
+                });
+                setCachedData(cacheKey, topNotes);
+            }
+        }
+        res.json(topNotes);
+    } catch (error) {
+        console.log('\n\nError retrieving top notes:', error);
+        handleError(res, error);
+    }
+}
+
 
 // Get database statistics for downloads service
 exports.getDatabaseStats = async (req, res) => {

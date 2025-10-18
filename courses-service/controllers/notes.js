@@ -1,6 +1,6 @@
 const Notes = require("../models/Notes");
 const { handleError } = require('../utils/error');
-const { findNotesById, populateUser, validateRequiredFields } = require('../utils/helpers');
+const { populateUser, validateRequiredFields } = require('../utils/helpers');
 
 // Helper function to find notes with optional limit
 const findNotes = async (query, res, limit = 0) => {
@@ -69,10 +69,16 @@ exports.getNotesByChapter = async (req, res) => {
     }
 };
 
-// Updated getOneNotes to use findNotesById
 exports.getOneNotes = async (req, res) => {
     try {
-        const notes = await findNotesById(req.params.id, res, 'title description notes_file chapter course courseCategory quizzes slug uploaded_by');
+        const notes = await Notes.findById(req.params.id).populate('course chapter courseCategory', 'title').select('title description notes_file chapter course courseCategory quizzes slug uploaded_by');
+        if (!notes) return res.status(404).json({ message: 'Notes not found!' });
+
+        let notesObj = notes.toObject ? notes.toObject() : notes;
+        if (notes.uploaded_by) {
+            const user = await populateUser(notes.uploaded_by);
+            notesObj.uploaded_by = user;
+        }
         res.status(200).json(notes)
     } catch (err) {
         handleError(res, err);
@@ -80,11 +86,13 @@ exports.getOneNotes = async (req, res) => {
 };
 
 exports.createNotes = async (req, res) => {
-    const { title, description } = req.body;
 
     if (req.file) {
         const not_file = req.file;
         try {
+
+            const { title, description } = req.body;
+            validateRequiredFields([{ name: 'title', value: title }, { name: 'description', value: description }]);
             const note = await Notes.findOne({ _id: req.params.id });
             if (!note) return res.status(404).json({ message: 'Note not found' });
 
@@ -121,11 +129,10 @@ exports.createNotes = async (req, res) => {
     }
 };
 
-// Updated updateNotes to use findNotesById
 exports.updateNotes = async (req, res) => {
     try {
-        const notes = await findNotesById(req.params.id, res);
-        if (!notes) return;
+        const notes = await Notes.findById(req.params.id);
+        if (!notes) res.status(404).json({ message: 'Notes not found!' });
 
         const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedNotes);
@@ -163,11 +170,10 @@ exports.removeQuizFromNotes = async (req, res) => {
     }
 };
 
-// Updated deleteNotes to use findNotesById
 exports.deleteNotes = async (req, res) => {
     try {
-        const notes = await findNotesById(req.params.id, res);
-        if (!notes) return;
+        const notes = await Notes.findById(req.params.id);
+        if (!notes) return res.status(404).json({ message: 'Notes not found!' });
 
         // Delete associated quizzes
         await Notes.updateOne(
@@ -178,6 +184,24 @@ exports.deleteNotes = async (req, res) => {
         // Delete this notes entry
         await Notes.deleteOne({ _id: req.params.id });
         res.status(200).json({ message: `Deleted!` });
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+exports.getBatchedNotes = async (req, res) => {
+    try {
+        const ids = req.body.noteIds;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'No quiz IDs provided!' });
+        }
+
+        const notes = await Notes.find({ _id: { $in: ids } }).populate('chapter course courseCategory', 'title');
+        if (!notes.length) {
+            return res.status(204).json({ message: 'No notes found!' });
+        }
+
+        res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
     }

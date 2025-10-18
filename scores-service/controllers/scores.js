@@ -25,7 +25,7 @@ exports.getScores = async (req, res) => {
             });
         }
 
-        if (req.query?.stats === 'true') {
+        if (req.query?.filter === 'stats') {
             console.log("Returning only stats: ", totalScores)
             return res.status(200).json(totalScores)
         }
@@ -61,7 +61,7 @@ exports.getScoresByTaker = async (req, res) => {
         // Check cache first
         let scores = getCachedData(cacheKey);
 
-        if (!scores) {
+        if (!scores || scores.length === 0) {
             scores = await Score.find({ taken_by: id }).sort({ test_date: -1 }).exec();
             if (!scores || scores.length === 0) return res.status(404).json({ message: 'You have no scores. Take some quizzes!' });
 
@@ -137,7 +137,7 @@ exports.getQuizRanking = async (req, res) => {
         // Check cache first
         let scores = getCachedData(cacheKey);
 
-        if (!scores) {
+        if (!scores || scores.length === 0) {
             scores = await Score.find({ quiz: id }).sort({ marks: -1 }).limit(20).exec();
             if (!scores || scores.length === 0) {
                 console.warn(`No scores found for the ${id} quiz`);
@@ -164,7 +164,7 @@ exports.getPopularQuizzes = async (req, res) => {
         // Check cache first
         let popularQuizzes = getCachedData(cacheKey);
 
-        if (!popularQuizzes) {
+        if (!popularQuizzes || popularQuizzes.length === 0) {
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 
@@ -212,7 +212,7 @@ exports.getMonthlyUser = async (req, res) => {
         // Check cache first
         let monthlyUserData = getCachedData(cacheKey);
 
-        if (!monthlyUserData) {
+        if (!monthlyUserData || monthlyUserData.length === 0) {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
             startOfMonth.setHours(0, 0, 0, 0);
@@ -378,7 +378,6 @@ exports.deleteScore = async (req, res) => {
 
 
 // STATISTICS CONTROLLERS
-// Get top users by quiz activity (for statistics service)
 exports.getTop10QuizzingUsers = async (req, res) => {
 
     const cacheKey = 'top_10_quizzing_users';
@@ -386,21 +385,20 @@ exports.getTop10QuizzingUsers = async (req, res) => {
         // Check cache first
         let topUsers = getCachedData(cacheKey);
 
-        if (!topUsers) {
+        if (!topUsers || topUsers.length === 0) {
 
-            const topUsersData = await Score.aggregate([
+            let topUsers = await Score.aggregate([
                 { $group: { _id: "$taken_by", totalQuizzes: { $sum: 1 }, avgMarks: { $avg: "$marks" } } },
                 { $sort: { totalQuizzes: -1 } },
                 { $limit: 10 }
             ]).exec();
 
-            if (topUsersData.length > 0) {
+            if (topUsers.length > 0) {
 
-                const userIds = topUsersData.map(u => u._id.toString());
-
+                const userIds = topUsers.map(u => u._id.toString());
                 const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, { timeout: 20000, });
 
-                topUsers = topUsersData.map(usr => {
+                topUsers = topUsers.map(usr => {
                     const user = users?.data?.find(u => u._id === usr._id.toString()) || {};
                     return {
                         _id: usr._id,
@@ -413,7 +411,6 @@ exports.getTop10QuizzingUsers = async (req, res) => {
                 setCachedData(cacheKey, topUsers);
             }
         }
-
         res.json(topUsers);
     } catch (error) {
         console.log('\n\nError retrieving top users by quizzes:', error);
@@ -428,7 +425,7 @@ exports.getTop10Quizzes = async (req, res) => {
         // Check cache first
         let topQuizzes = getCachedData(cacheKey);
 
-        if (!topQuizzes) {
+        if (!topQuizzes || topQuizzes.length === 0) {
 
             const topQuizzesData = await Score.aggregate([
                 { $group: { _id: "$quiz", totalTaken: { $sum: 1 } } },

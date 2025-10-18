@@ -57,14 +57,17 @@ const setCachedData = async (key, data, ttl = 300) => {
 };
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000) => {
+const callService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
     try {
         const response = await axios.get(url, {
             timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            }
         });
         return response.data;
     } catch (err) {
@@ -86,8 +89,6 @@ const makeRequest = async (req, serviceName, serviceUrl) => {
             data: req.body,
             headers: headers,
             validateStatus: function (status) {
-                // Accept all HTTP status codes as valid responses
-                // This prevents 4xx and 5xx from being treated as errors
                 return status >= 200 && status < 600;
             }
         });
@@ -120,7 +121,6 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
             // Forward all responses, including 4xx and 5xx status codes
             res.status(response.status).json(response.data);
         } else {
-            console.log(response)
             res.status(502).json({
                 success: false,
                 error: `${serviceName} Service Unavailable`,
@@ -138,13 +138,13 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
         }
 
         try {
-
+            console.log("Error making request: \n\n", error)
             if (error.name === 'AggregateError') {
 
-                // Print all errors
-                for (const err of error.cause.errors) {
-                    console.error(`\n\n - Error making ${req.method} request to ${serviceName} with url ${req.originalUrl}:`, err);
-                }
+                // // Print all errors
+                // for (const err of error.cause.errors) {
+                //     console.error(`\n\n - Error making ${req.method} request to ${serviceName} with url ${req.originalUrl}:`, err);
+                // }
 
                 res.status(502).json({
                     success: false,
@@ -165,13 +165,12 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
                 });
             }
         } catch (responseError) {
-            console.log(`Failed to send error response for ${serviceName}:`, responseError);
+            // console.log(`Failed to send error response for ${serviceName}:`, responseError);
         }
     }
 };
 
 module.exports = {
-    makeRequest,
     routeToService,
     callService,
     getCachedData,

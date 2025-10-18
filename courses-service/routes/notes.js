@@ -1,5 +1,5 @@
 const express = require("express")
-const { getNotes, getLimitedNotes, getNotesByCategory, getNotesByChapter, getOneNotes, createNotes, updateNotesQuizzes, updateNotes, removeQuizFromNotes, deleteNotes } = require("../controllers/notes")
+const { getNotes, getLimitedNotes, getNotesByCategory, getNotesByChapter, getOneNotes, getBatchedNotes, createNotes, updateNotesQuizzes, updateNotes, removeQuizFromNotes, deleteNotes } = require("../controllers/notes")
 const { authRole } = require("../middlewares/auth")
 const { notesUpload } = require("../middlewares/notesUpload")
 
@@ -11,6 +11,7 @@ router.get("/limited", getLimitedNotes)
 router.get("/category/:id", getNotesByCategory)
 router.get("/chapter/:id", getNotesByChapter)
 router.get("/:id", getOneNotes) // Combine slug and id into one route
+router.post("/batch", getBatchedNotes)
 
 // POST routes
 router.post("/", authRole(['Creator', 'Admin', 'SuperAdmin']), notesUpload.single('notes_file'), createNotes)

@@ -12,14 +12,17 @@ const s3Config = new S3({
 });
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000) => {
+const callService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
     try {
         const response = await axios.get(url, {
             timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            }
         });
         return response.data;
     } catch (err) {

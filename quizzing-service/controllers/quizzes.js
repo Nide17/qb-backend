@@ -50,7 +50,7 @@ exports.getQuizzes = async (req, res) => {
                 });
             }
 
-            if (req.query?.stats === 'true') {
+            if (req.query?.filter === 'stats') {
                 console.log("Returning only stats: ", totalQuizzes)
                 return res.status(200).json(totalQuizzes)
             }
