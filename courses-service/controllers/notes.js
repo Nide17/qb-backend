@@ -116,7 +116,7 @@ exports.createNotes = async (req, res) => {
         const savedNotes = await newNotes.save();
         if (!savedNotes) throw new Error('Could not save notes, try again!');
 
-        res.status(200).json(notes)
+        res.status(200).json(savedNotes);
 
     } catch (err) {
         handleError(res, err);
@@ -130,10 +130,14 @@ exports.updateNotes = async (req, res) => {
         const notes = await Notes.findById(req.params.id);
 
         if (!notes) res.status(404).json({ message: 'Notes not found!' });
-
-        let updates = { ...notes.toObject(), notes_file: not_file?.location };
-
+        console.log("notes: ", notes)
+        
+        let updates = { ...req.body };
+        if (not_file) updates.notes_file = not_file.location;
+        console.log("updates: ", updates)
+        
         const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, updates, { new: true });
+        console.log("updatedNotes: ", updatedNotes)
         res.status(200).json(updatedNotes);
     } catch (err) {
         handleError(res, err);
