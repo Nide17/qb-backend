@@ -118,7 +118,7 @@ exports.deleteBlogPostsView = async (req, res) => {
 
         const removedBlogPost = await blogPost.deleteOne();
 
-        if (!removedBlogPost) return res.status(503).json({ message: 'Something went wrong while deleting!' });
+        if (removedBlogPost.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
         res.status(200).json(blogPost);
     } catch (err) {

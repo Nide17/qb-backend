@@ -124,7 +124,7 @@ exports.deleteImageUpload = async (req, res) => {
 
         const removedImageUpload = await imageUpload.deleteOne()
 
-        if (!removedImageUpload)
+        if (removedImageUpload.deletedCount === 0)
             return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
     } catch (err) {

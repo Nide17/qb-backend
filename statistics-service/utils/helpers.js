@@ -13,10 +13,9 @@ const callService = async (url, timeout = 20000, token) => {
                 'x-auth-token': token,
             },
         });
-        console.log("response: ", response.data);
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err);
+        console.warn(`\n\nService call failed for URL: ${url}\nError name: ${err.name}, message: ${err.message}`);
         return null;
     }
 };
@@ -50,4 +49,32 @@ setInterval(() => {
     }
 }, CACHE_TTL);
 
-module.exports = { callService, getCachedData, setCachedData };
+const allowList = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://www.quizblog.rw',
+    'https://www.quizblog.online',
+]
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowList.includes(origin)) {
+            callback(null, true)
+        } else {
+            console.log(origin + ' is not allowed by CORS')
+            callback(new Error('Not allowed by CORS'))
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
+    maxAge: 3600
+}
+
+module.exports = {
+    callService,
+    getCachedData,
+    setCachedData,
+    corsOptions,
+};

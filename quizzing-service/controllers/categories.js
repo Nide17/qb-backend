@@ -2,7 +2,7 @@ const Category = require("../models/Category");
 const Quiz = require("../models/Quiz");
 const Question = require("../models/Question");
 const { handleError } = require('../utils/error');
-const { validateRequiredFields,  populateCategory } = require('../utils/helpers');
+const { validateRequiredFields, populateCategory } = require('../utils/helpers');
 
 exports.getCategories = async (req, res) => {
     try {
@@ -71,7 +71,7 @@ exports.updateCategory = async (req, res) => {
 exports.deleteCategory = async (req, res) => {
     try {
         const category = await Category.findById(req.params.id);
-        if (!category) return;
+        if (!category) throw new Error('Category not found!');
 
         // Delete all quizzes associated with this category
         await Quiz.deleteMany({ category: category._id });
@@ -81,6 +81,7 @@ exports.deleteCategory = async (req, res) => {
 
         const removedCategory = await Category.deleteOne({ _id: req.params.id });
         if (removedCategory.deletedCount === 0) throw new Error('Something went wrong while deleting!');
+
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);

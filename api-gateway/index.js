@@ -108,7 +108,7 @@ app.get('/api/aggregated/quiz/:id', async (req, res) => {
 
         const quiz = quizRes.status === 'fulfilled' ? quizRes.value.data : null;
         if (!quiz) {
-            return res.status(404).json({ error: 'Quiz not found' });
+            return res.status(404).json({ message: 'Quiz not found' });
         }
 
         // Aggregate data
@@ -247,7 +247,7 @@ app.get('/api/aggregated/user/:id', async (req, res) => {
 
         const user = userRes.status === 'fulfilled' ? userRes.value.data : null;
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ message: 'User not found' });
         }
 
         const aggregatedData = {
@@ -291,7 +291,7 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
 
         const category = categoryRes.status === 'fulfilled' ? categoryRes.value.data : null;
         if (!category) {
-            return res.status(404).json({ error: 'Category not found' });
+            return res.status(404).json({ message: 'Category not found' });
         }
 
         const quizzes = quizzesRes.status === 'fulfilled' ? quizzesRes.value.data : [];
@@ -324,7 +324,7 @@ app.get('/api/aggregated/search', async (req, res) => {
     try {
         const { q: query, type, page = 1, limit = 20 } = req.query;
         if (!query) {
-            return res.status(400).json({ error: 'Search query is required' });
+            return res.status(400).json({ message: 'Search query is required' });
         }
 
         const cacheKey = `search_${query}_${type}_${page}_${limit}`;

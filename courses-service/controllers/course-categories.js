@@ -76,7 +76,7 @@ exports.deleteCategory = async (req, res) => {
         ]);
 
         const removedCategory = await CourseCategory.deleteOne();
-        if (!removedCategory) return res.status(503).json({ message: 'Something went wrong while deleting!' });
+        if (removedCategory.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
 
         res.status(200).json(category);
     } catch (err) {

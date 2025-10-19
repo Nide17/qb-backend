@@ -1,4 +1,5 @@
 const Question = require("../models/Question");
+const slugify = require("slugify")
 const { handleError } = require('../utils/error');
 const { validateRequiredFields, updateQuizQuestions, deleteImageFromS3 } = require('../utils/helpers');
 
@@ -27,7 +28,6 @@ exports.getOneQuestion = async (req, res) => {
 exports.createQuestion = async (req, res) => {
 
     try {
-
         const { questionText, quiz, category, created_by, answerOptions, duration } = req.body;
         const qnImage = req.file;
 
@@ -61,12 +61,14 @@ exports.createQuestion = async (req, res) => {
         });
 
         const savedQuestion = await newQuestion.save();
-        if (!savedQuestion) throw new Error('Something went wrong during creation!');
+        if (!savedQuestion) {
+            throw new Error('Something went wrong during creation!');
+        }
 
         // Update the Quiz on Question creation
-        const updatedQuiz = await updateQuizQuestions(quiz, savedQuestion._id, 'add');
+        const isQuizUpdated = await updateQuizQuestions(quiz, savedQuestion._id, 'add');
 
-        if (!updatedQuiz) {
+        if (isQuizUpdated.deletedCount === 0) {
             Question.deleteOne(savedQuestion._id);
             throw new Error('Cannot update corresponding quiz!');
         }
@@ -113,6 +115,7 @@ exports.updateQuestion = async (req, res) => {
             // Find the question by id and update
             const updatedQuestion = await Question.findByIdAndUpdate({ _id: qtn._id }, {
                 questionText,
+                slug: slugify(`${questionText}`, { replacement: '-', lower: true, strict: true }),
                 question_image: qnImage && qnImage.location,
                 answerOptions: answers,
                 last_updated_by,
@@ -133,7 +136,7 @@ exports.deleteQuestion = async (req, res) => {
         if (!question) return res.status(404).json({ message: 'Question not found' });
 
         // Delete existing image
-        await deleteImageFromS3(question.question_image);
+        question.question_image && await deleteImageFromS3(question.question_image);
 
         // Remove question from questions of the quiz
         await updateQuizQuestions(question.quiz, question._id, 'remove');

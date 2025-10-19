@@ -427,7 +427,7 @@ exports.deleteUser = async (req, res) => {
         if (!user) return res.status(404).json({ message: 'User not found!' })
 
         const removedUser = await User.deleteOne({ _id: req.params.id })
-        if (!removedUser) throw new Error('Failed to delete user!')
+        if (removedUser.deletedCount === 0) throw new Error('Failed to delete user!')
 
         res.status(200).json(user)
     } catch (err) {

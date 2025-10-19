@@ -124,4 +124,38 @@ const deleteImageFromS3 = async (imagePath) => {
     return s3Config.deleteObject(params).promise();
 };
 
-module.exports = { s3Config, populateBlogPost, populateBlogPosts, populateUser, callService, findPostCategoryById, findImageUploadById, validateRequiredFields, deleteImageFromS3 };
+const allowList = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://www.quizblog.rw',
+    'https://www.quizblog.online',
+]
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowList.includes(origin)) {
+            callback(null, true)
+        } else {
+            console.log(origin + ' is not allowed by CORS')
+            callback(new Error('Not allowed by CORS'))
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
+    maxAge: 3600
+}
+
+module.exports = {
+    s3Config,
+    populateBlogPost,
+    populateBlogPosts,
+    populateUser,
+    callService,
+    findPostCategoryById,
+    findImageUploadById,
+    validateRequiredFields,
+    deleteImageFromS3,
+    corsOptions,
+};

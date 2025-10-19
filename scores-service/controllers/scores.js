@@ -365,7 +365,7 @@ exports.deleteScore = async (req, res) => {
         // Delete the Score
         const removedScore = await Score.deleteOne({ _id: req.params.id })
 
-        if (!removedScore) throw new Error('Something went wrong while deleting!');
+        if (removedScore.deletedCount === 0) throw new Error('Something went wrong while deleting!');
 
         res.status(200).json(score)
     }

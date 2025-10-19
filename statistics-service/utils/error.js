@@ -1,5 +1,5 @@
 const handleError = (res, err, status) => {
-    
+
     console.error('Error occurred:', err?.name, err?.message);
 
     // Handle MongoDB Cast Errors
@@ -63,7 +63,7 @@ const handleError = (res, err, status) => {
     else if (err.name === 'TokenExpiredError') {
         return res.status(401).json({
             success: false,
-            message: 'Token has expired',
+            message: 'You need to login again!',
             code: 'TOKEN_EXPIRED',
             timestamp: new Date().toISOString()
         });

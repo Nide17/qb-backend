@@ -200,7 +200,7 @@ exports.deleteBlogPost = async (req, res) => {
         }
 
         const removedBlogPost = await blogPost.deleteOne()
-        if (!removedBlogPost) {
+        if (removedBlogPost.deletedCount === 0) {
             return res.status(500).json({
                 success: false,
                 message: 'Something went wrong while deleting!'

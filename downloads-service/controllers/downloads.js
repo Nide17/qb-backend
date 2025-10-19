@@ -45,7 +45,7 @@ exports.getOneDownload = async (req, res) => {
     try {
         let download = await Download.findById(req.params.id).lean();
         if (!download) {
-            return res.status(404).json({ error: 'Download not found!' });
+            return res.status(404).json({ message: 'Download not found!' });
         }
         res.stats(200).json(download)
     } catch (err) {
@@ -59,7 +59,7 @@ exports.getNotesDownloader = async (req, res) => {
         let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
 
         if (!downloads || downloads.length === 0) {
-            return res.status(404).json({ error: 'No downloads found for this user' });
+            return res.status(404).json({ message: 'No downloads found for this user' });
         }
 
         // Populate downloads
@@ -77,7 +77,7 @@ exports.getCreatorDownloads = async (req, res) => {
     try {
         let downloads = await Download.find().lean();
         if (!downloads || downloads.length === 0) {
-            return res.status(404).json({ error: 'No downloads found for this course' });
+            return res.status(404).json({ message: 'No downloads found for this course' });
         }
 
         // Populate downloads
@@ -131,7 +131,7 @@ exports.createDownload = async (req, res) => {
 
         const savedDownload = await newDownload.save();
         if (!savedDownload) {
-            return res.status(400).json({ error: 'Something went wrong during creation!' });
+            return res.status(400).json({ message: 'Something went wrong during creation!' });
         }
 
         res.status(200).json({
@@ -144,7 +144,7 @@ exports.createDownload = async (req, res) => {
         });
     } catch (err) {
         console.log('Error creating download:', error.message);
-        res.status(500).json({ error: 'Failed to create download.' });
+        res.status(500).json({ message: 'Failed to create download.' });
     }
 };
 
@@ -152,18 +152,18 @@ exports.deleteDownload = async (req, res) => {
     try {
         const download = await Download.findById(req.params.id);
         if (!download) {
-            return res.status(404).json({ error: 'Download not found!' });
+            return res.status(404).json({ message: 'Download not found!' });
         }
 
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
         if (removedDownload.deletedCount === 0) {
-            return res.status(400).json({ error: 'Something went wrong while deleting!' });
+            return res.status(400).json({ message: 'Something went wrong while deleting!' });
         }
 
         res.status(200).json({ message: "Deleted successfully!" });
     } catch (err) {
         console.log('Error deleting download:', error.message);
-        res.status(500).json({ error: 'Failed to delete download' });
+        res.status(500).json({ message: 'Failed to delete download' });
     }
 };
 
@@ -196,7 +196,7 @@ exports.getTop10Downloaders = async (req, res) => {
         res.status(200).json(topDownloaders);
     } catch (err) {
         console.log('Error getting top downloaders:', error.message);
-        res.status(500).json({ error: 'Failed to get top downloaders' });
+        res.status(500).json({ message: 'Failed to get top downloaders' });
     }
 };
 
@@ -317,6 +317,6 @@ exports.getDatabaseStats = async (req, res) => {
         res.status(200).json(dbStats);
     } catch (err) {
         console.log('Error getting database stats:', error.message);
-        res.status(500).json({ error: 'Failed to get database statistics' });
+        res.status(500).json({ message: 'Failed to get database statistics' });
     }
 };

@@ -80,20 +80,21 @@ const validateRequiredFields = (fields) => {
 
 const updateQuizQuestions = async (quizId, questionId, action) => {
 
-    const quiz = await Quiz.findById(quizId);
+    try {
+        const quiz = await Quiz.findById(quizId);
 
-    if (!quiz) throw new Error('Quiz not found while updating questions!');
+        if (!quiz) throw new Error('Quiz not found while updating questions!');
 
-    if (action === 'add') {
-        quiz.questions.push(questionId);
-    } else if (action === 'remove') {
-        quiz.questions.pull(questionId);
-    }
-    await quiz.save().then(quiz => {
-        return quiz;
-    }).catch(err => {
+        if (action === 'add') {
+            quiz.questions.push(questionId);
+        } else if (action === 'remove') {
+            quiz.questions.pull(questionId);
+        }
+        await quiz.save();
+        return true
+    } catch (err) {
         throw new Error('Error updating quiz questions!');
-    })
+    }
 };
 
 // Helper function to delete image from S3
@@ -140,8 +141,37 @@ const populateQuizzes = async (quizzes) => {
 
     return plainQuizzes;
 };
+const allowList = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://www.quizblog.rw',
+    'https://www.quizblog.online',
+]
 
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowList.includes(origin)) {
+            callback(null, true)
+        } else {
+            console.log(origin + ' is not allowed by CORS')
+            callback(new Error('Not allowed by CORS'))
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
+    maxAge: 3600
+}
 
 module.exports = {
-    callService, validateRequiredFields, populateUser, populateCategory, updateQuizQuestions, deleteImageFromS3, populateQuiz, populateQuizzes
+    callService,
+    validateRequiredFields,
+    populateUser,
+    populateCategory,
+    updateQuizQuestions,
+    deleteImageFromS3,
+    populateQuiz,
+    populateQuizzes,
+    corsOptions,
 };

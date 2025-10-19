@@ -102,7 +102,7 @@ exports.getOneQuiz = async (req, res) => {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
 
-        const quiz = await Quiz.findOne(query).populate('category questions', '_id title questions slug created_by');
+        const quiz = await Quiz.findOne(query).populate('category questions');
         if (!quiz) {
             return res.status(404).json({ message: `Quiz with id ${id} not found` });
         }
