@@ -57,7 +57,6 @@ exports.getQuizzes = async (req, res) => {
             }
 
             if (req.query?.filter === 'stats') {
-                console.log("Returning only stats: ", totalQuizzes)
                 return res.status(200).json(totalQuizzes)
             }
 
@@ -133,10 +132,6 @@ exports.getQuizzesByCategory = async (req, res) => {
 exports.getQuizzesByNotes = async (req, res) => {
     try {
         const categories = await Category.find({ category: req.params.id });
-        if (!categories.length) {
-            return res.status(204).json({ message: 'No categories found!' });
-        }
-
         let quizzes = await Quiz.find({ category: { $in: categories } }).populate('category questions');
         if (!quizzes.length) {
             return res.status(204).json({ message: 'No quizzes found!' });

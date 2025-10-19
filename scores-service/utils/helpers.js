@@ -3,7 +3,7 @@ const Score = require("../models/Score");
 const { handleError } = require('./error');
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const callService = async (url, timeout = 70000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 

@@ -19,7 +19,7 @@ router.post("/", authRole(['Creator', 'Admin', 'SuperAdmin']), notesUpload.singl
 // PUT routes
 router.put("/notes-quizzes/remove/:id", authRole(['Creator', 'Admin', 'SuperAdmin']), removeQuizFromNotes)
 router.put("/notes-quizzes/:id", authRole(['Creator', 'Admin', 'SuperAdmin']), updateNotesQuizzes)
-router.put("/:id", authRole(['Creator', 'Admin', 'SuperAdmin']), updateNotes)
+router.put("/:id", authRole(['Creator', 'Admin', 'SuperAdmin']), notesUpload.single('notes_file'), updateNotes)
 
 // DELETE routes
 router.delete("/:id", authRole(['Creator', 'Admin', 'SuperAdmin']), deleteNotes)

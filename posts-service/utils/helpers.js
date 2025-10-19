@@ -117,11 +117,21 @@ const validateRequiredFields = (fields) => {
 
 // Helper function to delete image from S3
 const deleteImageFromS3 = async (imagePath) => {
-    const params = {
-        Bucket: process.env.S3_BUCKET,
-        Key: imagePath.split('/').pop()
-    };
-    return s3Config.deleteObject(params).promise();
+    try {
+        const deleteParams = {
+            Bucket: process.env.S3_BUCKET,
+            Key: imagePath.split('/').pop()
+        };
+        s3Config.deleteObject(deleteParams, function (err, data) {
+            if (err) {
+                console.error("Error deleting object:", err);
+            } else {
+                console.log("Object deleted successfully:", data);
+            }
+        })
+    } catch (err) {
+        throw new Error(`Error deleting image: ${err.message}`);
+    }
 };
 
 const allowList = [

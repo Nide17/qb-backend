@@ -114,15 +114,15 @@ const notifyAdmins = async (newContact) => {
     try {
         const fetchAdminEmails = async () => {
             try {
-                const response = await axios.get(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
-                return response.data;
+                const adminEmails = await callService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+                return adminEmails;
             } catch (error) {
                 console.warn(`Failed to fetch admin emails:`, error.message);
                 return new Promise((resolve) => {
                     setTimeout(async () => {
                         try {
-                            const retryResponse = await axios.get(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
-                            resolve(retryResponse.data);
+                            const retryAdminEmails = await callService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+                            resolve(retryAdminEmails);
                         } catch (retryError) {
                             console.warn(`Retry failed to fetch admin emails:`, retryError.message);
                             resolve(null);

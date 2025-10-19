@@ -20,7 +20,7 @@ exports.getOneCategory = async (req, res) => {
     try {
         const category = await findCourseCategoryById(req.params.id);
 
-        if (!category) return res.status(404).json({ message: 'Category not found!' });
+        if (!category) throw new Error('Category not found');
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);

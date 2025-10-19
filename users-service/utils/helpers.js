@@ -127,6 +127,25 @@ const corsOptions = {
     maxAge: 3600
 }
 
+// Helper function to delete image from S3
+const deleteImageFromS3 = async (imagePath) => {
+    try {
+        const deleteParams = {
+            Bucket: process.env.S3_BUCKET,
+            Key: imagePath.split('/').pop()
+        };
+        s3Config.deleteObject(deleteParams, function (err, data) {
+            if (err) {
+                console.error("Error deleting object:", err);
+            } else {
+                console.log("Object deleted successfully:", data);
+            }
+        })
+    } catch (err) {
+        throw new Error(`Error deleting image: ${err.message}`);
+    }
+};
+
 module.exports = {
     callService,
     populateSchoolDetails,
@@ -138,4 +157,5 @@ module.exports = {
     validateRequiredFields,
     sendSubscriptionEmail,
     corsOptions,
+    deleteImageFromS3,
 };

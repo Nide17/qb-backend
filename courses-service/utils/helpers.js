@@ -2,7 +2,6 @@ const axios = require('axios');
 const { handleError } = require('./error');
 const Course = require("../models/Course");
 const CourseCategory = require("../models/CourseCategory");
-const Notes = require("../models/Notes");
 const Chapter = require("../models/Chapter");
 
 // Helper function to call other services

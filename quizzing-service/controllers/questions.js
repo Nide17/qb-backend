@@ -108,9 +108,7 @@ exports.updateQuestion = async (req, res) => {
             const answers = answerOptions.map(a => JSON.parse(a));
 
             // Delete existing image
-            if (qnImage && qtn.question_image) {
-                await deleteImageFromS3(qtn.question_image);
-            }
+            qtn.question_image && await deleteImageFromS3(qtn.question_image);
 
             // Find the question by id and update
             const updatedQuestion = await Question.findByIdAndUpdate({ _id: qtn._id }, {

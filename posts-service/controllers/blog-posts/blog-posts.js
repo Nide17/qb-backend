@@ -1,6 +1,6 @@
 const BlogPost = require("../../models/blog-posts/BlogPost.js");
 const { handleError } = require('../../utils/error');
-const { s3Config, populateBlogPost, populateBlogPosts, validateRequiredFields } = require('../../utils/helpers');
+const { deleteImageFromS3, populateBlogPost, populateBlogPosts, validateRequiredFields } = require('../../utils/helpers');
 
 exports.getBlogPosts = async (req, res) => {
 
@@ -104,6 +104,7 @@ exports.getCreatedBy = async (req, res) => {
 }
 
 exports.createBlogPost = async (req, res) => {
+
     const bp_image = req.file ? req.file : null
     const { title, markdown, postCategory, creator, bgColor } = req.body
 
@@ -175,39 +176,16 @@ exports.updateBlogPostStatus = async (req, res) => {
 };
 
 exports.deleteBlogPost = async (req, res) => {
+
     try {
         const blogPost = await BlogPost.findById(req.params.id)
-        if (!blogPost) {
-            return res.status(404).json({
-                success: false,
-                message: 'BlogPost is not found!'
-            });
-        }
+        if (!blogPost) throw new Error('BlogPost is not found!');
 
-        if (blogPost.post_image) {
-            const params = {
-                Bucket: process.env.S3_BUCKET,
-                Key: blogPost.post_image.split('/').pop()
-            }
-
-            try {
-                await s3Config.deleteObject(params).promise();
-                console.log(params.Key + ' deleted from ' + params.Bucket);
-            } catch (err) {
-                console.log('ERROR in file Deleting : ' + JSON.stringify(err));
-                return res.status(400).json({ message: 'Failed to delete! ' + err.message });
-            }
-        }
-
+        blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne()
-        if (removedBlogPost.deletedCount === 0) {
-            return res.status(500).json({
-                success: false,
-                message: 'Something went wrong while deleting!'
-            });
-        }
 
-        res.status(200).json({ message: 'BlogPost deleted successfully!' });
+        if (removedBlogPost.deletedCount === 0) throw new Error('Something went wrong while deleting!')
+        res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);
     }

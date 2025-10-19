@@ -20,9 +20,12 @@ exports.getCategories = async (req, res) => {
 
 exports.getOneCategory = async (req, res) => {
     try {
-        let category = await Category.findOne({ _id: req.params.id }).populate('quizes', '_id title questions slug');
+        const id = req.params.id;
+        if (!id) throw new Error('Invalid category id!');
+        let category = await Category.findOne({ _id: id }).populate('quizes', '_id title questions slug');
+        if (!category) throw new Error('Unexistent category!');
+
         category = await populateCategory(category);
-        if (!category) return res.status(404).json({ message: 'Category not found!' });
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);
@@ -31,7 +34,6 @@ exports.getOneCategory = async (req, res) => {
 
 exports.createCategory = async (req, res) => {
     try {
-
         // Validate required fields
         validateRequiredFields([
             { name: 'title', value: req.body.title },
@@ -71,7 +73,7 @@ exports.updateCategory = async (req, res) => {
 exports.deleteCategory = async (req, res) => {
     try {
         const category = await Category.findById(req.params.id);
-        if (!category) throw new Error('Category not found!');
+        if (!category) throw new Error('Category does not exist!');
 
         // Delete all quizzes associated with this category
         await Quiz.deleteMany({ category: category._id });

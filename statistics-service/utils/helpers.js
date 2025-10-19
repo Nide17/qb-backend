@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const callService = async (url, timeout = 40000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -15,7 +15,7 @@ const callService = async (url, timeout = 20000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError name: ${err.name}, message: ${err.message}`);
+        console.warn(`\n\nService call failed for URL: ${url}\nError: ${err}, \n name: ${err.name}, \nmessage: ${err.message}`);
         return null;
     }
 };

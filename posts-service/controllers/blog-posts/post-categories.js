@@ -57,10 +57,10 @@ exports.createPostCategory = async (req, res) => {
 exports.updatePostCategory = async (req, res) => {
     try {
         const postCategory = await findPostCategoryById(req.params.id, res);
-        if (!postCategory) return res.status(404).json({ message: 'PostCategory not found!' });
+        if (!postCategory) throw new Error('PostCategory not found!');
 
         const updatedPostCategory = await PostCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedPostCategory) return res.status(404).json({ message: 'PostCategory not found!' });
+        if (!updatedPostCategory) throw new Error('PostCategory not found!');
 
         res.status(200).json(updatedPostCategory);
     } catch (err) {
@@ -71,11 +71,11 @@ exports.updatePostCategory = async (req, res) => {
 exports.deletePostCategory = async (req, res) => {
     try {
         const postCategory = await findPostCategoryById(req.params.id, res);
-        if (!postCategory) return res.status(404).json({ message: 'PostCategory not found!' });
+        if (!postCategory) throw new Error('PostCategory not found!');
 
         const removedPostCategory = await PostCategory.findByIdAndDelete(req.params.id);
-        if (!removedPostCategory) return res.status(404).json({ message: 'PostCategory not found!' });
-        res.status(200).json({ message: "Deleted successfully!" });
+        if (!removedPostCategory) throw new Error('PostCategory not found!');
+        res.status(200).json(postCategory);
     } catch (err) {
         handleError(res, err);
     }

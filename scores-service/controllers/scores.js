@@ -26,7 +26,6 @@ exports.getScores = async (req, res) => {
         }
 
         if (req.query?.filter === 'stats') {
-            console.log("Returning only stats: ", totalScores)
             return res.status(200).json(totalScores)
         }
 
@@ -186,7 +185,7 @@ exports.getPopularQuizzes = async (req, res) => {
                     const quiz = quizzes?.find(q => String(q._id) === String(pq._id));
                     return {
                         _id: pq._id,
-                        qTitle: quiz?.title || 'Unknown Quiz',
+                        qTitle: quiz?.title || 'Unavailable Quiz',
                         slug: quiz?.slug || '',
                         count: pq.count
                     };
@@ -356,7 +355,6 @@ exports.createScore = async (req, res) => {
 
 exports.deleteScore = async (req, res) => {
     try {
-
         //Find the Score to delete by id first
         const score = await Score.findOne({ _id: req.params.id })
 
@@ -442,7 +440,7 @@ exports.getTop10Quizzes = async (req, res) => {
                     const quiz = quizzes?.data?.find(q => String(q._id) === String(qz._id)) || {};
                     return {
                         _id: qz._id,
-                        title: quiz.title || 'Unknown Quiz',
+                        title: quiz.title || 'Unavailable Quiz',
                         category: quiz.category || 'Uncategorized',
                         slug: quiz.slug || '',
                         totalTaken: qz.totalTaken

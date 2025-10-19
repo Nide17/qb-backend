@@ -1,6 +1,6 @@
 const ImageUpload = require("../../models/blog-posts/ImageUpload");
 const { handleError } = require('../../utils/error');
-const { populateUser, findImageUploadById, validateRequiredFields } = require('../../utils/helpers');
+const { populateUser, findImageUploadById, validateRequiredFields, deleteImageFromS3 } = require('../../utils/helpers');
 
 // Refactored code to use reusable utilities and align with patterns from other services.
 exports.getImageUploads = async (req, res) => {
@@ -94,34 +94,7 @@ exports.deleteImageUpload = async (req, res) => {
         const imageUpload = await ImageUpload.findById(req.params.id)
         if (!imageUpload) return res.status(404).json({ message: 'Image upload is not found!' })
 
-        if (imageUpload.uploadImage) {
-            const params = {
-                Bucket: process.env.S3_BUCKET,
-                Key: imageUpload.uploadImage.split('/').pop()
-            }
-
-            try {
-                await s3Config.deleteObject(params, (err, data) => {
-                    if (err) {
-                        res.status(400).json({ message: err.message })
-                        console.log(err, err.stack) // an error occurred
-                    }
-                    else {
-                        res.status(200).json({ message: 'deleted!' })
-                        console.log(params.Key + ' deleted from ' + params.Bucket)
-                    }
-                })
-
-            }
-            catch (err) {
-                console.log('ERROR in file Deleting : ' + JSON.stringify(err))
-                res.status(400).json({
-                    message: 'Failed to delete! ' + err.message,
-                    success: false
-                })
-            }
-        }
-
+        imageUpload.uploadImage && await deleteImageFromS3(imageUpload.uploadImage);
         const removedImageUpload = await imageUpload.deleteOne()
 
         if (removedImageUpload.deletedCount === 0)

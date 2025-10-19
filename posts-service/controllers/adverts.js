@@ -1,6 +1,6 @@
 const Advert = require("../models/Advert.js");
 const { handleError } = require("../utils/error");
-const { deleteImageFromS3, validateRequiredFields, findAdvertById } = require('../utils/helpers');
+const { deleteImageFromS3, validateRequiredFields } = require('../utils/helpers');
 
 exports.getAdverts = async (req, res) => {
     try {
@@ -117,10 +117,7 @@ exports.deleteAdvert = async (req, res) => {
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw new Error('Advert not found!');
 
-        if (advert.advert_image) {
-            await deleteImageFromS3(advert.advert_image);
-        }
-
+        advert.advert_image && await deleteImageFromS3(advert.advert_image);
         const removedAdvert = await advert.deleteOne();
         if (removedAdvert.deletedCount === 0) throw new Error('Something went wrong during deletion!');
 

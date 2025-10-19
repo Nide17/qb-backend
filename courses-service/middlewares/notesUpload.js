@@ -3,7 +3,6 @@ const path = require('path')
 const multer = require('multer')
 const multerS3 = require('multer-s3')
 
-
 // AWS S3 Configuration
 const s3Config = new S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -11,7 +10,6 @@ const s3Config = new S3({
     Bucket: process.env.S3_BUCKET,
     region: process.env.AWS_REGION
 })
-
 
 // File Filter for multer to check if the file is an image
 const fileFilter = (req, file, callback) => {

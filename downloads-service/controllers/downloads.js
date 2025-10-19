@@ -143,27 +143,20 @@ exports.createDownload = async (req, res) => {
             downloaded_by: savedDownload.downloaded_by
         });
     } catch (err) {
-        console.log('Error creating download:', error.message);
-        res.status(500).json({ message: 'Failed to create download.' });
+        handleError(res, err);
     }
 };
 
 exports.deleteDownload = async (req, res) => {
     try {
         const download = await Download.findById(req.params.id);
-        if (!download) {
-            return res.status(404).json({ message: 'Download not found!' });
-        }
+        if (!download) throw new Error('Download not found!');
 
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
-        if (removedDownload.deletedCount === 0) {
-            return res.status(400).json({ message: 'Something went wrong while deleting!' });
-        }
-
-        res.status(200).json({ message: "Deleted successfully!" });
+        if (removedDownload.deletedCount === 0) throw new Error('Something went wrong while deleting!')
+        res.status(200).json(download);
     } catch (err) {
-        console.log('Error deleting download:', error.message);
-        res.status(500).json({ message: 'Failed to delete download' });
+        handleError(res, err);
     }
 };
 
@@ -195,8 +188,7 @@ exports.getTop10Downloaders = async (req, res) => {
 
         res.status(200).json(topDownloaders);
     } catch (err) {
-        console.log('Error getting top downloaders:', error.message);
-        res.status(500).json({ message: 'Failed to get top downloaders' });
+        handleError(res, err);
     }
 };
 

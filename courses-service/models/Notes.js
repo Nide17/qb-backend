@@ -37,7 +37,7 @@ const NotesSchema = new Schema({
     uploaded_by: {
         type: Schema.Types.ObjectId,
     },
-    quizzes: [
+    quizes: [
         {
             type: Schema.Types.ObjectId,
             default: []

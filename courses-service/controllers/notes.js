@@ -87,54 +87,53 @@ exports.getOneNotes = async (req, res) => {
 
 exports.createNotes = async (req, res) => {
 
-    if (req.file) {
+    try {
+
         const not_file = req.file;
-        try {
 
-            const { title, description } = req.body;
-            validateRequiredFields([{ name: 'title', value: title }, { name: 'description', value: description }]);
-            const note = await Notes.findOne({ _id: req.params.id });
-            if (!note) return res.status(404).json({ message: 'Note not found' });
+        const { title, description, chapter, course, courseCategory, uploaded_by } = req.body;
+        validateRequiredFields([
+            { name: 'title', value: title },
+            { name: 'description', value: description },
+            { name: 'chapter', value: chapter },
+            { name: 'course', value: course },
+            { name: 'courseCategory', value: courseCategory },
+            { name: 'uploaded_by', value: uploaded_by }
+        ])
 
-            const params = {
-                Bucket: process.env.S3_BUCKET || config.get('S3Bucket'),
-                Key: note.notes_file.split('/').pop()
-            };
+        const notes = await Notes.findOne({ title });
+        if (notes) throw new Error('Notes with that title arleady exists!')
 
-            s3Config.deleteObject(params, (err, data) => {
-                if (err) {
-                    console.log(err, err.stack);
-                } else {
-                    console.log(params.Key + ' notes deleted!');
-                }
-            });
+        const newNotes = new Notes({
+            title,
+            notes_file: not_file && not_file.location,
+            chapter,
+            course,
+            courseCategory,
+            uploaded_by
+        });
 
-            const updatedNotes = await Notes.findByIdAndUpdate(
-                { _id: req.params.id },
-                { title, description, notes_file: not_file.location },
-                { new: true }
-            );
+        const savedNotes = await newNotes.save();
+        if (!savedNotes) throw new Error('Could not save notes, try again!');
 
-            res.status(200).json(updatedNotes);
-        } catch (err) {
-            handleError(res, err);
-        }
-    } else {
-        try {
-            const notes = await Notes.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true });
-            res.status(200).json(notes);
-        } catch (err) {
-            handleError(res, err);
-        }
+        res.status(200).json(notes)
+
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
 exports.updateNotes = async (req, res) => {
     try {
+        const not_file = req.file;
+
         const notes = await Notes.findById(req.params.id);
+
         if (!notes) res.status(404).json({ message: 'Notes not found!' });
 
-        const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        let updates = { ...notes.toObject(), notes_file: not_file?.location };
+
+        const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, updates, { new: true });
         res.status(200).json(updatedNotes);
     } catch (err) {
         handleError(res, err);
@@ -175,15 +174,9 @@ exports.deleteNotes = async (req, res) => {
         const notes = await Notes.findById(req.params.id);
         if (!notes) return res.status(404).json({ message: 'Notes not found!' });
 
-        // Delete associated quizzes
-        await Notes.updateOne(
-            { _id: notes._id },
-            { $pull: { quizes: { $exists: true } } }
-        );
-
         // Delete this notes entry
-        await Notes.deleteOne({ _id: req.params.id });
-        res.status(200).json({ message: `Deleted!` });
+        await notes.deleteOne();
+        res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
     }

@@ -1,7 +1,7 @@
 const BlogPostsView = require("../../models/blog-posts/BlogPostsView");
 const scheduledReportMessage = require('./scheduledReport');
 const { handleError } = require('../../utils/error');
-const { populateUser, s3Config } = require('../../utils/helpers');
+const { populateUser, deleteImageFromS3 } = require('../../utils/helpers');
 
 // SCHEDULED REPORT MESSAGE
 scheduledReportMessage();
@@ -96,29 +96,11 @@ exports.updateBlogPostsView = async (req, res) => {
 exports.deleteBlogPostsView = async (req, res) => {
     try {
         const blogPost = await BlogPostsView.findById(req.params.id);
-        if (!blogPost) return res.status(404).json({ message: 'BlogPost not found!' });
-
-        if (blogPost.post_image) {
-            const params = {
-                Bucket: process.env.S3_BUCKET,
-                Key: blogPost.post_image.split('/').pop() // if any sub folder -> path/of/the/folder.ext
-            };
-
-            try {
-                await s3Config.deleteObject(params).promise();
-                console.log(params.Key + ' deleted from ' + params.Bucket);
-            } catch (err) {
-                console.log('ERROR in file Deleting: ' + JSON.stringify(err));
-                return res.status(400).json({
-                    message: 'Failed to delete! ' + err.message,
-                    success: false
-                });
-            }
-        }
-
+        if (!blogPost) throw new Error('BlogPost not found!');
+        blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne();
 
-        if (removedBlogPost.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
+        if (removedBlogPost.deletedCount === 0) throw new Error('Something went wrong while deleting!');
 
         res.status(200).json(blogPost);
     } catch (err) {

@@ -20,7 +20,7 @@ exports.getOneQuizComment = async (req, res) => {
 
     try {
         let quizComment = await QuizComment.findById(req.params.id).select(selectFields);
-        if (!quizComment) return res.status(404).json({ message: 'No quizComment found!' });
+        if (!quizComment) throw new Error('QuizComment not found!');
         quizComment = await populateSenderAndQuiz(quizComment);
         res.status(200).json(quizComment);
     } catch (err) {
@@ -53,12 +53,7 @@ exports.createQuizComment = async (req, res) => {
         // Create new QuizComment
         const newQuizComment = new QuizComment({ comment, quiz, sender });
         const savedQuizComment = await newQuizComment.save();
-        if (!savedQuizComment) {
-            return res.status(500).json({
-                success: false,
-                message: 'Something went wrong during creation!'
-            });
-        }
+        if (!savedQuizComment) throw new Error('Something went wrong while creating!!');
 
         res.status(200).json({
             _id: savedQuizComment._id,
@@ -74,7 +69,7 @@ exports.createQuizComment = async (req, res) => {
 exports.updateQuizComment = async (req, res) => {
     try {
         const quizComment = await QuizComment.findById(req.params.id);
-        if (!quizComment) return res.status(404).json({ message: 'QuizComment not found!' });
+        if (!quizComment) throw new Error('QuizComment not found!');
 
         const updatedQuizComment = await QuizComment.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedQuizComment);
@@ -89,7 +84,7 @@ exports.approveRejectComment = async (req, res) => {
 
     try {
         const quizComment = await QuizComment.findById(commentID);
-        if (!quizComment) return res.status(404).json({ message: 'QuizComment not found!' });
+        if (!quizComment) throw new Error('QuizComment not found!');
 
         const updatedQuizComment = await QuizComment.findByIdAndUpdate(commentID, { status: req.body.status }, { new: true });
         res.status(200).json(updatedQuizComment);
@@ -101,22 +96,12 @@ exports.approveRejectComment = async (req, res) => {
 exports.deleteQuizComment = async (req, res) => {
     try {
         const quizComment = await QuizComment.findById(req.params.id);
-        if (!quizComment) {
-            return res.status(404).json({
-                success: false,
-                message: 'QuizComment not found!'
-            });
-        }
+        if (!quizComment) throw new Error('QuizComment not found!');
 
         const removedQuizComment = await QuizComment.deleteOne({ _id: req.params.id });
-        if (removedQuizComment.deletedCount === 0) {
-            return res.status(500).json({
-                success: false,
-                message: 'Something went wrong while deleting!'
-            });
-        }
+        if (removedQuizComment.deletedCount === 0) throw new Error('Something went wrong while deleting!');
 
-        res.status(200).json({ message: "Deleted successfully!" });
+        res.status(200).json(quizComment);
     } catch (err) {
         handleError(res, err);
     }

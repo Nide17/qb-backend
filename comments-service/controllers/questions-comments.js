@@ -155,7 +155,7 @@ exports.deleteQuestionComment = async (req, res) => {
         const removedQuestionComment = await QuestionComment.deleteOne({ _id: req.params.id });
         if (removedQuestionComment.deletedCount === 0) return res.status(500).json({ message: 'Something went wrong while deleting!' });
 
-        res.status(200).json({ message: "Deleted successfully!" });
+        res.status(200).json(questionComment);
     } catch (err) {
         handleError(res, err);
     }

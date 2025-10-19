@@ -6,7 +6,7 @@ const { sendEmail } = require("../utils/emails/sendEmail")
 const User = require("../models/User")
 const PswdResetToken = require("../models/PswdResetToken")
 const { handleError } = require("../utils/error")
-const { s3Config, populateSchoolDetails, hashPassword, updateUserToken } = require("../utils/helpers")
+const { deleteImageFromS3, populateSchoolDetails, hashPassword, updateUserToken } = require("../utils/helpers")
 
 // Get all users
 exports.getUsers = async (req, res) => {
@@ -376,16 +376,7 @@ exports.updateProfileImage = async (req, res) => {
             });
         }
 
-        if (profile.image) {
-            const params = {
-                Bucket: process.env.S3_BUCKET,
-                Key: profile.image.split('/').pop()
-            }
-            s3Config.deleteObject(params, (err, data) => {
-                if (err) console.log(err, err.stack)
-                else console.log(params.Key + ' deleted!')
-            })
-        }
+        profile.image && await deleteImageFromS3(profile.image);
 
         let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true })
         updatedUserProfile = await populateSchoolDetails(updatedUserProfile)

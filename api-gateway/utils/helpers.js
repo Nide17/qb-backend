@@ -57,7 +57,7 @@ const setCachedData = async (key, data, ttl = 300) => {
 };
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const callService = async (url, timeout = 60000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
