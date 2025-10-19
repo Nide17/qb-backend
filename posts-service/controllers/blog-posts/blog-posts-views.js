@@ -88,8 +88,8 @@ exports.updateBlogPostsView = async (req, res) => {
 
         const updatedBlogPostsView = await BlogPostsView.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedBlogPostsView);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

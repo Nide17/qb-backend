@@ -24,7 +24,7 @@ exports.getFacultiesByLevel = async (req, res) => {
 
 exports.getOneFaculty = async (req, res) => {
     try {
-        const faculty = await Faculty.findById(req.params.id).populate('school level', 'title').select('title school level')
+        const faculty = await Faculty.findById(req.params.id).populate('school level', 'title school level')
 
         if (!faculty) return res.status(404).json({ message: 'Faculty not found!' });
         res.status(200).json(faculty);
@@ -35,10 +35,9 @@ exports.getOneFaculty = async (req, res) => {
 
 exports.createFaculty = async (req, res) => {
 
-    const { title, school, level, years } = req.body
-
     try {
         // Validation
+        const { title, school, level, years } = req.body
         validateRequiredFields([{ name: 'title', value: title }, { name: 'school', value: school }, { name: 'level', value: level }])
 
         // Check if faculty with same title exists in the same school level
@@ -75,8 +74,8 @@ exports.updateFaculty = async (req, res) => {
 
         const updatedFaculty = await Faculty.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedFaculty);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

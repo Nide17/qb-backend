@@ -130,8 +130,8 @@ exports.approveRejectComment = async (req, res) => {
 
         const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(commentID, { status: req.body.status }, { new: true });
         res.status(200).json(updatedQuestionComment);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 }
 
@@ -142,8 +142,8 @@ exports.updateQuestionComment = async (req, res) => {
 
         const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedQuestionComment);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

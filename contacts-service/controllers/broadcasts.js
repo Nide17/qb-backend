@@ -15,8 +15,8 @@ exports.getOneBroadcast = async (req, res) => {
     try {
         const broadcast = await findBroadcastById(req.params.id, res);
         if (broadcast) res.status(200).json(broadcast);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -65,8 +65,8 @@ exports.updateBroadcast = async (req, res) => {
 
         const updatedBroadcast = await Broadcast.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedBroadcast);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

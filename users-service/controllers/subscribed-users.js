@@ -57,8 +57,8 @@ exports.updateSubscribedUser = async (req, res) => {
     try {
         const updatedSubscribedUser = await SubscribedUser.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedSubscribedUser);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -68,7 +68,7 @@ exports.deleteSubscribedUser = async (req, res) => {
         if (!subscribedUser) return;
 
         const removedSubscribedUser = await subscribedUser.deleteOne();
-        if (removedSubscribedUser.deletedCount === 0) return handleError(res, 'Something went wrong while deleting!');
+        if (removedSubscribedUser.deletedCount === 0) throw new Error('Something went wrong while deleting!');
 
         res.status(200).json(subscribedUser);
     } catch (err) {

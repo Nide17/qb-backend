@@ -35,9 +35,9 @@ exports.getDownloads = async (req, res) => {
             totalDownloads,
             downloads
         });
-    } catch (error) {
+    } catch (err) {
         console.log('Error getting downloads:', error.message);
-        handleError(res, error);
+        handleError(res, err);
     }
 };
 
@@ -48,9 +48,9 @@ exports.getOneDownload = async (req, res) => {
             return res.status(404).json({ error: 'Download not found!' });
         }
         res.stats(200).json(download)
-    } catch (error) {
+    } catch (err) {
         console.log('Error getting download:', error.message);
-        handleError(res, error);
+        handleError(res, err);
     }
 };
 
@@ -67,9 +67,9 @@ exports.getNotesDownloader = async (req, res) => {
             downloads[i] = await populateDownload(downloads[i]);
         }
         res.status(200).json(downloads);
-    } catch (error) {
+    } catch (err) {
         console.log('Error getting downloads by user:', error.message);
-        handleError(res, error);
+        handleError(res, err);
     }
 };
 
@@ -88,9 +88,9 @@ exports.getCreatorDownloads = async (req, res) => {
         // Get downloads by creator: i.e notes.uploaded_by
         downloads = downloads.filter(download => download.notes.uploaded_by === req.params.id);
         res.status(200).json(downloads);
-    } catch (error) {
+    } catch (err) {
         console.log('Error getting downloads by course:', error.message);
-        handleError(res, error);
+        handleError(res, err);
     }
 };
 
@@ -142,7 +142,7 @@ exports.createDownload = async (req, res) => {
             courseCategory: savedDownload.course,
             downloaded_by: savedDownload.downloaded_by
         });
-    } catch (error) {
+    } catch (err) {
         console.log('Error creating download:', error.message);
         res.status(500).json({ error: 'Failed to create download.' });
     }
@@ -161,7 +161,7 @@ exports.deleteDownload = async (req, res) => {
         }
 
         res.status(200).json({ message: "Deleted successfully!" });
-    } catch (error) {
+    } catch (err) {
         console.log('Error deleting download:', error.message);
         res.status(500).json({ error: 'Failed to delete download' });
     }
@@ -194,7 +194,7 @@ exports.getTop10Downloaders = async (req, res) => {
         }
 
         res.status(200).json(topDownloaders);
-    } catch (error) {
+    } catch (err) {
         console.log('Error getting top downloaders:', error.message);
         res.status(500).json({ error: 'Failed to get top downloaders' });
     }
@@ -233,9 +233,9 @@ exports.getTop10Notes = async (req, res) => {
             }
         }
         res.json(topNotes);
-    } catch (error) {
-        console.log('\n\nError retrieving top notes:', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('\n\nError retrieving top notes:', err);
+        handleError(res, err);
     }
 }
 
@@ -315,7 +315,7 @@ exports.getDatabaseStats = async (req, res) => {
         };
 
         res.status(200).json(dbStats);
-    } catch (error) {
+    } catch (err) {
         console.log('Error getting database stats:', error.message);
         res.status(500).json({ error: 'Failed to get database statistics' });
     }

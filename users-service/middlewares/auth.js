@@ -11,7 +11,6 @@ const verifyToken = (req, res) => {
     return handleTokenError(req, res, 401, 'No token, authorization Denied')
   }
   try {
-    console.log("token verif: ", token, process.env.JWT_SECRET)
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = decoded
     return decoded

@@ -25,7 +25,7 @@ exports.getLevelsBySchool = async (req, res) => {
 
 exports.getOneLevel = async (req, res) => {
     try {
-        const level = await Level.findById(req.params.id).select('title');
+        const level = await Level.findById(req.params.id).populate('school', 'title');
 
         if (!level) return res.status(404).json({ message: 'Level not found!' });
         res.status(200).json(level);
@@ -39,7 +39,6 @@ exports.createLevel = async (req, res) => {
     const { title, school } = req.body;
 
     try {
-
         // Validation
         validateRequiredFields([{ name: 'title', value: title }, { name: 'school', value: school }]);
 
@@ -72,8 +71,8 @@ exports.updateLevel = async (req, res) => {
 
         const updatedLevel = await Level.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedLevel);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

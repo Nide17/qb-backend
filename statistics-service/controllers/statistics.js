@@ -77,9 +77,9 @@ exports.getSystemMetrics = async (req, res) => {
 
         console.log("metrics: ", metrics)
         res.json(metrics);
-    } catch (error) {
-        console.log('\n\nError retrieving system metrics:', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('\n\nError retrieving system metrics:', err);
+        handleError(res, err);
     }
 };
 
@@ -190,9 +190,9 @@ exports.getDashboardStats = async (req, res) => {
         // }
 
         res.json(stats);
-    } catch (error) {
-        console.log('\n\nError retrieving dashboard stats:', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('\n\nError retrieving dashboard stats:', err);
+        handleError(res, err);
     }
 };
 
@@ -212,8 +212,8 @@ exports.updateDashboardStats = async (req, res) => {
         }
 
         res.json({ message: 'Dashboard stats updated successfully' });
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -421,15 +421,15 @@ exports.getTop10Notes = async (req, res) => {
 };
 
 exports.getDailyUserRegistration = async (req, res) => {
-    const cacheKey = 'daily_user_registration';
+    // const cacheKey = 'daily_user_registration';
 
     try {
-        let dailyReg = getCachedData(cacheKey);
+        // let dailyReg = getCachedData(cacheKey);
 
-        if (!dailyReg || dailyReg.length === 0) {
-            dailyReg = await callService(`${process.env.USERS_SERVICE_URL}/api/users/daily-user-registration`);
-            setCachedData(cacheKey, dailyReg);
-        }
+        // if (!dailyReg || dailyReg.length === 0) {
+        dailyReg = await callService(`${process.env.USERS_SERVICE_URL}/api/users/daily-user-registration`);
+        // setCachedData(cacheKey, dailyReg);
+        // }
 
         res.json(dailyReg);
     } catch (err) {
@@ -474,9 +474,9 @@ exports.getLiveAnalytics = async (req, res) => {
         }
 
         res.json(analytics);
-    } catch (error) {
-        // console.log('\n\nError retrieving live analytics:', error);
-        handleError(res, error);
+    } catch (err) {
+        // console.log('\n\nError retrieving live analytics:', err);
+        handleError(res, err);
     }
 };
 
@@ -485,7 +485,7 @@ exports.clearStatsCache = async (req, res) => {
     try {
         cache.clear();
         res.json({ message: 'Statistics cache cleared successfully' });
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };

@@ -68,9 +68,9 @@ const populateSchoolDetails = async (user) => {
         // Fetch school, level, and faculty details
         if (user.school && user.level && user.faculty) {
             const faculty = await callService(`${process.env.SCHOOLS_SERVICE_URL}/api/faculties/${user.faculty}`);
-            userObj.faculty = { title: faculty?.title };
-            userObj.level = { title: faculty?.level?.title };
-            userObj.school = { title: faculty?.school?.title };
+            userObj.faculty = { _id: faculty?._id, title: faculty?.title };
+            userObj.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+            userObj.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
         }
         return userObj;
     } catch (error) {

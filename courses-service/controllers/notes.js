@@ -136,8 +136,8 @@ exports.updateNotes = async (req, res) => {
 
         const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedNotes);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -161,7 +161,7 @@ exports.removeQuizFromNotes = async (req, res) => {
 
         await Notes.updateOne(
             { _id: note._id },
-            { $pull: { quizzes: req.body.quizID } }
+            { $pull: { quizes: req.body.quizID } }
         );
 
         res.status(200).json({ message: `Deleted!` });
@@ -178,7 +178,7 @@ exports.deleteNotes = async (req, res) => {
         // Delete associated quizzes
         await Notes.updateOne(
             { _id: notes._id },
-            { $pull: { quizzes: { $exists: true } } }
+            { $pull: { quizes: { $exists: true } } }
         );
 
         // Delete this notes entry

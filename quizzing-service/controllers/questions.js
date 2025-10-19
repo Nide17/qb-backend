@@ -25,12 +25,14 @@ exports.getOneQuestion = async (req, res) => {
 };
 
 exports.createQuestion = async (req, res) => {
-    const { questionText, quiz, category, created_by, answerOptions, duration } = req.body;
-    const qnImage = req.file;
 
-    // Parse answer options from frontend
-    const answers = answerOptions.map(a => JSON.parse(a));
     try {
+
+        const { questionText, quiz, category, created_by, answerOptions, duration } = req.body;
+        const qnImage = req.file;
+
+        // Parse answer options from frontend
+        const answers = answerOptions.map(a => JSON.parse(a));
 
         // Validate required fields
         validateRequiredFields([
@@ -59,11 +61,15 @@ exports.createQuestion = async (req, res) => {
         });
 
         const savedQuestion = await newQuestion.save();
+        if (!savedQuestion) throw new Error('Something went wrong during creation!');
 
         // Update the Quiz on Question creation
-        await updateQuizQuestions(quiz, savedQuestion._id, 'add');
+        const updatedQuiz = await updateQuizQuestions(quiz, savedQuestion._id, 'add');
 
-        if (!savedQuestion) return handleError(res, 'Something went wrong during creation!');
+        if (!updatedQuiz) {
+            Question.deleteOne(savedQuestion._id);
+            throw new Error('Cannot update corresponding quiz!');
+        }
 
         res.status(200).json(savedQuestion);
     } catch (err) {
@@ -72,14 +78,15 @@ exports.createQuestion = async (req, res) => {
 };
 
 exports.updateQuestion = async (req, res) => {
-    const { questionText, answerOptions, newQuiz, oldQuizID, last_updated_by, duration } = req.body;
-    const qnImage = req.file;
-
-    // Find the Question by id
-    const qtn = await Question.findOne({ _id: req.params.id });
-    if (!qtn) return res.status(404).json({ message: 'Question not found' });
 
     try {
+        const { questionText, answerOptions, newQuiz, oldQuizID, last_updated_by, duration } = req.body;
+        const qnImage = req.file;
+
+        // Find the Question by id
+        const qtn = await Question.findOne({ _id: req.params.id });
+        if (!qtn) return res.status(404).json({ message: 'Question not found' });
+        
         // Changing question's quiz
         if (newQuiz && oldQuizID) {
             const updatedQuestion = await Question.findByIdAndUpdate({ _id: qtn._id }, {
@@ -114,8 +121,8 @@ exports.updateQuestion = async (req, res) => {
 
             res.status(200).json(updatedQuestion);
         }
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -134,7 +141,7 @@ exports.deleteQuestion = async (req, res) => {
         // Delete the question
         const removedQuestion = await question.deleteOne();
 
-        if (removedQuestion.deletedCount === 0) return handleError(res, 'Something went wrong while deleting!');
+        if (removedQuestion.deletedCount === 0) throw new Error('Something went wrong while deleting!');
 
         res.status(200).json(question);
     } catch (err) {

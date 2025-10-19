@@ -81,13 +81,19 @@ const validateRequiredFields = (fields) => {
 const updateQuizQuestions = async (quizId, questionId, action) => {
 
     const quiz = await Quiz.findById(quizId);
+
     if (!quiz) throw new Error('Quiz not found while updating questions!');
+
     if (action === 'add') {
         quiz.questions.push(questionId);
     } else if (action === 'remove') {
         quiz.questions.pull(questionId);
     }
-    await quiz.save();
+    await quiz.save().then(quiz => {
+        return quiz;
+    }).catch(err => {
+        throw new Error('Error updating quiz questions!');
+    })
 };
 
 // Helper function to delete image from S3

@@ -39,7 +39,7 @@ exports.createImageUpload = async (req, res) => {
         const { imageTitle, owner } = req.body;
 
         if (!req.file) {
-            handleError(res, new Error('FILE_MISSING'));
+            throw new Error('FILE_MISSING');
         }
 
         const imgUp_file = req.file;
@@ -52,7 +52,7 @@ exports.createImageUpload = async (req, res) => {
         ]);
         // Check for duplicate imageTitle
         const imgUp = await ImageUpload.findOne({ imageTitle });
-        if (imgUp) handleError(res, new Error('Failed! Image with that name already exists!'));
+        if (imgUp) throw new Error('Failed! Image with that name already exists!');
 
         const newImgUp = new ImageUpload({
             imageTitle,
@@ -61,7 +61,7 @@ exports.createImageUpload = async (req, res) => {
         });
 
         const savedImgUp = await newImgUp.save();
-        if (!savedImgUp) handleError(res, new Error('Something went wrong during creation! file size should not exceed 1MB'));
+        if (!savedImgUp) throw new Error('Something went wrong during creation! file size should not exceed 1MB');
 
         res.status(200).json({
             _id: savedImgUp._id,
@@ -83,8 +83,8 @@ exports.updateImageUpload = async (req, res) => {
 
         const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedImageUpload);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

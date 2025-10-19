@@ -199,9 +199,9 @@ exports.getPopularQuizzes = async (req, res) => {
         }
 
         res.json(popularQuizzes);
-    } catch (error) {
-        console.log('\n\nError retrieving popular quizzes: ', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('\n\nError retrieving popular quizzes: ', err);
+        handleError(res, err);
     }
 }
 
@@ -236,8 +236,8 @@ exports.getMonthlyUser = async (req, res) => {
                         uPhoto: user.image,
                         count: monthlyUser[0].count
                     };
-                } catch (userError) {
-                    console.log('Error fetching user data:', userError);
+                } catch (usererr) {
+                    console.log('Error fetching user data:', usererr);
                     monthlyUserData = null;
                 }
             } else {
@@ -248,9 +248,9 @@ exports.getMonthlyUser = async (req, res) => {
         }
 
         res.json(monthlyUserData);
-    } catch (error) {
-        console.log('\n\nError retrieving monthly user: ', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('\n\nError retrieving monthly user: ', err);
+        handleError(res, err);
     }
 }
 
@@ -305,7 +305,7 @@ exports.createScore = async (req, res) => {
 
             const savedScore = await newScore.save()
 
-            if (!savedScore) return handleError(res, 'Something went wrong during creation!');
+            if (!savedScore) throw new Error('Something went wrong during creation!');
 
             // Clear relevant cache entries
             const cacheKeysToDelete = [`scores_user_${taken_by}`, `ranking_${quiz}`, 'popular_quizzes', 'monthly_user'];
@@ -365,7 +365,7 @@ exports.deleteScore = async (req, res) => {
         // Delete the Score
         const removedScore = await Score.deleteOne({ _id: req.params.id })
 
-        if (!removedScore) return handleError(res, 'Something went wrong while deleting!');
+        if (!removedScore) throw new Error('Something went wrong while deleting!');
 
         res.status(200).json(score)
     }
@@ -412,9 +412,9 @@ exports.getTop10QuizzingUsers = async (req, res) => {
             }
         }
         res.json(topUsers);
-    } catch (error) {
-        console.log('\n\nError retrieving top users by quizzes:', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('\n\nError retrieving top users by quizzes:', err);
+        handleError(res, err);
     }
 };
 
@@ -452,8 +452,8 @@ exports.getTop10Quizzes = async (req, res) => {
             }
         }
         res.json(topQuizzes);
-    } catch (error) {
-        console.log('\n\nError retrieving top quizzes:', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('\n\nError retrieving top quizzes:', err);
+        handleError(res, err);
     }
 }

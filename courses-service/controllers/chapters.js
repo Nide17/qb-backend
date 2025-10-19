@@ -90,8 +90,8 @@ exports.updateChapter = async (req, res) => {
 
         const updatedChapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedChapter);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

@@ -102,24 +102,20 @@ exports.updateContact = async (req, res) => {
         }
 
         // Send Reply email
-        try {
-            sendEmail(
-                req.body.to_contact,
-                "New reply",
-                {
-                    name: req.body.to_contact_name,
-                    question: req.body.contact_question,
-                    answer: htmlMessage,
-                },
-                "./template/reply.handlebars"
-            );
-        } catch (err) {
-            console.error('Error sending reply email:', err);
-        }
+        sendEmail(
+            req.body.to_contact,
+            "New reply",
+            {
+                name: req.body.to_contact_name,
+                question: req.body.contact_question,
+                answer: htmlMessage,
+            },
+            "./template/reply.handlebars"
+        );
 
         res.status(200).json(req.body);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

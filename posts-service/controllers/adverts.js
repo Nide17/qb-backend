@@ -56,7 +56,7 @@ exports.createAdvert = async (req, res) => {
         ]);
 
         if (!req.file) {
-            handleError(res, new Error('FILE_MISSING'));
+            throw new Error('FILE_MISSING');
         }
 
         const ad_file = req.file;
@@ -95,8 +95,8 @@ exports.updateAdvert = async (req, res) => {
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedAdvert);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -107,8 +107,8 @@ exports.updateAdvertStatus = async (req, res) => {
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
         res.status(200).json(updatedAdvert);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -137,7 +137,7 @@ exports.deleteAdvertImage = async (req, res) => {
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { new: true });
         res.status(200).json(updatedAdvert);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };

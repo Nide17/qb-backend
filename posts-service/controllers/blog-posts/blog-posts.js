@@ -157,8 +157,8 @@ exports.updateBlogPost = async (req, res) => {
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedBlogPost);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -169,8 +169,8 @@ exports.updateBlogPostStatus = async (req, res) => {
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
         res.status(200).json(updatedBlogPost);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
@@ -220,7 +220,7 @@ exports.deleteBlogPostImage = async (req, res) => {
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { new: true });
         res.status(200).json(updatedBlogPost);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };

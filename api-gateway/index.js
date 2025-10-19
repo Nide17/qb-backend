@@ -126,9 +126,9 @@ app.get('/api/aggregated/quiz/:id', async (req, res) => {
 
         await setCachedData(cacheKey, aggregatedData);
         res.json(aggregatedData);
-    } catch (error) {
-        console.error('Error aggregating quiz data:\n', error);
-        handleError(res, error);
+    } catch (err) {
+        console.error('Error aggregating quiz data:\n', err);
+        handleError(res, err);
     }
 });
 
@@ -185,9 +185,9 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
 
         await setCachedData(cacheKey, aggregatedData);
         res.json(aggregatedData);
-    } catch (error) {
-        console.error('Error aggregating quizzes data:\n', error);
-        handleError(res, error);
+    } catch (err) {
+        console.error('Error aggregating quizzes data:\n', err);
+        handleError(res, err);
     }
 });
 
@@ -223,9 +223,9 @@ app.get('/api/aggregated/dashboard', async (req, res) => {
 
         await setCachedData(cacheKey, dashboardData);
         res.json(dashboardData);
-    } catch (error) {
-        console.error('Error aggregating dashboard data:\n', error);
-        handleError(res, error);
+    } catch (err) {
+        console.error('Error aggregating dashboard data:\n', err);
+        handleError(res, err);
     }
 });
 
@@ -269,9 +269,9 @@ app.get('/api/aggregated/user/:id', async (req, res) => {
 
         await setCachedData(cacheKey, aggregatedData);
         res.json(aggregatedData);
-    } catch (error) {
-        console.error('Error aggregating user data:\n', error);
-        handleError(res, error);
+    } catch (err) {
+        console.error('Error aggregating user data:\n', err);
+        handleError(res, err);
     }
 });
 
@@ -314,9 +314,9 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
 
         await setCachedData(cacheKey, aggregatedData);
         res.json(aggregatedData);
-    } catch (error) {
-        console.error('Error aggregating category data:\n', error);
-        handleError(res, error);
+    } catch (err) {
+        console.error('Error aggregating category data:\n', err);
+        handleError(res, err);
     }
 });
 
@@ -369,9 +369,9 @@ app.get('/api/aggregated/search', async (req, res) => {
 
         await setCachedData(cacheKey, aggregatedData);
         res.json(aggregatedData);
-    } catch (error) {
-        console.error('Error performing search:\n', error);
-        handleError(res, error);
+    } catch (err) {
+        console.error('Error performing search:\n', err);
+        handleError(res, err);
     }
 });
 
@@ -479,8 +479,8 @@ async function startServer() {
             console.log('📡 Ready to route requests to microservices');
             console.log(`📦 Redis cache: ${redisCache.isConnected ? 'Connected' : 'Disconnected'}`);
         });
-    } catch (error) {
-        console.error('Failed to start server:\n', error);
+    } catch (err) {
+        console.error('Failed to start server:\n', err);
         process.exit(1);
     }
 }

@@ -63,8 +63,8 @@ exports.updateCategory = async (req, res) => {
         updatedCategory = await populateCategory(updatedCategory);
 
         res.status(200).json(updatedCategory);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

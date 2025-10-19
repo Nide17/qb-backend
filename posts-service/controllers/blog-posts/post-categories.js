@@ -12,7 +12,6 @@ exports.getPostCategories = async (req, res) => {
         let populatedCategories = await Promise.all(
             postCategories.map(async (category) => {
                 let creator = await populateUser(category.creator) || category.creator;
-                console.log('Created by:', { ...category.toObject(), creator });
                 return { ...category.toObject(), creator };
             })
         ) || postCategories;
@@ -46,7 +45,7 @@ exports.createPostCategory = async (req, res) => {
         }
         const newPostCategory = new PostCategory({ title, answer, created_by });
         const savedPostCategory = newPostCategory.save().catch(() => {
-            handleError(res, new Error('Could not save post category, try again!'));
+            throw new Error('Could not save post category, try again!')
         });
         if (!savedPostCategory) return;
         res.status(200).json(savedPostCategory);
@@ -64,8 +63,8 @@ exports.updatePostCategory = async (req, res) => {
         if (!updatedPostCategory) return res.status(404).json({ message: 'PostCategory not found!' });
 
         res.status(200).json(updatedPostCategory);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

@@ -14,9 +14,8 @@ exports.getSchools = async (req, res) => {
 };
 
 exports.getOneSchool = async (req, res) => {
-
     try {
-        let school = await School.findById(req.params.id).select('title');
+        let school = await School.findById(req.params.id).select('_id title');
         if (!school) return res.status(404).json({ message: 'School not found!' });
         res.status(200).json(school)
     } catch (err) {
@@ -56,8 +55,8 @@ exports.updateSchool = async (req, res) => {
     try {
         const updatedSchool = await School.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedSchool);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

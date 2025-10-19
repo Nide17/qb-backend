@@ -95,8 +95,8 @@ exports.updateCourse = async (req, res) => {
 
         const updatedCourse = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedCourse);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

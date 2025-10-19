@@ -102,7 +102,7 @@ exports.getBatchedUsers = async (req, res) => {
 // Get daily user registration statistics
 exports.getDailyUserRegistration = async (req, res) => {
     try {
-        const dailyRegistration = await User.aggregate([
+        const usersStats = await User.aggregate([
             {
                 $project: {
                     register_date_CAT: {
@@ -131,9 +131,7 @@ exports.getDailyUserRegistration = async (req, res) => {
             }
         ]).exec()
 
-        const total = dailyRegistration.reduce((acc, user) => acc + user.users, 0)
-
-        res.status(200).json({ dailyRegistration, total })
+        res.status(200).json(usersStats)
     } catch (err) {
         handleError(res, err)
     }
@@ -162,7 +160,7 @@ exports.login = async (req, res) => {
             if (!user.current_token || err) {
 
                 const updatedUser = await updateUserToken(user)
-                if (!updatedUser) return handleError(res, 'Could not log you in, try again later!')
+                if (!updatedUser) throw new Error('Could not log you in, try again later!')
 
                 res.status(200).json({
                     current_token: updatedUser.current_token,
@@ -176,7 +174,7 @@ exports.login = async (req, res) => {
                     })
                 } else {
                     const confirmedUser = await updateUserToken(user)
-                    if (!confirmedUser) return handleError(res, 'Could not log you in, try again later!')
+                    if (!confirmedUser) throw new Error('Could not log you in, try again later!')
 
                     res.status(200).json({
                         current_token: confirmedUser.current_token,
@@ -234,7 +232,7 @@ exports.register = async (req, res) => {
             const newUser = new User({ name, email, password: hash, otp, verified: false })
             const savedUser = await newUser.save()
 
-            if (!savedUser) return handleError(res, 'Could not save user, try again!', 500)
+            if (!savedUser) throw new Error('Could not save user, try again!', 500)
 
             await sendEmail(email, "One Time Password (OTP) verification for Quiz Blog account", { name, otp }, "./template/otp.handlebars")
             console.log("new user's otp: ", otp)
@@ -262,7 +260,7 @@ exports.verifyOTP = async (req, res) => {
 
         const updatedUser = await updateUserToken(usr)
 
-        if (!updatedUser) return handleError(res, 'Could not verify user, try again!', 500)
+        if (!updatedUser) throw new Error('Could not verify user, try again!', 500)
 
         res.status(200).json({
             current_token: updatedUser.current_token,
@@ -312,8 +310,8 @@ exports.sendResetLink = async (req, res) => {
             "./template/requestResetPassword.handlebars"
         ).then(async (conn) => {
             res.status(200).json({ message: 'Reset email sent successfully', status: 200 })
-        }).catch((error) => {
-            console.error(error)
+        }).catch((err) => {
+            console.error(err)
             res.status(400).json({ message: 'Failed to send reset link to your email!', status: 500 })
         })
     } catch (err) {
@@ -403,9 +401,9 @@ exports.updateProfile = async (req, res) => {
         let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true })
         user = await populateSchoolDetails(user)
         res.status(200).json(user)
-    } catch (error) {
-        console.log(error)
-        handleError(res, error)
+    } catch (err) {
+        console.log(err)
+        handleError(res, err)
     }
 }
 
@@ -417,8 +415,8 @@ exports.updateUser = async (req, res) => {
         if (!user) return res.status(404).json({ message: 'User not found!' })
 
         res.status(200).json(user)
-    } catch (error) {
-        handleError(res, error)
+    } catch (err) {
+        handleError(res, err)
     }
 }
 

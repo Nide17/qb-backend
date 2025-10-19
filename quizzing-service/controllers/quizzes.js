@@ -181,13 +181,14 @@ exports.createQuiz = async (req, res) => {
         if (existingQuiz) throw new Error('Quiz already exists!');
 
         const newQuiz = new Quiz({ title, description, category, created_by });
+        const updatedCategory = await Category.findByIdAndUpdate(category, { $addToSet: { quizes: newQuiz._id } },
+            { new: true }
+        );
+
+        if (!updatedCategory) throw new Error('Cannot update corresponding category!');
+        console.log(updatedCategory)
         const savedQuiz = await newQuiz.save();
         if (!savedQuiz) throw new Error('Something went wrong during creation!');
-
-        await Category.updateOne(
-            { "_id": category },
-            { $addToSet: { "quizzes": savedQuiz._id } }
-        );
 
         res.status(200).json(savedQuiz);
     } catch (err) {
@@ -204,7 +205,7 @@ exports.notifying = async (req, res) => {
         try {
             const { data } = await callService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
             subscribers = data;
-        } catch (error) {
+        } catch (err) {
             console.error('Error fetching subscribers:', error.message);
         }
 
@@ -241,12 +242,12 @@ exports.updateQuiz = async (req, res) => {
 
         await Category.updateOne(
             { _id: req.body.oldCategoryID },
-            { $pull: { quizzes: quiz._id } }
+            { $pull: { quizes: quiz._id } }
         );
 
         await Category.updateOne(
             { _id: req.body.category },
-            { $addToSet: { "quizzes": quiz._id } }
+            { $addToSet: { "quizes": quiz._id } }
         );
 
         res.status(200).json(quiz);
@@ -276,14 +277,14 @@ exports.deleteQuiz = async (req, res) => {
 
         await Category.updateOne(
             { _id: quiz.category },
-            { $pull: { quizzes: quiz._id } }
+            { $pull: { quizes: quiz._id } }
         );
 
         await Question.deleteMany({ quiz: quiz._id });
 
-        await quiz.remove();
+        await Quiz.deleteOne({ _id: req.params.id });
 
-        res.status(200).json({ message: 'Deleted!' });
+        res.status(200).json(quiz);
     } catch (err) {
         handleError(res, err);
     }
@@ -388,8 +389,8 @@ exports.getDatabaseStats = async (req, res) => {
         };
 
         res.status(200).json(dbStats);
-    } catch (error) {
-        console.log('Error getting database stats:', error);
-        handleError(res, error);
+    } catch (err) {
+        console.log('Error getting database stats:', err);
+        handleError(res, err);
     }
 };

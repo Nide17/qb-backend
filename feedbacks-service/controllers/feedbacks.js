@@ -67,8 +67,8 @@ exports.updateFeedback = async (req, res) => {
             return res.status(404).json({ message: 'Feedback not found!' });
         }
         res.status(200).json(updatedFeedback);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

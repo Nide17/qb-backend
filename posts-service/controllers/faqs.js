@@ -10,8 +10,8 @@ const handleFindByIdAndUpdate = async (id, update, res) => {
 
         const updatedFaq = await Faq.findByIdAndUpdate(id, update, { new: true });
         res.status(200).json(updatedFaq);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

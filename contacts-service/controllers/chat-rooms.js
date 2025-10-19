@@ -17,8 +17,8 @@ exports.getOneChatRoom = async (req, res) => {
     try {
         const chatRoom = await findChatRoomById(req.params.id, res);
         if (chatRoom) res.status(200).json(chatRoom);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 
 };
@@ -97,8 +97,8 @@ exports.updateChatRoom = async (req, res) => {
 
         const updatedChatRoom = await ChatRoom.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedChatRoom);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 

@@ -58,8 +58,8 @@ exports.updateCategory = async (req, res) => {
 
         const updatedCategory = await CourseCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedCategory);
-    } catch (error) {
-        handleError(res, error);
+    } catch (err) {
+        handleError(res, err);
     }
 };
 
