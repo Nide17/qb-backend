@@ -71,7 +71,9 @@ exports.getNotesByChapter = async (req, res) => {
 
 exports.getOneNotes = async (req, res) => {
     try {
-        const notes = await Notes.findById(req.params.id).populate('course chapter courseCategory', 'title').select('title description notes_file chapter course courseCategory quizzes slug uploaded_by');
+        const id = req.params.id;
+        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+        const notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title')
         if (!notes) return res.status(404).json({ message: 'Notes not found!' });
 
         let notesObj = notes.toObject ? notes.toObject() : notes;
@@ -131,11 +133,11 @@ exports.updateNotes = async (req, res) => {
 
         if (!notes) res.status(404).json({ message: 'Notes not found!' });
         console.log("notes: ", notes)
-        
+
         let updates = { ...req.body };
         if (not_file) updates.notes_file = not_file.location;
         console.log("updates: ", updates)
-        
+
         const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, updates, { new: true });
         console.log("updatedNotes: ", updatedNotes)
         res.status(200).json(updatedNotes);

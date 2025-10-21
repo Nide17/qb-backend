@@ -21,8 +21,8 @@ exports.getCategories = async (req, res) => {
 exports.getOneCategory = async (req, res) => {
     try {
         const id = req.params.id;
-        if (!id) throw new Error('Invalid category id!');
-        let category = await Category.findOne({ _id: id }).populate('quizes', '_id title questions slug');
+        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+        let category = await Category.findOne(query).populate('quizes', '_id title questions slug');
         if (!category) throw new Error('Unexistent category!');
 
         category = await populateCategory(category);

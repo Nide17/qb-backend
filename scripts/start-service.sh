@@ -25,7 +25,7 @@ echo "📂 Directory: $SERVICE"
 echo "🌐 Check logs for port information"
 echo ""
 
-cd "$SERVICE"
+cd "$SERVICE" || exit
 
 # Check if package.json exists
 if [ ! -f "package.json" ]; then
@@ -33,5 +33,5 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# Start the service
-npm start
+# Start the service with nodemon
+npx nodemon --watch . --exec "npm start"
