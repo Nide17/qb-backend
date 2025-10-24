@@ -22,4 +22,4 @@ const RoomMessageSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model("RoomMessage", RoomMessageSchema);
+module.exports = mongoose.model('RoomMessage', RoomMessageSchema);

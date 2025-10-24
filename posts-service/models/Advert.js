@@ -32,8 +32,8 @@ const AdvertSchema = new Schema({
     status: { // Active, Inactive
         type: String,
         required: true,
-        default: "Inactive"
+        default: 'Inactive'
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model("Advert", AdvertSchema);
+module.exports = mongoose.model('Advert', AdvertSchema);

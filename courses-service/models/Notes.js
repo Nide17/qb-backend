@@ -1,9 +1,9 @@
 // Bring in Mongo
-const mongoose = require('mongoose')
-const slugify = require("slugify")
+const mongoose = require('mongoose');
+const slugify = require('slugify');
 
 //initialize Mongo schema
-const Schema = mongoose.Schema
+const Schema = mongoose.Schema;
 
 //create a schema object
 const NotesSchema = new Schema({
@@ -45,13 +45,13 @@ const NotesSchema = new Schema({
     ]
 }, { timestamps: true });
 
-NotesSchema.pre("validate", function (next) {
-    const notes = this
+NotesSchema.pre('validate', function (next) {
+    const notes = this;
 
     if (notes.title) {
-        notes.slug = slugify(`${notes.title}`, { replacement: '-', lower: true, strict: true })
+        notes.slug = slugify(`${notes.title}`, { replacement: '-', lower: true, strict: true });
     }
-    next()
-})
+    next();
+});
 
 module.exports = mongoose.model('Notes', NotesSchema);

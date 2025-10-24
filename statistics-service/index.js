@@ -1,29 +1,29 @@
-const express = require('express')
-const cors = require('cors')
+const express = require('express');
+const cors = require('cors');
 const os = require('os');
 const process = require('process');
-const dotenv = require('dotenv')
-const { handleError } = require('./utils/error')
-const { corsOptions } = require('./utils/helpers')
+const dotenv = require('dotenv');
+const { handleError } = require('./utils/error');
+const { corsOptions } = require('./utils/helpers');
 
 // Config
-dotenv.config()
-const app = express()
+dotenv.config();
+const app = express();
 
 // Middlewares
-app.use(cors(corsOptions))
-app.use(express.json())
+app.use(cors(corsOptions));
+app.use(express.json());
 
 // Routes
-app.use("/api/statistics", require('./routes/statistics'))
+app.use('/api/statistics', require('./routes/statistics'));
 
 // home route
-app.get('/', (req, res) => { res.send('Welcome to QB statistics API') })
+app.get('/', (req, res) => { res.send('Welcome to QB statistics API'); });
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
     try {
-        res.json({
+        res.status(200).json({
             service: 'statistics-service',
             database: 'not-required',
             status: 'healthy',
@@ -67,11 +67,11 @@ app.get('/health', async (req, res) => {
 });
 
 // Handle errors: takes res, err, status
-app.use((err, req, res, next) => handleError(res, err))
+app.use((err, req, res, _next) => handleError(res, err));
 
 app.listen(process.env.PORT || 5011, async () => {
-    console.log(`Statistics service is running on port ${process.env.PORT || 5011}, No database required.`)
-})
+    console.log(`Statistics service is running on port ${process.env.PORT || 5011}, No database required.`);
+});
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

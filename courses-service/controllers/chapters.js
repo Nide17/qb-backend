@@ -1,12 +1,12 @@
-const Chapter = require("../models/Chapter");
-const Notes = require("../models/Notes");
+const Chapter = require('../models/Chapter');
+const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
-const { populateUser, validateRequiredFields, findChapterById } = require('../utils/helpers');
+const { populateUser, validateRequiredFields } = require('../utils/helpers');
 
 exports.getChapters = async (req, res) => {
     try {
         const chapters = await Chapter.find().populate('course courseCategory', 'title').sort({ createdAt: -1 }).select('title description course courseCategory created_by');
-        if (!chapters) return res.status(204).json({ message: 'No chapters found!' });
+        if (!chapters) throw {'message':'No chapters found!','statusCode':204};
 
         // Populate created_by field for each chapter
         const populatedChapters = await Promise.all(
@@ -41,8 +41,13 @@ exports.getChaptersByCourse = async (req, res) => {
 
 exports.getOneChapter = async (req, res) => {
     try {
-        const course = await findChapterById(req.params.id, res, 'title description course courseCategory created_by');
-        if (course) res.status(200).json(course);
+        let chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by');
+        if (!chapter) throw {'message':'Chapter not found!','statusCode':404};
+
+        // Populate user
+        chapter = chapter.toObject ? chapter.toObject() : chapter;
+        chapter.created_by = await populateUser(chapter.created_by);
+        res.status(200).json(chapter);
     } catch (err) {
         handleError(res, err);
     }
@@ -64,7 +69,7 @@ exports.createChapter = async (req, res) => {
 
         // Check for duplicate title
         const chapter = await Chapter.findOne({ title });
-        if (chapter) return res.status(403).json({ message: 'Chapter already exists!' });
+        if (chapter) throw {'message':'Chapter with this title already exists!','statusCode':409};
 
         const newChapter = new Chapter({
             title,
@@ -75,7 +80,7 @@ exports.createChapter = async (req, res) => {
         });
 
         const savedChapter = await newChapter.save();
-        if (!savedChapter) return res.status(503).json({ message: 'Something went wrong during creation!' });
+        if (!savedChapter) throw {'message':'Something went wrong during creation!','statusCode':503};
 
         res.status(200).json(savedChapter);
     } catch (err) {
@@ -85,9 +90,6 @@ exports.createChapter = async (req, res) => {
 
 exports.updateChapter = async (req, res) => {
     try {
-        const chapter = await findChapterById(req.params.id, res);
-        if (!chapter) return res.status(404).json({ message: 'Chapter not found!' });
-
         const updatedChapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedChapter);
     } catch (err) {
@@ -97,8 +99,9 @@ exports.updateChapter = async (req, res) => {
 
 exports.deleteChapter = async (req, res) => {
     try {
-        const chapter = await findChapterById(req.params.id, res);
-        if (!chapter) return res.status(404).json({ message: 'Chapter not found!' });
+
+        let chapter = await Chapter.findById(req.params.id);
+        if (!chapter) throw {'message':'Chapter not found!','statusCode':404};
 
         // Delete notes belonging to this chapter
         await Notes.deleteMany({ chapter: chapter._id });

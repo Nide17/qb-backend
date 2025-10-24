@@ -82,7 +82,7 @@ const handleError = (res, err, status) => {
         } else if (err.request) {
             return res.status(503).json({
                 success: false,
-                message: `Feedbacks Service Unavailable`,
+                message: 'Feedbacks Service Unavailable',
                 code: 'SERVICE_UNAVAILABLE',
                 timestamp: new Date().toISOString()
             });
@@ -93,7 +93,7 @@ const handleError = (res, err, status) => {
     else if (err.code === 'ENOTFOUND') {
         return res.status(404).json({
             success: false,
-            message: `Route ${req.originalUrl} does not exist`,
+            message: 'Route does not exist',
             code: 'NOT_FOUND',
             timestamp: new Date().toISOString()
         });
@@ -103,15 +103,15 @@ const handleError = (res, err, status) => {
     const statusCode = status || err.statusCode || 500;
     res.status(statusCode).json({
         success: false,
-        message: err.message || 'Internal server error',
+        message: err?.message || typeof err === 'string' ? err : 'Internal server error',
         code: err.code || 'INTERNAL_ERROR',
         timestamp: new Date().toISOString()
     });
-}
+};
 
 // Memory monitoring configuration
-const MEMORY_WARNING_THRESHOLD = 0.8; // 80% of available memory
-const MEMORY_CRITICAL_THRESHOLD = 0.9; // 90% of available memory
+// const MEMORY_WARNING_THRESHOLD = 0.8; // 80% of available memory
+// const MEMORY_CRITICAL_THRESHOLD = 0.9; // 90% of available memory
 
 // Monitor memory usage and log warnings
 const monitorMemoryUsage = () => {

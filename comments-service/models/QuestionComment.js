@@ -22,7 +22,7 @@ const QuestionCommentSchema = new Schema({
     status: { // Pending - Approved - Rejected
         type: String,
         required: true,
-        default: "Pending"
+        default: 'Pending'
     }
 }, { timestamps: true });
 

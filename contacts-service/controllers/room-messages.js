@@ -1,6 +1,6 @@
-const RoomMessage = require("../models/RoomMessage");
+const RoomMessage = require('../models/RoomMessage');
 const { handleError } = require('../utils/error');
-const { callService, validateRequiredFields, findRoomMessageById, notifyAdmins } = require('../utils/helpers');
+const { getFromService, validateRequiredFields, notifyAdmins, validateRoomMessageData } = require('../utils/helpers');
 
 exports.getRoomMessages = async (req, res) => {
     try {
@@ -10,7 +10,7 @@ exports.getRoomMessages = async (req, res) => {
         const fetchUser = async (userId, context) => {
             try {
                 if (!userId) return null;
-                const response = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+                const response = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
                 return response;
             } catch (error) {
                 console.warn(`Failed to fetch ${context} user ${userId}:`, error.message);
@@ -61,8 +61,8 @@ exports.getRoomMessageByRoom = async (req, res) => {
 
 exports.getOneRoomMessage = async (req, res) => {
     try {
-    const roomMessage = await findRoomMessageById(req.params.id, res);
-    if (roomMessage) res.status(200).json(roomMessage);
+        const roomMessage = await RoomMessage.findById(req.params.id);
+        if (roomMessage) res.status(200).json(roomMessage);
     } catch (err) {
         handleError(res, err);
     }
@@ -79,7 +79,7 @@ exports.createRoomMessage = async (req, res) => {
             { name: 'content', value: content },
             { name: 'roomID', value: roomID }
         ]);
-        
+
         const newRoomMessage = new RoomMessage({
             sender: senderID,
             receiver: receiverID,
@@ -89,10 +89,7 @@ exports.createRoomMessage = async (req, res) => {
 
         const savedMessage = await newRoomMessage.save();
         if (!savedMessage) {
-            return res.status(500).json({
-                success: false,
-                message: 'Something went wrong during creation!'
-            });
+            throw {'statusCode':500,'message':'Something went wrong during creation!'};
         }
 
         // Notify admins about the new room message
@@ -114,7 +111,7 @@ exports.createRoomMessage = async (req, res) => {
 
 exports.deleteRoomMessage = async (req, res) => {
     try {
-        const roomMessage = await findRoomMessageById(req.params.id, res);
+        const roomMessage = await RoomMessage.findById(req.params.id);
         if (!roomMessage) return;
 
         const deletedMessage = await RoomMessage.findByIdAndDelete(req.params.id);

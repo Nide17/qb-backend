@@ -1,103 +1,103 @@
 // Import dependencies
-const bcrypt = require("bcryptjs")
-const jwt = require("jsonwebtoken")
-const crypto = require("crypto")
-const { sendEmail } = require("../utils/emails/sendEmail")
-const User = require("../models/User")
-const PswdResetToken = require("../models/PswdResetToken")
-const { handleError } = require("../utils/error")
-const { deleteImageFromS3, populateSchoolDetails, hashPassword, updateUserToken } = require("../utils/helpers")
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { sendEmail } = require('../utils/emails/sendEmail');
+const User = require('../models/User');
+const PswdResetToken = require('../models/PswdResetToken');
+const { handleError } = require('../utils/error');
+const { deleteImageFromS3, populateSchoolDetails, hashPassword, updateUserToken } = require('../utils/helpers');
 
 // Get all users
 exports.getUsers = async (req, res) => {
 
-    const limit = req.query.limit ? parseInt(req.query.limit) : 0
-    const filter = req.query.filter ? req.query.filter : '' // Eg: name, school, level, faculty, interests, about, image
+    const limit = req.query.limit ? parseInt(req.query.limit) : 0;
+    const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
 
     try {
-        let users = await User.find(filter ? { [filter]: { $exists: true } } : {}).limit(limit).sort({ register_date: -1 }).select(`name email role register_date` + (filter ? ` ${filter}` : ''))
-        if (!users.length) return res.status(204).json({ message: 'No users found!' })
+        let users = await User.find(filter ? { [filter]: { $exists: true } } : {}).limit(limit).sort({ register_date: -1 }).select('name email role register_date' + (filter ? ` ${filter}` : ''));
+        if (!users.length) throw { 'message': 'No users found!', 'statusCode': 204 };
 
-        res.status(200).json(users)
+        res.status(200).json(users);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Get 8 latest users
 exports.getLatestUsers = async (req, res) => {
     try {
         let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
-        if (!users.length) return res.status(404).json({ message: 'No users found!' })
-        res.status(200).json(users)
+        if (!users.length) throw { 'message': 'No users found!', 'statusCode': 404 };
+        res.status(200).json(users);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Get Admin and Creators users
 exports.getAdminsCreators = async (req, res) => {
     try {
         let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
-        if (!adminsCreators.length) return res.status(404).json({ message: 'No users found!' })
-        res.status(200).json(adminsCreators)
+        if (!adminsCreators.length) throw { 'message': 'No users found!', 'statusCode': 404 };
+        res.status(200).json(adminsCreators);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Get one user by ID
 exports.getOneUser = async (req, res) => {
 
     try {
         let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
-        if (!user) return res.status(404).json({ message: 'User not found!' });
+        if (!user) throw { 'message': 'User not found!', 'statusCode': 404 };
 
         // Populate user school details
-        user = await populateSchoolDetails(user)
-        res.status(200).json(user)
+        user = await populateSchoolDetails(user);
+        res.status(200).json(user);
 
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Load user by token
 exports.loadUser = async (req, res) => {
     try {
         let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
 
-        if (!user) return res.status(204).json({ message: 'No active session!' })
-        user = await populateSchoolDetails(user)
-        return res.status(200).json(user)
+        if (!user) throw { 'message': 'No active session!', 'statusCode': 204 };
+        user = await populateSchoolDetails(user);
+        return res.status(200).json(user);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Get emails of all admins
 exports.getAdminsEmails = async (req, res) => {
     try {
-        const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email')
-        if (!admins) return res.status(404).json({ message: 'No admins found!' })
-        const adminEmails = admins.map(admin => admin.email)
-        return res.status(200).json(adminEmails)
+        const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
+        if (!admins) throw { 'message': 'No admins found!', 'statusCode': 404 };
+        const adminEmails = admins.map(admin => admin.email);
+        return res.status(200).json(adminEmails);
     } catch (err) {
-        console.error(err)
-        handleError(res, err)
+        console.error(err);
+        handleError(res, err);
     }
-}
+};
 
 // Get batched users: by IDs list from the post body
 exports.getBatchedUsers = async (req, res) => {
     try {
-        const users = await User.find({ _id: { $in: req.body?.userIds } }).select('name email')
-        if (!users.length) return res.status(404).json({ message: 'No users found!' })
-        res.status(200).json(users)
+        const users = await User.find({ _id: { $in: req.body?.userIds } }).select('name email');
+        if (!users.length) throw { 'message': 'No users found!', 'statusCode': 404 };
+        res.status(200).json(users);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Get daily user registration statistics
 exports.getDailyUserRegistration = async (req, res) => {
@@ -107,15 +107,15 @@ exports.getDailyUserRegistration = async (req, res) => {
                 $project: {
                     register_date_CAT: {
                         $dateToString: {
-                            format: "%Y-%m-%d",
-                            date: { $add: ["$register_date", 2 * 60 * 60 * 1000] }
+                            format: '%Y-%m-%d',
+                            date: { $add: ['$register_date', 2 * 60 * 60 * 1000] }
                         }
                     }
                 }
             },
             {
                 $group: {
-                    _id: "$register_date_CAT",
+                    _id: '$register_date_CAT',
                     users: { $sum: 1 }
                 }
             },
@@ -125,68 +125,65 @@ exports.getDailyUserRegistration = async (req, res) => {
             {
                 $project: {
                     _id: 0,
-                    date: "$_id",
+                    date: '$_id',
                     users: 1
                 }
             }
-        ]).exec()
+        ]).exec();
 
-        res.status(200).json(usersStats)
+        res.status(200).json(usersStats);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // User login
 exports.login = async (req, res) => {
-    const { email, password, confirmLogin } = req.body
-    if (!email || !password) return res.status(400).json({ message: 'Please fill all fields' })
+    const { email, password, confirmLogin } = req.body;
+    if (!email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
 
     try {
-        const user = await User.findOne({ email })
-        if (!user) return res.status(404).json({ message: 'User not found' })
+        const user = await User.findOne({ email });
+        if (!user) throw { 'statusCode': 404, 'message': 'User not found' };
 
-        const isMatch = await bcrypt.compare(password, user.password)
-        if (!isMatch) return res.status(400).json({ message: 'Incorrect E-mail or Password!' })
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) throw { 'statusCode': 400, 'message': 'Incorrect E-mail or Password!' };
 
         if (!user.verified && new Date(user.register_date) > new Date('2024-12-09')) {
-            const otp = Math.floor(100000 + Math.random() * 900000).toString()
-            await User.findOneAndUpdate({ email }, { otp })
-            await sendEmail(email, otp)
-            return res.status(400).json({ message: 'Account not verified yet, check your email for OTP!' })
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            await User.findOneAndUpdate({ email }, { otp });
+            await sendEmail(email, otp);
+            throw { 'statusCode': 400, 'message': 'Account not verified yet, check your email for OTP!' };
         }
 
-        jwt.verify(user.current_token, process.env.JWT_SECRET, async (err, decoded) => {
+        jwt.verify(user.current_token, process.env.JWT_SECRET, async (err) => {
             if (!user.current_token || err) {
 
-                const updatedUser = await updateUserToken(user)
-                if (!updatedUser) throw new Error('Could not log you in, try again later!')
+                const updatedUser = await updateUserToken(user);
+                if (!updatedUser) throw new Error('Could not log you in, try again later!');
 
                 res.status(200).json({
                     current_token: updatedUser.current_token,
                     user: updatedUser
-                })
+                });
             } else {
                 if (!confirmLogin) {
-                    return res.status(401).json({
-                        message: 'Already logged in, Log out & use here',
-                        id: 'CONFIRM_ERR'
-                    })
+                    throw { 'statusCode': 401, 'message': 'Already logged in, Log out & use here', 'code': 'CONFIRM_ERR' };
                 } else {
-                    const confirmedUser = await updateUserToken(user)
-                    if (!confirmedUser) throw new Error('Could not log you in, try again later!')
+                    const confirmedUser = await updateUserToken(user);
+                    if (!confirmedUser) throw new Error('Could not log you in, try again later!');
 
                     res.status(200).json({
                         current_token: confirmedUser.current_token,
                         user: confirmedUser,
-                    })
+                    });
                 }
             }
-        })
+        });
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // User logout
 exports.logout = async (req, res) => {
@@ -195,72 +192,72 @@ exports.logout = async (req, res) => {
             req.body.userId,
             { $set: { current_token: null } },
             { new: true }
-        )
-        if (!loggedOutUser) return res.status(404).json({ message: 'User not found!' })
-        res.status(200).json({ message: 'Good Bye!', status: 200 })
+        );
+        if (!loggedOutUser) throw { 'statusCode': 404, 'message': 'User not found!' };
+        res.status(200).json({ message: 'Good Bye!', status: 200 });
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // User registration
 exports.register = async (req, res) => {
 
-    const { name, email, password } = req.body
-    const emailTest = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i
-    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+    const { name, email, password } = req.body;
+    const emailTest = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    if (!name || !email || !password) return res.status(400).json({ message: 'Please fill all fields' })
-    if (!emailTest.test(email)) return res.status(400).json({ message: 'Please provide a valid email!' })
+    if (!name || !email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
+    if (!emailTest.test(email)) throw { 'statusCode': 400, 'message': 'Please provide a valid email!' };
 
     try {
-        const user = await User.findOne({ email })
-        const hash = await hashPassword(password)
+        const user = await User.findOne({ email });
+        const hash = await hashPassword(password);
 
         if (user && (user.verified === true)) {
-            return res.status(400).json({ message: 'User already exists, login instead!' })
+            throw { 'statusCode': 400, 'message': 'User already exists, login instead!' };
         }
 
         // If user already and not verified, update user
-        await User.findOneAndUpdate({ email }, { name, password: hash, otp })
-        await sendEmail(email, "One Time Password (OTP) verification for Quiz Blog account", { name, otp }, "./template/otp.handlebars")
-        console.log("existing user otp: ", otp)
+        await User.findOneAndUpdate({ email }, { name, password: hash, otp });
+        await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
+        console.log('existing user otp: ', otp);
 
         // If user does not exist, create a new one
         if (!user) {
 
-            const newUser = new User({ name, email, password: hash, otp, verified: false })
-            const savedUser = await newUser.save()
+            const newUser = new User({ name, email, password: hash, otp, verified: false });
+            const savedUser = await newUser.save();
 
-            if (!savedUser) throw new Error('Could not save user, try again!', 500)
+            if (!savedUser) throw { statusCode: 500, message: 'Could not save user, try again!' };
 
-            await sendEmail(email, "One Time Password (OTP) verification for Quiz Blog account", { name, otp }, "./template/otp.handlebars")
-            console.log("new user's otp: ", otp)
+            await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
+            console.log('new user\'s otp: ', otp);
         }
 
-        res.status(200).json({ message: 'Registration successful! Please verify your email to login.', email })
+        res.status(200).json({ message: 'Registration successful! Please verify your email to login.', email });
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Verify OTP
 exports.verifyOTP = async (req, res) => {
 
-    const { email, otp } = req.body
-    if (!email || !otp) return res.status(400).json({ message: "Email and OTP are required!" })
+    const { email, otp } = req.body;
+    if (!email || !otp) throw { 'statusCode': 400, 'message': 'Email and OTP are required!' };
 
     try {
-        const usr = await User.findOne({ email }).select('-password')
+        const usr = await User.findOne({ email }).select('-password');
 
-        if (!usr) return res.status(400).json({ message: "User does not exist" })
-        if (otp !== usr.otp) return res.status(400).json({ message: "Invalid OTP provided." })
+        if (!usr) throw { 'statusCode': 400, 'message': 'User does not exist' };
+        if (otp !== usr.otp) throw { 'statusCode': 400, 'message': 'Invalid OTP provided.' };
 
-        await User.findOneAndUpdate({ email }, { verified: true })
+        await User.findOneAndUpdate({ email }, { verified: true });
 
-        const updatedUser = await updateUserToken(usr)
+        const updatedUser = await updateUserToken(usr);
 
-        if (!updatedUser) throw new Error('Could not verify user, try again!', 500)
+        if (!updatedUser) throw { statusCode: 500, message: 'Could not verify user, try again!' };
 
         res.status(200).json({
             current_token: updatedUser.current_token,
@@ -270,158 +267,143 @@ exports.verifyOTP = async (req, res) => {
                 email: updatedUser.email,
                 role: updatedUser.role
             },
-            message: "Account verified now!", status: 200
-        })
+            message: 'Account verified now!', status: 200
+        });
     } catch (err) {
-        handleError(res, err, 500)
+        handleError(res, err, 500);
     }
-}
+};
 
 // Send password reset link
 exports.sendResetLink = async (req, res) => {
-    const email = req.body.email
+    const email = req.body.email;
     try {
-        const userToReset = await User.findOne({ email })
+        const userToReset = await User.findOne({ email });
         if (!userToReset) {
-            return res.status(404).json({
-                success: false,
-                message: 'User with that email does not exist!'
-            });
+            throw { 'statusCode': 404, 'message': 'User with that email does not exist!' };
         }
 
-        let token = await PswdResetToken.findOne({ userId: userToReset._id })
-        if (token) await token.deleteOne()
+        let token = await PswdResetToken.findOne({ userId: userToReset._id });
+        if (token) await token.deleteOne();
 
-        let resetToken = crypto.randomBytes(32).toString("hex")
-        const hash = await hashPassword(resetToken)
+        let resetToken = crypto.randomBytes(32).toString('hex');
+        const hash = await hashPassword(resetToken);
         await new PswdResetToken({
             userId: userToReset._id,
             token: hash,
             register_date: Date.now(),
-        }).save()
+        }).save();
 
-        const clientURL = req.headers.origin
-        const link = `${clientURL}/reset-password?token=${resetToken}&id=${userToReset._id}`
+        const clientURL = req.headers.origin;
+        const link = `${clientURL}/reset-password?token=${resetToken}&id=${userToReset._id}`;
 
         sendEmail(
             userToReset.email,
-            "Password reset for your Quiz-Blog account!",
+            'Password reset for your Quiz-Blog account!',
             { name: userToReset.name, link: link },
-            "./template/requestResetPassword.handlebars"
-        ).then(async (conn) => {
-            res.status(200).json({ message: 'Reset email sent successfully', status: 200 })
+            './template/requestResetPassword.handlebars'
+        ).then(async () => {
+            res.status(200).json({ message: 'Reset email sent successfully', status: 200 });
         }).catch((err) => {
-            console.error(err)
-            res.status(400).json({ message: 'Failed to send reset link to your email!', status: 500 })
-        })
+            console.error(err);
+            handleError(res, { statusCode: 500, message: 'Failed to send reset link to your email!' }, 500);
+        });
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Send new password
 exports.sendNewPassword = async (req, res) => {
     try {
-        const { userId, token, password } = req.body
-        let passwordResetToken = await PswdResetToken.findOne({ userId })
+        const { userId, token, password } = req.body;
+        let passwordResetToken = await PswdResetToken.findOne({ userId });
         if (!passwordResetToken) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid or expired link, try resetting again!"
-            });
+            throw { 'statusCode': 400, 'message': 'Invalid or expired link, try resetting again!' };
         }
 
-        const isValid = await bcrypt.compare(token, passwordResetToken.token)
+        const isValid = await bcrypt.compare(token, passwordResetToken.token);
         if (!isValid) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid link, try resetting again!"
-            });
+            throw { 'statusCode': 400, 'message': 'Invalid link, try resetting again!' };
         }
 
-        const hash = await hashPassword(password)
-        await User.updateOne({ _id: userId }, { $set: { password: hash } }, { new: true })
+        const hash = await hashPassword(password);
+        await User.updateOne({ _id: userId }, { $set: { password: hash } }, { new: true });
 
-        const resetUser = await User.findById({ _id: userId })
+        const resetUser = await User.findById({ _id: userId });
         sendEmail(
             resetUser.email,
-            "Password reset for your Quiz-Blog account is successful!",
+            'Password reset for your Quiz-Blog account is successful!',
             { name: resetUser.name },
-            "./template/resetPassword.handlebars"
-        )
+            './template/resetPassword.handlebars'
+        );
 
-        await passwordResetToken.deleteOne()
-        res.status(200).json({ message: "Password reset successful!", status: 200 })
+        await passwordResetToken.deleteOne();
+        res.status(200).json({ message: 'Password reset successful!', status: 200 });
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Update profile image
 exports.updateProfileImage = async (req, res) => {
     if (!req.file) {
-        return res.status(400).json({
-            success: false,
-            message: 'FILE_MISSING'
-        });
+        throw { 'statusCode': 400, 'message': 'FILE_MISSING' };
     }
 
-    const img_file = req.file
+    const img_file = req.file;
     try {
-        const profile = await User.findOne({ _id: req.params.id })
+        const profile = await User.findOne({ _id: req.params.id });
         if (!profile) {
-            return res.status(404).json({
-                success: false,
-                message: 'Failed! profile not exists!'
-            });
+            throw { 'statusCode': 404, 'message': 'Failed! profile not exists!' };
         }
 
         profile.image && await deleteImageFromS3(profile.image);
 
-        let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true })
-        updatedUserProfile = await populateSchoolDetails(updatedUserProfile)
-        res.status(200).json(updatedUserProfile)
+        let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true });
+        updatedUserProfile = await populateSchoolDetails(updatedUserProfile);
+        res.status(200).json(updatedUserProfile);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Update profile
 exports.updateProfile = async (req, res) => {
     try {
-        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true })
-        user = await populateSchoolDetails(user)
-        res.status(200).json(user)
+        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true });
+        user = await populateSchoolDetails(user);
+        res.status(200).json(user);
     } catch (err) {
-        console.log(err)
-        handleError(res, err)
+        console.log(err);
+        handleError(res, err);
     }
-}
+};
 
 // Update user
 exports.updateUser = async (req, res) => {
     try {
-        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true })
+        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true });
 
-        if (!user) return res.status(404).json({ message: 'User not found!' })
+        if (!user) throw { 'statusCode': 404, 'message': 'User not found!' };
 
-        res.status(200).json(user)
+        res.status(200).json(user);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};
 
 // Delete user
 exports.deleteUser = async (req, res) => {
     try {
-        const user = await User.findById(req.params.id)
-        if (!user) return res.status(404).json({ message: 'User not found!' })
+        const user = await User.findById(req.params.id);
+        if (!user) throw { 'statusCode': 404, 'message': 'User not found!' };
 
-        const removedUser = await User.deleteOne({ _id: req.params.id })
-        if (removedUser.deletedCount === 0) throw new Error('Failed to delete user!')
+        const removedUser = await User.deleteOne({ _id: req.params.id });
+        if (removedUser.deletedCount === 0) throw new Error('Failed to delete user!');
 
-        res.status(200).json(user)
+        res.status(200).json(user);
     } catch (err) {
-        handleError(res, err)
+        handleError(res, err);
     }
-}
+};

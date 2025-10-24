@@ -1,6 +1,6 @@
 // Bring in Mongo
-const mongoose = require('mongoose')
-const slugify = require("slugify")
+const mongoose = require('mongoose');
+const slugify = require('slugify');
 
 //initialize Mongo schema
 const Schema = mongoose.Schema;
@@ -59,15 +59,15 @@ const QuestionSchema = new Schema({
         type: String,
         required: true,
     },
-})
+});
 
-QuestionSchema.pre("validate", function (next) {
-    const question = this
+QuestionSchema.pre('validate', function (next) {
+    const question = this;
 
     if (question.questionText) {
-        question.slug = slugify(`${question.questionText}`, { replacement: '-', lower: true, strict: true })
+        question.slug = slugify(`${question.questionText}`, { replacement: '-', lower: true, strict: true });
     }
-    next()
-})
+    next();
+});
 
-module.exports = mongoose.model("Question", QuestionSchema);
+module.exports = mongoose.model('Question', QuestionSchema);

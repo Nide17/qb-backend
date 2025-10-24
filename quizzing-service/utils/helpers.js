@@ -1,6 +1,6 @@
 const axios = require('axios');
-const Quiz = require("../models/Quiz");
-const { S3 } = require("@aws-sdk/client-s3");
+const Quiz = require('../models/Quiz');
+const { S3 } = require('@aws-sdk/client-s3');
 
 const s3Config = new S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -10,7 +10,7 @@ const s3Config = new S3({
 });
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const getFromService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -32,7 +32,7 @@ const callService = async (url, timeout = 20000, token) => {
 // Simple population function for users
 const populateUser = async (userId) => {
     if (!userId) return null;
-    const data = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+    const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
     return data ? {
         _id: data._id,
@@ -50,7 +50,7 @@ const populateCategory = async (category) => {
     try {
         // Fetch courseCategory details
         if (category.courseCategory) {
-            const categoryData = await callService(`${process.env.COURSES_SERVICE_URL}/api/course-categories/${category.courseCategory}`);
+            const categoryData = await getFromService(`${process.env.COURSES_SERVICE_URL}/api/course-categories/${category.courseCategory}`);
             if (categoryData) {
                 categoryObj.courseCategory = categoryData;
             }
@@ -92,8 +92,9 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
             quiz.questions.pull(questionId);
         }
         await quiz.save();
-        return true
+        return true;
     } catch (err) {
+        console.error(err.message);
         throw new Error('Error updating quiz questions!');
     }
 };
@@ -107,11 +108,11 @@ const deleteImageFromS3 = async (imagePath) => {
         };
         s3Config.deleteObject(deleteParams, function (err, data) {
             if (err) {
-                console.error("Error deleting object:", err);
+                console.error('Error deleting object:', err);
             } else {
-                console.log("Object deleted successfully:", data);
+                console.log('Object deleted successfully:', data);
             }
-        })
+        });
     } catch (err) {
         throw new Error(`Error deleting image: ${err.message}`);
     }
@@ -158,25 +159,25 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
-    callService,
+    getFromService,
     validateRequiredFields,
     populateUser,
     populateCategory,

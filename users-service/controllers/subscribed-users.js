@@ -1,11 +1,11 @@
-const SubscribedUser = require("../models/SubscribedUser");
+const SubscribedUser = require('../models/SubscribedUser');
 const { handleError } = require('../utils/error');
-const { validateRequiredFields, sendSubscriptionEmail } = require("../utils/helpers")
+const { validateRequiredFields, sendSubscriptionEmail } = require('../utils/helpers');
 
 exports.getSubscribedUsers = async (req, res) => {
     try {
-        const subscribedUsers = await SubscribedUser.find().sort({ createdAt: -1 });
-        if (!subscribedUsers) return res.status(204).json({ message: 'No subscribed users found!' });
+    const subscribedUsers = await SubscribedUser.find().sort({ createdAt: -1 });
+    if (!subscribedUsers) throw {'message':'No subscribed users found!','statusCode':204};
         res.status(200).json(subscribedUsers);
     } catch (err) {
         handleError(res, err);
@@ -15,8 +15,8 @@ exports.getSubscribedUsers = async (req, res) => {
 exports.getOneSubscribedUser = async (req, res) => {
     try {
         const subscribedUser = await SubscribedUser.findById(req.params.id).select('name email createdAt');
-        if (!subscribedUser) return res.status(404).json({ message: 'No subscribed user found!' });
-        return res.status(200).json(subscribedUser);
+    if (!subscribedUser) throw {'message':'No subscribed user found!','statusCode':404};
+    return res.status(200).json(subscribedUser);
     } catch (err) {
         handleError(res, err);
     }
@@ -35,13 +35,13 @@ exports.createSubscribedUser = async (req, res) => {
     try {
         const subscriber = await SubscribedUser.findOne({ email });
         if (subscriber) {
-            return res.status(400).json({ message: 'You are already subscribed!' });
+            throw {'message':'You are already subscribed!','statusCode':400};
         }
 
         const newSubscriber = new SubscribedUser({ name, email });
         const savedSubscriber = await newSubscriber.save();
         if (!savedSubscriber) {
-            return res.status(400).json({ message: 'Failed to subscribe!' });
+            throw {'message':'Failed to subscribe!','statusCode':400};
         }
 
         // Sending e-mail to subscribed user
@@ -64,8 +64,8 @@ exports.updateSubscribedUser = async (req, res) => {
 
 exports.deleteSubscribedUser = async (req, res) => {
     try {
-        const subscribedUser = await SubscribedUser.findById(req.params.id);
-        if (!subscribedUser) return;
+    const subscribedUser = await SubscribedUser.findById(req.params.id);
+    if (!subscribedUser) throw {'message':'Subscribed user not found!','statusCode':404};
 
         const removedSubscribedUser = await subscribedUser.deleteOne();
         if (removedSubscribedUser.deletedCount === 0) throw new Error('Something went wrong while deleting!');

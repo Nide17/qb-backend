@@ -1,5 +1,5 @@
 const os = require('os');
-const { callService } = require('./helpers');
+const { getFromService } = require('./helpers');
 
 /**
  * Health Monitoring and Metrics Collection
@@ -111,24 +111,39 @@ class HealthMonitor {
     /**
      * Check service health
      */
-    async checkservicesHealth(serviceName, url, timeout = 10000) {
+    async checkservicesHealth(serviceName, url) {
         const startTime = Date.now();
 
         try {
-            const response = await callService(`${url}/health`, {
-                timeout
-            });
+            if (!url || typeof url !== 'string' || url.startsWith('undefined')) {
+                const responseTime = Date.now() - startTime;
+                const healthStatus = {
+                    service: serviceName,
+                    status: 'unhealthy',
+                    responseTime,
+                    timestamp: Date.now(),
+                    details: null,
+                    error: 'Service URL not configured'
+                };
+
+                this.healthChecks.set(serviceName, healthStatus);
+                return healthStatus;
+            }
+
+            const response = await getFromService(`${url}/health`);
 
             const responseTime = Date.now() - startTime;
-            const isHealthy = response.status === 200;
+
+            // getFromService returns either an object or null; handle both
+            const isHealthy = response && (response.status === 200 || response.status === 'healthy' || response.status === 'ok');
 
             const healthStatus = {
                 service: serviceName,
                 status: isHealthy ? 'healthy' : 'degraded',
                 responseTime,
                 timestamp: Date.now(),
-                details: response.data || null,
-                error: null
+                details: response || null,
+                error: response ? null : 'No response or invalid health payload'
             };
 
             this.healthChecks.set(serviceName, healthStatus);
@@ -150,48 +165,13 @@ class HealthMonitor {
         }
     }
 
-    /**
-     * Check database connectivity
-     */
-    async checkDatabaseHealth(mongoose) {
-        try {
-            const state = mongoose.connection.readyState;
-            const states = {
-                0: 'disconnected',
-                1: 'connected',
-                2: 'connecting',
-                3: 'disconnecting'
-            };
-
-            const dbHealth = {
-                status: state === 1 ? 'healthy' : 'unhealthy',
-                state: states[state],
-                host: mongoose.connection.host,
-                name: mongoose.connection.name,
-                timestamp: Date.now()
-            };
-
-            if (state === 1) {
-                // Test with a simple query
-                const startTime = Date.now();
-                await mongoose.connection.db.admin().ping();
-                dbHealth.responseTime = Date.now() - startTime;
-            }
-
-            return dbHealth;
-        } catch (error) {
-            return {
-                status: 'unhealthy',
-                error: error.message,
-                timestamp: Date.now()
-            };
-        }
-    }
+    // Database health checks have been removed from the gateway.
+    // The HealthMonitor remains focused on service checks and system metrics.
 
     /**
      * Get comprehensive health report
      */
-    async getHealthReport(services = [], mongoose = null) {
+    async getHealthReport(services = []) {
         const systemMetrics = this.getSystemMetrics();
         const serviceChecks = [];
 
@@ -201,12 +181,6 @@ class HealthMonitor {
             serviceChecks.push(health);
         }
 
-        // Check database if provided
-        let databaseHealth = null;
-        if (mongoose) {
-            databaseHealth = await this.checkDatabaseHealth(mongoose);
-        }
-
         // Calculate overall status
         const unhealthyServices = serviceChecks.filter(s => s.status === 'unhealthy').length;
         const degradedServices = serviceChecks.filter(s => s.status === 'degraded').length;
@@ -214,7 +188,7 @@ class HealthMonitor {
         let overallStatus = 'healthy';
         if (unhealthyServices > 0) {
             overallStatus = 'unhealthy';
-        } else if (degradedServices > 0 || (databaseHealth && databaseHealth.status === 'unhealthy')) {
+        } else if (degradedServices > 0) {
             overallStatus = 'degraded';
         }
 
@@ -223,7 +197,6 @@ class HealthMonitor {
             timestamp: Date.now(),
             uptime: Date.now() - this.metrics.uptime,
             system: systemMetrics,
-            database: databaseHealth,
             services: serviceChecks,
             metrics: this.getMetricsSummary(),
             alerts: this.alerts.slice(-10) // Last 10 alerts

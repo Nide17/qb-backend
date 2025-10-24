@@ -8,20 +8,6 @@ exports.initialize = (httpServer) => {
     // Initialize with the enhanced socket manager
     io = socketManager.initialize(httpServer);
 
-    // Enhanced socket manager automatically handles:
-    // - User authentication and sessions
-    // - Connection management and reconnection
-    // - Online user tracking and presence
-// Enhanced Socket.IO for Contacts Service
-// Uses the shared enhanced socket manager for improved real-time features
-const socketManager = require('../../shared-utils/enhanced-socket');
-
-let io = null;
-
-exports.initialize = (httpServer) => {
-    // Initialize with the enhanced socket manager
-    io = socketManager.initialize(httpServer);
-
     console.log('✨ Contacts Service: Enhanced Socket.IO initialized');
     
     // Set up contacts-specific event handlers
@@ -76,43 +62,26 @@ exports.getIO = () => {
 };
 
 // Enhanced methods using the new socket manager
-exports.getOnlineUsers = () => {
-    return socketManager.getOnlineUsers();
-};
-
-exports.getOnlineUserCount = () => {
-    return socketManager.getOnlineUserCount();
-};
-
-exports.getOnlineUserById = (userId) => {
-    return socketManager.getUserById(userId);
-};
-
-exports.sendToUser = (userId, event, data) => {
-    return socketManager.sendToUser(userId, event, data);
-};
-
-exports.broadcastToRoom = (roomId, event, data) => {
-    return socketManager.broadcastToRoom(roomId, event, data);
-};
-
-exports.broadcastToAll = (event, data) => {
-    return socketManager.broadcastToAll(event, data);
-};
+exports.getOnlineUsers = () => socketManager.getOnlineUsers();
+exports.getOnlineUserCount = () => socketManager.getOnlineUserCount();
+exports.getOnlineUserById = (userId) => socketManager.getUserById(userId);
+exports.sendToUser = (userId, event, data) => socketManager.sendToUser(userId, event, data);
+exports.broadcastToRoom = (roomId, event, data) => socketManager.broadcastToRoom(roomId, event, data);
+exports.broadcastToAll = (event, data) => socketManager.broadcastToAll(event, data);
 
 // Backward compatibility methods (deprecated)
-exports.addOnlineUser = (user) => {
+exports.addOnlineUser = (_user) => {
     console.warn('addOnlineUser is deprecated - users are managed automatically');
 };
 
-exports.removeOnlineUser = (socketID) => {
+exports.removeOnlineUser = (_socketID) => {
     console.warn('removeOnlineUser is deprecated - users are managed automatically');
 };
 
-exports.getOnlineUser = (socketID) => {
+exports.getOnlineUser = (_socketID) => {
     console.warn('getOnlineUser is deprecated - use getOnlineUserById instead');
     const users = socketManager.getOnlineUsers();
-    return users.find(user => user.socketId === socketID);
+    return users.find(user => user.socketId === _socketID);
 };
 
 exports.getOnlineUserByEmail = (email) => {

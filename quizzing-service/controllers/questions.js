@@ -1,5 +1,5 @@
-const Question = require("../models/Question");
-const slugify = require("slugify")
+const Question = require('../models/Question');
+const slugify = require('slugify');
 const { handleError } = require('../utils/error');
 const { validateRequiredFields, updateQuizQuestions, deleteImageFromS3 } = require('../utils/helpers');
 
@@ -7,8 +7,8 @@ const { validateRequiredFields, updateQuizQuestions, deleteImageFromS3 } = requi
 exports.getQuestions = async (req, res) => {
 
     try {
-        const questions = await Question.find().sort({ creation_date: -1 }).populate('category quiz');
-        if (!questions) return res.status(404).json({ message: 'No questions found!' });
+    const questions = await Question.find().sort({ creation_date: -1 }).populate('category quiz');
+    if (!questions || questions.length === 0) throw {'message':'No questions found!','statusCode':204};
         res.status(200).json(questions);
     } catch (err) {
         handleError(res, err);
@@ -17,8 +17,8 @@ exports.getQuestions = async (req, res) => {
 
 exports.getOneQuestion = async (req, res) => {
     try {
-        const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
-        if (!question) return res.status(404).json({ message: 'Question not found!' });
+    const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
+    if (!question) throw {'message':'Question not found!','statusCode':404};
         res.status(200).json(question);
     } catch (err) {
         handleError(res, err);
@@ -47,7 +47,7 @@ exports.createQuestion = async (req, res) => {
         let existingQtn = await Question.findOne({ questionText });
 
         if (existingQtn) {
-            return res.status(400).json({ message: 'A question with same name already exists!' });
+            throw {'message':'A question with same name already exists!','statusCode':400};
         }
 
         const newQuestion = new Question({
@@ -86,8 +86,8 @@ exports.updateQuestion = async (req, res) => {
         const qnImage = req.file;
 
         // Find the Question by id
-        const qtn = await Question.findOne({ _id: req.params.id });
-        if (!qtn) return res.status(404).json({ message: 'Question not found' });
+    const qtn = await Question.findOne({ _id: req.params.id });
+    if (!qtn) throw {'message':'Question not found','statusCode':404};
         
         // Changing question's quiz
         if (newQuiz && oldQuizID) {
@@ -131,7 +131,7 @@ exports.deleteQuestion = async (req, res) => {
     try {
         // Find the Question to delete by id first
         const question = await Question.findById(req.params.id);
-        if (!question) return res.status(404).json({ message: 'Question not found' });
+    if (!question) throw {'message':'Question not found','statusCode':404};
 
         // Delete existing image
         question.question_image && await deleteImageFromS3(question.question_image);

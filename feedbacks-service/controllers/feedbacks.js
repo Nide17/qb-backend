@@ -1,4 +1,4 @@
-const Feedback = require("../models/Feedback");
+const Feedback = require('../models/Feedback');
 const { handleError } = require('../utils/error');
 const { populateFeedbackDetails } = require('../utils/helpers');
 
@@ -13,7 +13,7 @@ exports.getFeedbacks = async (req, res) => {
 
     const totalPages = await Feedback.countDocuments({});
     const PAGE_SIZE = 20;
-    const pageNo = parseInt(req.query.pageNo || "0");
+    const pageNo = parseInt(req.query.pageNo || '0');
     const query = getPagination(pageNo, PAGE_SIZE);
 
     try {
@@ -22,7 +22,7 @@ exports.getFeedbacks = async (req, res) => {
             await Feedback.find().sort({ createdAt: -1 }).exec();
 
         if (!feedbacks) {
-            return res.status(204).json({ message: 'No feedbacks found!' });
+            throw {'message':'No feedbacks found!','statusCode':204};
         }
 
         if (pageNo > 0) {
@@ -41,7 +41,7 @@ exports.getFeedbacks = async (req, res) => {
 exports.getOneFeedback = async (req, res) => {
     try {
         let feedback = await Feedback.findById(req.params.id).select('quiz score user comment rating');
-        if (!feedback) return res.status(404).json({ message: 'No feedback found!' });
+        if (!feedback) throw {'message':'Feedback not found!','statusCode':404};
 
         feedback = await populateFeedbackDetails(feedback) || feedback;
         res.status(200).json(feedback);
@@ -64,7 +64,7 @@ exports.updateFeedback = async (req, res) => {
     try {
         const updatedFeedback = await Feedback.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedFeedback) {
-            return res.status(404).json({ message: 'Feedback not found!' });
+            throw {'message':'Feedback not found!','statusCode':404};
         }
         res.status(200).json(updatedFeedback);
     } catch (err) {
@@ -77,13 +77,13 @@ exports.deleteFeedback = async (req, res) => {
         const feedback = await Feedback.findById(req.params.id);
 
         if (!feedback) {
-            return res.status(404).json({ message: 'Feedback not found!' });
+            throw {'message':'Feedback not found!','statusCode':404};
         }
 
         const removedFeedback = await feedback.deleteOne();
 
         if (removedFeedback.deletedCount === 0) {
-            return res.status(503).json({ message: 'Something went wrong while deleting!' });
+            throw {'message':'Something went wrong while deleting!','statusCode':503};
         }
         res.status(200).json(feedback);
     } catch (err) {

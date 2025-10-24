@@ -1,4 +1,4 @@
-const BlogPostsView = require("../../models/blog-posts/BlogPostsView");
+const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
 const scheduledReportMessage = require('./scheduledReport');
 const { handleError } = require('../../utils/error');
 const { populateUser, deleteImageFromS3 } = require('../../utils/helpers');
@@ -8,8 +8,8 @@ scheduledReportMessage();
 
 exports.getBlogPostsViews = async (req, res) => {
     try {
-        let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
-        if (!blogPostsViews) return res.status(204).json({ message: 'No blog Posts Views found!' });
+    let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
+    if (!blogPostsViews) throw {'message':'No blog Posts Views found!','statusCode':204};
 
         let blogPostsViewsObj = blogPostsViews.map(view => view?.toObject ? view.toObject() : view);
         blogPostsViewsObj = await Promise.all(blogPostsViewsObj?.map(async view => {
@@ -29,7 +29,7 @@ exports.getOneBlogPostsView = async (req, res) => {
     try {
         let blogPostsView = await BlogPostsView.findById(req.params.id);
 
-        if (!blogPostsView) return res.status(404).json({ message: 'Blog Post View not found!' });
+    if (!blogPostsView) throw {'message':'Blog Post View not found!','statusCode':404};
         res.status(200).json(blogPostsView);
     } catch (err) {
         handleError(res, err);
@@ -39,7 +39,7 @@ exports.getOneBlogPostsView = async (req, res) => {
 exports.getRecentTenViews = async (req, res) => {
     try {
         let recentTenViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).limit(10).select('-__v');
-        if (!recentTenViews) return res.status(404).json({ message: '10 blog posts views not found!' });
+    if (!recentTenViews) throw {'message':'10 blog posts views not found!','statusCode':404};
 
         let recentTenViewsObj = recentTenViews.map(view => view?.toObject ? view.toObject() : view);
         recentTenViewsObj = await Promise.all(recentTenViewsObj?.map(async view => {
@@ -59,14 +59,14 @@ exports.createBlogPostsView = async (req, res) => {
     const { blogPost, viewer, device, country } = req.body;
 
     if (!blogPost) {
-        return res.status(400).json({ message: 'Blog post does not exist.' });
+        throw {'message':'Blog post does not exist.','statusCode':400};
     }
 
     try {
         const newBlogPostView = new BlogPostsView({ blogPost, viewer, device, country });
         const savedBlogPost = await newBlogPostView.save();
 
-        if (!savedBlogPost) return res.status(503).json({ message: 'Something went wrong during creation! File size should not exceed 1MB' });
+    if (!savedBlogPost) throw {'message':'Something went wrong during creation! File size should not exceed 1MB','statusCode':503};
 
         res.status(200).json({
             _id: savedBlogPost._id,
@@ -84,7 +84,7 @@ exports.createBlogPostsView = async (req, res) => {
 exports.updateBlogPostsView = async (req, res) => {
     try {
         let blogPostsView = await BlogPostsView.findById(req.params.id);
-        if (!blogPostsView) return res.status(404).json({ message: 'BlogPostsView not found!' });
+    if (!blogPostsView) throw {'message':'BlogPostsView not found!','statusCode':404};
 
         const updatedBlogPostsView = await BlogPostsView.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedBlogPostsView);

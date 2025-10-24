@@ -1,14 +1,33 @@
 const axios = require('axios');
-const { sendEmail } = require("../utils/emails/sendEmail");
-const Broadcast = require("../models/Broadcast");
-const Contact = require("../models/Contact");
-const RoomMessage = require("../models/RoomMessage");
-const ChatRoom = require("../models/ChatRoom");
+const { sendEmail } = require('../utils/emails/sendEmail');
+const Broadcast = require('../models/Broadcast');
+const Contact = require('../models/Contact');
+const RoomMessage = require('../models/RoomMessage');
+const ChatRoom = require('../models/ChatRoom');
+
+// Helper function to call other services (shared pattern)
+const getFromService = async (url, timeout = 20000, token) => {
+    if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
+
+    try {
+        const response = await axios.get(url, {
+            timeout,
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-token': token
+            }
+        });
+        return response.data;
+    } catch (err) {
+        console.warn(`Service call failed for URL: ${url} -`, err?.message || err);
+        return null;
+    }
+};
 
 // Simple population function for users
 const populateUser = async (userId) => {
     if (!userId) return null;
-    const data = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+    const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
     return data ? {
         _id: data._id,
@@ -17,10 +36,10 @@ const populateUser = async (userId) => {
 };
 
 // Helper function to find Broadcast By Id
-const findBroadcastById = async (id, res, selectFields = '') => {
+const findBroadcastById = async (id, selectFields = '') => {
     try {
         const broadcast = await Broadcast.findById(id).select(selectFields);
-        if (!broadcast) return res.status(404).json({ message: 'Broadcast not found!' });
+        if (!broadcast) throw { statusCode: 404, message: 'Broadcast not found!' };
 
         // Populate sent_by details
         let broadcastObj = broadcast.toObject ? broadcast.toObject() : broadcast;
@@ -38,10 +57,10 @@ const findBroadcastById = async (id, res, selectFields = '') => {
 };
 
 // Helper function to find Contact By Id
-const findContactById = async (id, res, selectFields = '') => {
+const findContactById = async (id, selectFields = '') => {
     try {
         const contact = await Contact.findById(id).select(selectFields);
-        if (!contact) return res.status(404).json({ message: 'Contact not found!' });
+        if (!contact) throw { statusCode: 404, message: 'Contact not found!' };
         return contact;
     } catch (err) {
         console.error('Error finding Contact by ID:', err);
@@ -50,10 +69,10 @@ const findContactById = async (id, res, selectFields = '') => {
 };
 
 // Helper function to find ChatRoom By Id
-const findChatRoomById = async (id, res, selectFields = '') => {
+const findChatRoomById = async (id, selectFields = '') => {
     try {
         const chatRoom = await ChatRoom.findById(id).select(selectFields);
-        if (!chatRoom) return res.status(404).json({ message: 'Chat Room not found!' });
+        if (!chatRoom) throw { statusCode: 404, message: 'Chat Room not found!' };
         return chatRoom;
     } catch (err) {
         console.error('Error finding ChatRoom by ID:', err);
@@ -62,10 +81,10 @@ const findChatRoomById = async (id, res, selectFields = '') => {
 };
 
 // Helper function to find RoomMessage By Id
-const findRoomMessageById = async (id, res, selectFields = '') => {
+const findRoomMessageById = async (id, selectFields = '') => {
     try {
         const roomMessage = await RoomMessage.findById(id).select(selectFields);
-        if (!roomMessage) return res.status(404).json({ message: 'Room Message not found!' });
+        if (!roomMessage) throw { statusCode: 404, message: 'Room Message not found!' };
 
         // Populate sender, receiver, and room details
         let roomMessageObj = roomMessage.toObject ? roomMessage.toObject() : roomMessage;
@@ -82,7 +101,7 @@ const findRoomMessageById = async (id, res, selectFields = '') => {
             }
         }
         if (roomMessage.room) {
-            const roomData = await callService(`${process.env.CONTACTS_SERVICE_URL}/api/chat-rooms/${roomMessage.room}`);
+            const roomData = await getFromService(`${process.env.CONTACTS_SERVICE_URL}/api/chat-rooms/${roomMessage.room}`);
             roomMessageObj.room = roomData ? { _id: roomData._id, name: roomData.name } : { _id: roomMessage.room, name: 'Unknown Room' };
         }
         return roomMessageObj;
@@ -104,7 +123,7 @@ const sendEmails = (recipients, title, message, clientURL) => {
                     message: message,
                     unsubscribeLink: `${clientURL}/unsubscribe`
                 },
-                "./template/broadcast.handlebars"
+                './template/broadcast.handlebars'
             );
         }, 2000 * index);
     });
@@ -114,17 +133,17 @@ const notifyAdmins = async (newContact) => {
     try {
         const fetchAdminEmails = async () => {
             try {
-                const adminEmails = await callService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+                const adminEmails = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
                 return adminEmails;
             } catch (error) {
-                console.warn(`Failed to fetch admin emails:`, error.message);
+                console.warn('Failed to fetch admin emails:', error.message);
                 return new Promise((resolve) => {
                     setTimeout(async () => {
                         try {
-                            const retryAdminEmails = await callService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+                            const retryAdminEmails = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
                             resolve(retryAdminEmails);
                         } catch (retryError) {
-                            console.warn(`Retry failed to fetch admin emails:`, retryError.message);
+                            console.warn('Retry failed to fetch admin emails:', retryError.message);
                             resolve(null);
                         }
                     }, 60000);
@@ -153,6 +172,16 @@ const validateRequiredFields = (fields) => {
     }
 };
 
+// Lightweight validator for room message payloads used by room-messages controller
+const validateRoomMessageData = (data) => {
+    if (!data) throw new Error('No data provided');
+    const required = ['senderID', 'receiverID', 'content', 'roomID'];
+    required.forEach((key) => {
+        if (!data[key]) throw new Error(`Missing required field: ${key}`);
+    });
+    return true;
+};
+
 // Helper function to populate users in chat rooms
 const populateUsersInChatRooms = async (chatRooms) => {
     const userIds = chatRooms.map(room => room.users).flat();
@@ -162,7 +191,7 @@ const populateUsersInChatRooms = async (chatRooms) => {
         const userResults = await Promise.allSettled(
             uniqueUserIds.map(async (userId) => {
                 if (!userId) return null;
-                const response = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+                const response = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
                 return response;
             })
         );
@@ -193,24 +222,25 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
+    getFromService,
     notifyAdmins,
     sendEmails,
     findBroadcastById,
@@ -218,6 +248,7 @@ module.exports = {
     findChatRoomById,
     findRoomMessageById,
     validateRequiredFields,
+    validateRoomMessageData,
     populateUsersInChatRooms,
     corsOptions,
 };

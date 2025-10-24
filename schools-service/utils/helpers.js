@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const getFromService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -35,25 +35,25 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
-    callService,
+    getFromService,
     validateRequiredFields,
     corsOptions,
 };

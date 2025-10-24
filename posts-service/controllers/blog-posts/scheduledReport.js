@@ -1,14 +1,14 @@
-const { sendHtmlEmail } = require("../../utils/sendEmail")
+const { sendHtmlEmail } = require('../../utils/sendEmail');
 // const twilioSID = process.env.TWILIO_ACCOUNT_SID
 // const twilioToken = process.env.TWILIO_AUTH_TOKEN
 // const client = require('twilio')(twilioSID, twilioToken)
-const { callService } = require('../../utils/helpers');
+const { getFromService } = require('../../utils/helpers');
 
 // BlogPostsView Model
-const BlogPostsView = require('../../models/blog-posts/BlogPostsView')
+const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
 
-const from = 'whatsapp:+14155238886'; // Twilio WhatsApp Sandbox number
-const numbers = ['whatsapp:+250786791577', 'whatsapp:+250738140795']
+// const _from = 'whatsapp:+14155238886'; // Twilio WhatsApp Sandbox number
+// const _numbers = ['whatsapp:+250786791577', 'whatsapp:+250738140795'];
 
 const getDailyReport = async () => {
     try {
@@ -22,7 +22,7 @@ const getDailyReport = async () => {
             { $group: { _id: '$_id.blogPost', countries: { $push: { country: '$_id.country', device: '$_id.device', count: '$count' } }, count: { $sum: '$count' } } },
             { $sort: { '_id': 1 } },
             { $lookup: { from: 'blogposts', localField: '_id', foreignField: '_id', as: 'blogPost' } },
-            { $unwind: "$blogPost" },
+            { $unwind: '$blogPost' },
             { $project: { _id: 0, blogPost: '$blogPost.title', countries: 1, count: 1 } }
         ]);
 
@@ -31,7 +31,7 @@ const getDailyReport = async () => {
         console.error(err);
         return null;
     }
-}
+};
 
 const processReportData = (result) => {
     let totalViewsCount = 0;
@@ -61,20 +61,20 @@ const processReportData = (result) => {
     });
 
     return { totalViewsCount, uniqueCountriesCount, uniqueDevicesCount, blogPostsViews };
-}
+};
 
 const generateReportMessage = (report, currentDate) => {
-    let reportMessage = `*TODAY, ${currentDate} REPORT FOR BLOG POSTS VIEWS* \n\n`
-    reportMessage += `*Total Views:* ${report?.totalViewsCount} \n\n`
-    reportMessage += `*Unique Countries:* \n`
+    let reportMessage = `*TODAY, ${currentDate} REPORT FOR BLOG POSTS VIEWS* \n\n`;
+    reportMessage += `*Total Views:* ${report?.totalViewsCount} \n\n`;
+    reportMessage += '*Unique Countries:* \n';
     report?.uniqueCountriesCount.forEach(country => reportMessage += `${country.country}: ${country.count} \n`);
-    reportMessage += `\n*Unique Devices:* \n`
+    reportMessage += '\n*Unique Devices:* \n';
     report?.uniqueDevicesCount.forEach(device => reportMessage += `${device.device}: ${device.count} \n`);
-    reportMessage += `\n*Blog Posts Views:* \n`
+    reportMessage += '\n*Blog Posts Views:* \n';
     report?.blogPostsViews.forEach(blogPost => reportMessage += `${blogPost.blogPost}: ${blogPost.count} \n`);
 
     return reportMessage;
-}
+};
 
 const generateReportEmail = (report, currentDate) => {
     return {
@@ -89,8 +89,8 @@ const generateReportEmail = (report, currentDate) => {
             <h4><u>Blog Posts Views:</u></h4>
             <ul>${report?.blogPostsViews.map(blogPost => `<li>${blogPost.blogPost}: ${blogPost.count}</li>`).join('')}</ul>
         `
-    }
-}
+    };
+};
 
 const sendReport = async (reportMessage, reportMessageEmail, adminsEmails) => {
     // numbers.forEach(to => {
@@ -99,7 +99,7 @@ const sendReport = async (reportMessage, reportMessageEmail, adminsEmails) => {
     //         .catch(error => console.error(error));
     // });
     adminsEmails && adminsEmails.forEach(admEmail => sendHtmlEmail(admEmail, reportMessageEmail.subject, reportMessageEmail.html));
-}
+};
 
 const fetchAdminEmails = async () => {
     let attempts = 0;
@@ -108,7 +108,7 @@ const fetchAdminEmails = async () => {
 
     while (attempts < maxAttempts) {
         try {
-            const adminEmails = await callService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+            const adminEmails = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
 
             if (adminEmails && adminEmails.length > 0) {
                 return adminEmails;
@@ -125,7 +125,7 @@ const fetchAdminEmails = async () => {
             }
         }
     }
-}
+};
 
 const scheduledReportMessage = async () => {
     try {
@@ -157,4 +157,4 @@ const scheduledReportMessage = async () => {
     }
 };
 
-module.exports = scheduledReportMessage
+module.exports = scheduledReportMessage;

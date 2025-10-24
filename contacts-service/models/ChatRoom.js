@@ -13,4 +13,4 @@ const ChatRoomSchema = new Schema({
     users: [{ type: Schema.Types.ObjectId, }]
 }, { timestamps: true });
 
-module.exports = mongoose.model("ChatRoom", ChatRoomSchema);
+module.exports = mongoose.model('ChatRoom', ChatRoomSchema);

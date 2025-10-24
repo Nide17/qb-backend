@@ -1,11 +1,11 @@
-const Advert = require("../models/Advert.js");
-const { handleError } = require("../utils/error");
+const Advert = require('../models/Advert.js');
+const { handleError } = require('../utils/error');
 const { deleteImageFromS3, validateRequiredFields } = require('../utils/helpers');
 
 exports.getAdverts = async (req, res) => {
     try {
-        const adverts = await Advert.find().sort({ createdAt: -1 });
-        if (!adverts) return res.status(204).json({ message: 'No adverts found!' });
+    const adverts = await Advert.find().sort({ createdAt: -1 });
+    if (!adverts) throw {'message':'No adverts found!','statusCode':204};
         res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
@@ -14,10 +14,10 @@ exports.getAdverts = async (req, res) => {
 
 exports.getOneAdvert = async (req, res) => {
     try {
-        const advert = await Advert.findById(req.params.id);
+    const advert = await Advert.findById(req.params.id);
 
-        if (!advert) return res.status(404).json({ message: 'Advert not found!' });
-        res.status(200).json(advert);
+    if (!advert) throw {'message':'Advert not found!','statusCode':404};
+    res.status(200).json(advert);
     } catch (err) {
         handleError(res, err);
     }
@@ -25,9 +25,9 @@ exports.getOneAdvert = async (req, res) => {
 
 exports.getActiveAdverts = async (req, res) => {
     try {
-        const adverts = await Advert.find({ status: 'Active' }).sort({ createdAt: -1 });
-        if (!adverts) return res.status(404).json({ message: 'No active adverts found!' });
-        res.status(200).json(adverts);
+    const adverts = await Advert.find({ status: 'Active' }).sort({ createdAt: -1 });
+    if (!adverts) throw {'message':'No active adverts found!','statusCode':404};
+    res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
     }
@@ -35,9 +35,9 @@ exports.getActiveAdverts = async (req, res) => {
 
 exports.getCreatedBy = async (req, res) => {
     try {
-        const adverts = await Advert.find({ owner: req.params.id }).sort({ createdAt: -1 });
-        if (!adverts) return res.status(404).json({ message: 'No adverts found!' });
-        res.status(200).json(adverts);
+    const adverts = await Advert.find({ owner: req.params.id }).sort({ createdAt: -1 });
+    if (!adverts) throw {'message':'No adverts found!','statusCode':404};
+    res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
     }
@@ -90,11 +90,11 @@ exports.createAdvert = async (req, res) => {
 
 exports.updateAdvert = async (req, res) => {
     try {
-        const advert = await Advert.findById(req.params.id);
-        if (!advert) return res.status(404).json({ message: 'Advert not found!' });
+    const advert = await Advert.findById(req.params.id);
+    if (!advert) throw {'message':'Advert not found!','statusCode':404};
 
-        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        res.status(200).json(updatedAdvert);
+    const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.status(200).json(updatedAdvert);
     } catch (err) {
         handleError(res, err);
     }
@@ -102,11 +102,11 @@ exports.updateAdvert = async (req, res) => {
 
 exports.updateAdvertStatus = async (req, res) => {
     try {
-        const advert = await Advert.findById(req.params.id);
-        if (!advert) return res.status(404).json({ message: 'Advert not found!' });
+    const advert = await Advert.findById(req.params.id);
+    if (!advert) throw {'message':'Advert not found!','statusCode':404};
 
-        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-        res.status(200).json(updatedAdvert);
+    const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+    res.status(200).json(updatedAdvert);
     } catch (err) {
         handleError(res, err);
     }
@@ -129,11 +129,11 @@ exports.deleteAdvert = async (req, res) => {
 
 exports.deleteAdvertImage = async (req, res) => {
     try {
-        const advert = await Advert.findById(req.params.id);
-        if (!advert) return res.status(404).json({ message: 'Advert not found!' });
+    const advert = await Advert.findById(req.params.id);
+    if (!advert) throw {'message':'Advert not found!','statusCode':404};
 
-        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { new: true });
-        res.status(200).json(updatedAdvert);
+    const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { new: true });
+    res.status(200).json(updatedAdvert);
     } catch (err) {
         handleError(res, err);
     }

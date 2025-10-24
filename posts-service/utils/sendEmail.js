@@ -1,7 +1,7 @@
-const nodemailer = require("nodemailer");
-const handlebars = require("handlebars");
-const fs = require("fs");
-const path = require("path");
+const nodemailer = require('nodemailer');
+const handlebars = require('handlebars');
+const fs = require('fs');
+const path = require('path');
 
 const createTransporter = () => {
   return nodemailer.createTransport({
@@ -35,7 +35,7 @@ const sendActualMail = async (transporter, mailOptions, retries) => {
 const sendEmail = async (email, subject, payload, template, retries = 3) => {
   try {
     const transporter = createTransporter();
-    const source = fs.readFileSync(path.join(__dirname, template), "utf8");
+    const source = fs.readFileSync(path.join(__dirname, template), 'utf8');
     const compiledTemplate = handlebars.compile(source);
     const mailOptions = {
       from: '"quizblog.rw(Quiz-Blog)" <quizblog.rw@gmail.com>',

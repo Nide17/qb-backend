@@ -1,4 +1,6 @@
 const axios = require('axios');
+const http = require('http');
+const util = require('util');
 const RedisCacheManager = require('./redis-cache');
 
 // Initialize Redis cache manager
@@ -57,16 +59,15 @@ const setCachedData = async (key, data, ttl = 300) => {
 };
 
 // Helper function to call other services
-const callService = async (url, timeout = 60000, token) => {
+const getFromService = async (url, timeout = 60000) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
     try {
         const response = await axios.get(url, {
-            timeout, // 20 seconds default timeout for normal requests, longer for long running tasks
+            timeout, // 60 seconds default timeout for normal requests, longer for long running tasks
             headers: {
                 'Content-Type': 'application/json',
-                'x-auth-token': token
             }
         });
         return response.data;
@@ -76,28 +77,54 @@ const callService = async (url, timeout = 60000, token) => {
     }
 };
 
+
 const makeRequest = async (req, serviceName, serviceUrl) => {
-    try {
-        // Prepare headers, include internal service header if present
-        const headers = {
-            'x-auth-token': req.header('x-auth-token')
-        };
+    const maxRetries = 3;
+    let retries = 0;
 
-        const response = await axios({
-            method: req.method,
-            url: `${serviceUrl}${req.originalUrl}`,
-            data: req.body,
-            headers: headers,
-            validateStatus: function (status) {
-                return status >= 200 && status < 600;
+    const makeAttempt = async () => {
+        try {
+            const headers = {
+                'x-auth-token': req.header('x-auth-token')
+            };
+
+            // Set timeout and keep-alive properties
+            const response = await axios({
+                method: req.method,
+                url: `${serviceUrl}${req.originalUrl}`,
+                data: req.body,
+                headers,
+                validateStatus: function (status) {
+                    return status >= 200 && status < 600;
+                },
+                timeout: 5000, // 5-second timeout
+                httpAgent: new http.Agent({
+                    keepAlive: true,
+                    keepAliveMsecs: 1000
+                })
+            });
+            return response;
+        } catch (error) {
+            console.error(`[${serviceName}] Request failed`, {
+                retryCount: retries + 1,
+                maxRetries,
+                error: error.message,
+                stack: error.stack
+            });
+
+            if (retries >= maxRetries ||
+                error.code === 'ECONNRESET' ||
+                error.code === 'ETIMEDOUT') {
+                throw error;
             }
-        });
 
-        return response;
-    } catch (error) {
-        console.error(`Error making ${req.method} request to ${serviceName} with url ${req.originalUrl}:`, error);
-        throw error; // Rethrow the error to be handled by routeToService
-    }
+            retries++;
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+            return makeAttempt();
+        }
+    };
+
+    return makeAttempt();
 };
 
 const routeToService = (serviceName, serviceUrl) => async (req, res) => {
@@ -105,6 +132,22 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
     // Check if response has already been sent
     if (res.headersSent) {
         console.log(`Response already sent for ${serviceName} request`);
+        return;
+    }
+
+    // Validate serviceUrl before making requests
+    if (!serviceUrl || typeof serviceUrl !== 'string' || serviceUrl.startsWith('undefined')) {
+        console.warn(`Invalid or missing service URL for ${serviceName}:`, serviceUrl);
+        if (!res.headersSent) {
+            res.status(502).json({
+                success: false,
+                error: `${serviceName} Service Unavailable`,
+                message: `Invalid URL or ${serviceName} service is not configured`,
+                code: 'SERVICE_UNAVAILABLE',
+                service: serviceName,
+                timestamp: new Date().toISOString()
+            });
+        }
         return;
     }
 
@@ -119,7 +162,22 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
 
         if (response && response.status && response.data !== undefined) {
             // Forward all responses, including 4xx and 5xx status codes
-            res.status(response.status).json(response.data);
+            try {
+                // Try to send JSON normally
+                res.status(response.status).json(response.data);
+            } catch (serializeError) {
+                // Response contained a non-serializable / circular structure. Fall back to safe stringified details.
+                console.warn(`Failed to serialize response from ${serviceName}; falling back to inspect():`, serializeError.message);
+                res.status(502).json({
+                    success: false,
+                    error: `${serviceName} Service Returned Non-Serializable Payload`,
+                    message: `${serviceName} returned a response that could not be serialized to JSON`,
+                    details: util.inspect(response.data, { depth: 2, breakLength: 80 }),
+                    code: 'NON_SERIALIZABLE_PAYLOAD',
+                    service: serviceName,
+                    timestamp: new Date().toISOString()
+                });
+            }
         } else {
             res.status(502).json({
                 success: false,
@@ -138,7 +196,7 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
         }
 
         try {
-            console.log("Error making request: \n\n", error)
+            console.log('Error making request: \n\n', error);
             if (error.name === 'AggregateError') {
 
                 // // Print all errors
@@ -164,8 +222,8 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
                     timestamp: new Date().toISOString()
                 });
             }
-        } catch (responseError) {
-            // console.log(`Failed to send error response for ${serviceName}:`, responseError);
+        } catch (_responseError) {
+            console.log(`Failed to send error response for ${serviceName}:`, _responseError);
         }
     }
 };
@@ -176,26 +234,26 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
     routeToService,
-    callService,
+    getFromService,
     getCachedData,
     setCachedData,
     redisCache,

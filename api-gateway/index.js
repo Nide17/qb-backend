@@ -1,9 +1,8 @@
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
-const os = require('os')
-const process = require('process')
-const { routeToService, callService, setCachedData, getCachedData, redisCache, memoryCache } = require('./utils/helpers');
+const process = require('process');
+const { routeToService, getFromService, setCachedData, getCachedData, redisCache, memoryCache } = require('./utils/helpers');
 const { handleError } = require('./utils/error');
 const HealthMonitor = require('./utils/health-monitor');
 const socketManager = require('./utils/enhanced-socket');
@@ -94,21 +93,22 @@ app.get('/api/aggregated/quiz/:id', async (req, res) => {
         const cacheKey = `quiz_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
         if (cached) {
-            return res.json(cached);
+            return res.status(200).json(cached);
         }
 
         // Fetch quiz with all related data
         const [quizRes, categoryRes, questionsRes, commentsRes, scoresRes] = await Promise.allSettled([
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${req.params.id}`),
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`),
-            callService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?quiz=${req.params.id}`),
-            callService(`${process.env.SCORES_SERVICE_URL}/api/scores?quiz=${req.params.id}`)
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${req.params.id}`),
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`),
+            getFromService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?quiz=${req.params.id}`),
+            getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores?quiz=${req.params.id}`)
         ]);
 
         const quiz = quizRes.status === 'fulfilled' ? quizRes.value.data : null;
         if (!quiz) {
-            return res.status(404).json({ message: 'Quiz not found' });
+            handleError(res, { status: 404, message: 'Quiz not found' });
+            return;
         }
 
         // Aggregate data
@@ -125,7 +125,7 @@ app.get('/api/aggregated/quiz/:id', async (req, res) => {
         };
 
         await setCachedData(cacheKey, aggregatedData);
-        res.json(aggregatedData);
+        res.status(200).json(aggregatedData);
     } catch (err) {
         console.error('Error aggregating quiz data:\n', err);
         handleError(res, err);
@@ -138,7 +138,7 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
         const cacheKey = `quizzes_${page}_${limit}_${category}_${search}_${difficulty}_${created_by}`;
         const cached = await getCachedData(cacheKey);
         if (cached) {
-            return res.json(cached);
+            return res.status(200).json(cached);
         }
 
         // Build query parameters
@@ -151,9 +151,9 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
         if (created_by) queryParams.append('created_by', created_by);
 
         const [quizzesRes, categoriesRes, usersRes] = await Promise.allSettled([
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?${queryParams}`),
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
-            callService(`${process.env.USERS_SERVICE_URL}/api/users`)
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?${queryParams}`),
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
+            getFromService(`${process.env.USERS_SERVICE_URL}/api/users`)
         ]);
 
         if (quizzesRes.status === 'rejected') {
@@ -184,7 +184,7 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
         };
 
         await setCachedData(cacheKey, aggregatedData);
-        res.json(aggregatedData);
+        res.status(200).json(aggregatedData);
     } catch (err) {
         console.error('Error aggregating quizzes data:\n', err);
         handleError(res, err);
@@ -196,17 +196,17 @@ app.get('/api/aggregated/dashboard', async (req, res) => {
         const cacheKey = 'dashboard_stats';
         const cached = await getCachedData(cacheKey);
         if (cached) {
-            return res.json(cached);
+            return res.status(200).json(cached);
         }
 
         // Fetch dashboard statistics from multiple services
         const [quizzesRes, usersRes, coursesRes, postsRes, scoresRes, feedbacksRes] = await Promise.allSettled([
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
-            callService(`${process.env.USERS_SERVICE_URL}/api/users`),
-            callService(`${process.env.COURSES_SERVICE_URL}/api/courses`),
-            callService(`${process.env.POSTS_SERVICE_URL}/api/blog-posts`),
-            callService(`${process.env.SCORES_SERVICE_URL}/api/scores`),
-            callService(`${process.env.FEEDBACKS_SERVICE_URL}/api/feedbacks`)
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
+            getFromService(`${process.env.USERS_SERVICE_URL}/api/users`),
+            getFromService(`${process.env.COURSES_SERVICE_URL}/api/courses`),
+            getFromService(`${process.env.POSTS_SERVICE_URL}/api/blog-posts`),
+            getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores`),
+            getFromService(`${process.env.FEEDBACKS_SERVICE_URL}/api/feedbacks`)
         ]);
 
         const dashboardData = {
@@ -222,7 +222,7 @@ app.get('/api/aggregated/dashboard', async (req, res) => {
         };
 
         await setCachedData(cacheKey, dashboardData);
-        res.json(dashboardData);
+        res.status(200).json(dashboardData);
     } catch (err) {
         console.error('Error aggregating dashboard data:\n', err);
         handleError(res, err);
@@ -235,19 +235,20 @@ app.get('/api/aggregated/user/:id', async (req, res) => {
         const cacheKey = `user_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
         if (cached) {
-            return res.json(cached);
+            return res.status(200).json(cached);
         }
 
         const [userRes, scoresRes, quizzesRes, commentsRes] = await Promise.allSettled([
-            callService(`${process.env.USERS_SERVICE_URL}/api/users/${req.params.id}`),
-            callService(`${process.env.SCORES_SERVICE_URL}/api/scores?user=${req.params.id}`),
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?created_by=${req.params.id}`),
-            callService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?user=${req.params.id}`)
+            getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${req.params.id}`),
+            getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores?user=${req.params.id}`),
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?created_by=${req.params.id}`),
+            getFromService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?user=${req.params.id}`)
         ]);
 
         const user = userRes.status === 'fulfilled' ? userRes.value.data : null;
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            handleError(res, { status: 404, message: 'User not found' });
+            return;
         }
 
         const aggregatedData = {
@@ -268,7 +269,7 @@ app.get('/api/aggregated/user/:id', async (req, res) => {
         };
 
         await setCachedData(cacheKey, aggregatedData);
-        res.json(aggregatedData);
+        res.status(200).json(aggregatedData);
     } catch (err) {
         console.error('Error aggregating user data:\n', err);
         handleError(res, err);
@@ -280,18 +281,19 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
         const cacheKey = `category_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
         if (cached) {
-            return res.json(cached);
+            return res.status(200).json(cached);
         }
 
         const [categoryRes, quizzesRes, questionsRes] = await Promise.allSettled([
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/categories/${req.params.id}`),
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?category=${req.params.id}`),
-            callService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`)
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/categories/${req.params.id}`),
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?category=${req.params.id}`),
+            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`)
         ]);
 
         const category = categoryRes.status === 'fulfilled' ? categoryRes.value.data : null;
         if (!category) {
-            return res.status(404).json({ message: 'Category not found' });
+            handleError(res, { status: 404, message: 'Category not found' });
+            return;
         }
 
         const quizzes = quizzesRes.status === 'fulfilled' ? quizzesRes.value.data : [];
@@ -313,7 +315,7 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
         };
 
         await setCachedData(cacheKey, aggregatedData);
-        res.json(aggregatedData);
+        res.status(200).json(aggregatedData);
     } catch (err) {
         console.error('Error aggregating category data:\n', err);
         handleError(res, err);
@@ -324,28 +326,29 @@ app.get('/api/aggregated/search', async (req, res) => {
     try {
         const { q: query, type, page = 1, limit = 20 } = req.query;
         if (!query) {
-            return res.status(400).json({ message: 'Search query is required' });
+            handleError(res, { status: 400, message: 'Search query is required' });
+            return;
         }
 
         const cacheKey = `search_${query}_${type}_${page}_${limit}`;
         const cached = await getCachedData(cacheKey);
         if (cached) {
-            return res.json(cached);
+            return res.status(200).json(cached);
         }
 
         const searchPromises = [];
 
         if (!type || type === 'quizzes') {
-            searchPromises.push(callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes?search=${query}&pageNo=${page}&limit=${limit}`));
         }
         if (!type || type === 'users') {
-            searchPromises.push(callService(`${process.env.USERS_SERVICE_URL}/api/users?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(getFromService(`${process.env.USERS_SERVICE_URL}/api/users?search=${query}&pageNo=${page}&limit=${limit}`));
         }
         if (!type || type === 'posts') {
-            searchPromises.push(callService(`${process.env.POSTS_SERVICE_URL}/api/blog-posts?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(getFromService(`${process.env.POSTS_SERVICE_URL}/api/blog-posts?search=${query}&pageNo=${page}&limit=${limit}`));
         }
         if (!type || type === 'courses') {
-            searchPromises.push(callService(`${process.env.COURSES_SERVICE_URL}/api/courses?search=${query}&pageNo=${page}&limit=${limit}`));
+            searchPromises.push(getFromService(`${process.env.COURSES_SERVICE_URL}/api/courses?search=${query}&pageNo=${page}&limit=${limit}`));
         }
 
         const results = await Promise.allSettled(searchPromises);
@@ -368,7 +371,7 @@ app.get('/api/aggregated/search', async (req, res) => {
         };
 
         await setCachedData(cacheKey, aggregatedData);
-        res.json(aggregatedData);
+        res.status(200).json(aggregatedData);
     } catch (err) {
         console.error('Error performing search:\n', err);
         handleError(res, err);
@@ -392,6 +395,7 @@ app.get('/api/health', async (req, res) => {
     };
 
     const healthMonitor = new HealthMonitor();
+    // Health monitor does not need gateway DB; gateway has no DB connection
     const healthReport = await healthMonitor.getHealthReport(services);
 
     // Add cache information
@@ -406,7 +410,7 @@ app.get('/api/health', async (req, res) => {
         }
     };
 
-    res.json(healthReport);
+    res.status(200).json(healthReport);
 });
 
 // Metrics endpoint
@@ -416,7 +420,7 @@ app.get('/api/metrics', (req, res) => {
     const metrics = healthMonitor.getMetricsSummary();
     const systemMetrics = healthMonitor.getSystemMetrics();
 
-    res.json({
+    res.status(200).json({
         ...metrics,
         system: systemMetrics,
         timestamp: new Date().toISOString()
@@ -424,14 +428,15 @@ app.get('/api/metrics', (req, res) => {
 });
 
 // 404 Route Not Found
-app.use((req, res, next) => {
+app.use((req, res, _next) => {
     if (!res.headersSent) {
-        res.status(404).send({ error: `Route ${req.url} does not exist` });
+        handleError(res, { status: 404, message: `Route ${req.url} does not exist` });
+        return;
     }
 });
 
 // Error Handling Middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
     console.error('Global error handler:', err.stack);
     console.error('Error details:', err);
 
@@ -490,7 +495,6 @@ startServer();
 // Graceful shutdown
 process.on('SIGTERM', async () => {
     console.log('Received SIGTERM, shutting down gracefully...');
-    await mongoose.connection.close();
     await redisCache.disconnect();
     app.close(() => {
         console.log('Server closed');
@@ -501,7 +505,6 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
     console.log('Received SIGINT, shutting down gracefully...');
-    await mongoose.connection.close();
     await redisCache.disconnect();
     app.close(() => {
         console.log('Server closed');
@@ -513,4 +516,9 @@ process.on('SIGINT', async () => {
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
     process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection:', reason);
+    // Consider sending notification to monitoring system
 });

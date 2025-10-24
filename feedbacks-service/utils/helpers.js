@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const getFromService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -29,11 +29,11 @@ const populateFeedbackDetails = async (feedback) => {
 
     // Populate feedback score, and quiz details
     const [quiz, score] = await Promise.all([
-        callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${feedback.quiz}`),
-        callService(`${process.env.SCORES_SERVICE_URL}/api/scores/${feedback.score}`)
+        getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${feedback.quiz}`),
+        getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores/${feedback.score}`)
     ]);
 
-    const user = score?.taken_by ? await callService(`${process.env.USERS_SERVICE_URL}/api/users/${score.taken_by}`) : null;
+    const user = score?.taken_by ? await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${score.taken_by}`) : null;
 
     // Attach populated data to feedback
     feedbackObj.quiz = quiz ? { _id: quiz._id, title: quiz.title } : feedbackObj.quiz;
@@ -53,25 +53,25 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
-    callService,
+    getFromService,
     populateFeedbackDetails,
     corsOptions,
 };

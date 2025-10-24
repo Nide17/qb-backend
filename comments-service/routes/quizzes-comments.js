@@ -1,21 +1,21 @@
-const express = require("express")
-const { getQuizzesComments, getOneQuizComment, getCommentsByQuiz, createQuizComment, approveRejectComment, deleteQuizComment } = require("../controllers/quizzes-comments")
-const { auth, authRole } = require("../middlewares/auth")
+const express = require('express');
+const { getQuizzesComments, getOneQuizComment, getCommentsByQuiz, createQuizComment, approveRejectComment, deleteQuizComment } = require('../controllers/quizzes-comments');
+const { auth, authRole } = require('../middlewares/auth');
 
-const router = express.Router()
+const router = express.Router();
 
 // GET routes
-router.get("/", getQuizzesComments)
-router.get("/quiz/:quizId", getCommentsByQuiz)
-router.get("/:id", getOneQuizComment)
+router.get('/', getQuizzesComments);
+router.get('/quiz/:quizId', getCommentsByQuiz);
+router.get('/:id', getOneQuizComment);
 
 // POST routes
-router.post("/", auth, createQuizComment)
+router.post('/', auth, createQuizComment);
 
 // PUT routes
-router.put("/approve-reject/:id/", authRole(['Admin', 'SuperAdmin']), approveRejectComment)
+router.put('/approve-reject/:id/', authRole(['Admin', 'SuperAdmin']), approveRejectComment);
 
 // DELETE routes
-router.delete("/:id", authRole(['Admin', 'SuperAdmin']), deleteQuizComment)
+router.delete('/:id', authRole(['Admin', 'SuperAdmin']), deleteQuizComment);
 
-module.exports = router
+module.exports = router;

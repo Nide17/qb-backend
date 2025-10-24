@@ -1,4 +1,4 @@
-const PostCategory = require("../../models/blog-posts/PostCategory");
+const PostCategory = require('../../models/blog-posts/PostCategory');
 const { handleError } = require('../../utils/error');
 const { findPostCategoryById, populateUser, validateRequiredFields } = require('../../utils/helpers');
 
@@ -6,7 +6,7 @@ const { findPostCategoryById, populateUser, validateRequiredFields } = require('
 exports.getPostCategories = async (req, res) => {
     try {
         const postCategories = await PostCategory.find().sort({ createdAt: -1 });
-        if (!postCategories) return res.status(204).json({ message: 'No postCategories found!' });
+        if (!postCategories || postCategories.length === 0) throw {'statusCode':204,'message':'No postCategories found!'};
 
         // Populate creator field for each post category
         let populatedCategories = await Promise.all(
@@ -23,8 +23,12 @@ exports.getPostCategories = async (req, res) => {
 };
 
 exports.getOnePostCategory = async (req, res) => {
-    const postCategory = await findPostCategoryById(req.params.id, res);
-    if (postCategory) res.status(200).json(postCategory);
+    try {
+        const postCategory = await findPostCategoryById(req.params.id);
+        res.status(200).json(postCategory);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.createPostCategory = async (req, res) => {
@@ -41,13 +45,13 @@ exports.createPostCategory = async (req, res) => {
         // Check for duplicate title
         const postCat = await PostCategory.findOne({ title });
         if (postCat) {
-            return res.status(400).json({ message: 'Failed! Post category with that title already exists!' });
+            throw {'message':'Failed! Post category with that title already exists!','statusCode':400};
         }
         const newPostCategory = new PostCategory({ title, answer, created_by });
-        const savedPostCategory = newPostCategory.save().catch(() => {
-            throw new Error('Could not save post category, try again!')
+        const savedPostCategory = await newPostCategory.save().catch(() => {
+            throw new Error('Could not save post category, try again!');
         });
-        if (!savedPostCategory) return;
+        if (!savedPostCategory) throw {'statusCode':500,'message':'Could not save post category, try again!'};
         res.status(200).json(savedPostCategory);
     } catch (err) {
         handleError(res, err);
@@ -56,11 +60,8 @@ exports.createPostCategory = async (req, res) => {
 
 exports.updatePostCategory = async (req, res) => {
     try {
-        const postCategory = await findPostCategoryById(req.params.id, res);
-        if (!postCategory) throw new Error('PostCategory not found!');
-
         const updatedPostCategory = await PostCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedPostCategory) throw new Error('PostCategory not found!');
+        if (!updatedPostCategory) throw { statusCode: 404, message: 'PostCategory not found!' };
 
         res.status(200).json(updatedPostCategory);
     } catch (err) {
@@ -70,11 +71,10 @@ exports.updatePostCategory = async (req, res) => {
 
 exports.deletePostCategory = async (req, res) => {
     try {
-        const postCategory = await findPostCategoryById(req.params.id, res);
-        if (!postCategory) throw new Error('PostCategory not found!');
+        const postCategory = await findPostCategoryById(req.params.id);
 
         const removedPostCategory = await PostCategory.findByIdAndDelete(req.params.id);
-        if (!removedPostCategory) throw new Error('PostCategory not found!');
+        if (!removedPostCategory) throw { statusCode: 404, message: 'PostCategory not found!' };
         res.status(200).json(postCategory);
     } catch (err) {
         handleError(res, err);

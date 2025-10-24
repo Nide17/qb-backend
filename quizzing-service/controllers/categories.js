@@ -1,13 +1,13 @@
-const Category = require("../models/Category");
-const Quiz = require("../models/Quiz");
-const Question = require("../models/Question");
+const Category = require('../models/Category');
+const Quiz = require('../models/Quiz');
+const Question = require('../models/Question');
 const { handleError } = require('../utils/error');
 const { validateRequiredFields, populateCategory } = require('../utils/helpers');
 
 exports.getCategories = async (req, res) => {
     try {
         let categories = await Category.find().sort({ creation_date: -1 }).populate('quizes', '_id title questions slug');
-        if (!categories) return res.status(204).json({ message: 'No categories found!' });
+    if (!categories) throw {'message':'No categories found!','statusCode':204};
 
         for (let i = 0; i < categories.length; i++) {
             categories[i] = await populateCategory(categories[i]);
@@ -43,7 +43,7 @@ exports.createCategory = async (req, res) => {
         // Check for duplicate title
         const existingCategory = await Category.findOne({ title: req.body.title });
         if (existingCategory) {
-            return res.status(400).json({ message: 'Failed! Category with that title already exists!' });
+            throw {'message':'Failed! Category with that title already exists!','statusCode':400};
         }
 
         const newCategory = new Category(req.body);

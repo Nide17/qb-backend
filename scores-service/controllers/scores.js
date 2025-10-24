@@ -1,38 +1,34 @@
 const axios = require('axios');
-const Score = require("../models/Score");
+const Score = require('../models/Score');
 const { handleError } = require('../utils/error');
-const { callService, getCachedData, setCachedData, cache, findScoreById, populateScore } = require('../utils/helpers');
+const { getFromService, getCachedData, setCachedData, cache, populateScore } = require('../utils/helpers');
 
 exports.getScores = async (req, res) => {
 
     try {
         // Pagination - ENFORCE pagination to prevent memory exhaustion
-        const totalScores = await Score.countDocuments({})
-        var PAGE_SIZE = 20
-        var pageNo = parseInt(req.query.pageNo || "1") // Default to at most 1 page to avoid mem leak
-        var query = {}
+        const totalScores = await Score.countDocuments({});
+        var PAGE_SIZE = 20;
+        var pageNo = parseInt(req.query.pageNo || '1'); // Default to at most 1 page to avoid mem leak
+        var query = {};
 
         // Always enforce pagination - never load all scores
-        query.limit = PAGE_SIZE
-        query.skip = PAGE_SIZE * (pageNo - 1)
+        query.limit = PAGE_SIZE;
+        query.skip = PAGE_SIZE * (pageNo - 1);
 
         // Always use pagination to prevent memory exhaustion
         let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
 
         if (!scores || scores.length === 0) {
-            return res.status(204).json({
-                message: 'No scores found'
-            });
+            throw {'statusCode':204,'message':'No scores found'};
         }
 
         if (req.query?.filter === 'stats') {
-            return res.status(200).json(totalScores)
+            return res.status(200).json(totalScores);
         }
 
         // Populate scores
-        for (let i = 0; i < scores.length; i++) {
-            scores[i] = await populateScore(scores[i]);
-        }
+        scores = await Promise.all(scores.map(score => populateScore(score)));
 
         return res.status(200).json({
             totalPages: Math.ceil(totalScores / PAGE_SIZE),
@@ -45,11 +41,11 @@ exports.getScores = async (req, res) => {
     } catch (err) {
         // Check if this is a memory exhaustion error
         if (err.message && err.message.includes('JavaScript heap out of memory')) {
-            return res.status(500).json({ message: 'Memory exhaustion error' });
+            throw {'statusCode':500,'message':'Memory exhaustion error'};
         }
         handleError(res, err);
     }
-}
+};
 
 exports.getScoresByTaker = async (req, res) => {
 
@@ -62,12 +58,10 @@ exports.getScoresByTaker = async (req, res) => {
 
         if (!scores || scores.length === 0) {
             scores = await Score.find({ taken_by: id }).sort({ test_date: -1 }).exec();
-            if (!scores || scores.length === 0) return res.status(404).json({ message: 'You have no scores. Take some quizzes!' });
+                if (!scores || scores.length === 0) throw {'statusCode':404,'message':'You have no scores. Take some quizzes!'};
 
             // Populate scores
-            for (let i = 0; i < scores.length; i++) {
-                scores[i] = await populateScore(scores[i]);
-            }
+            scores = await Promise.all(scores.map(score => populateScore(score)));
             setCachedData(cacheKey, scores);
         }
 
@@ -75,30 +69,24 @@ exports.getScoresByTaker = async (req, res) => {
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.getScoresForQuizCreator = async (req, res) => {
     try {
         // Add pagination to prevent memory exhaustion
         const PAGE_SIZE = 50; // Larger page size for creators but still limited
-        const pageNo = parseInt(req.query.pageNo || "1");
+        const pageNo = parseInt(req.query.pageNo || '1');
         const skip = PAGE_SIZE * (pageNo - 1);
 
         const totalScores = await Score.countDocuments({});
         let scores = await Score.find().skip(skip).limit(PAGE_SIZE).sort({ test_date: -1 }).exec();
 
         if (!scores || scores.length === 0) {
-            return res.status(404).json({
-                message: 'No scores found',
-                page: pageNo,
-                totalPages: Math.ceil(totalScores / PAGE_SIZE)
-            });
+            throw { statusCode: 404, message: '404' };
         }
 
         // Populate scores
-        for (let i = 0; i < scores.length; i++) {
-            scores[i] = await populateScore(scores[i]);
-        }
+        scores = await Promise.all(scores.map(score => populateScore(score)));
 
         res.status(200).json({
             totalPages: Math.ceil(totalScores / PAGE_SIZE),
@@ -110,25 +98,45 @@ exports.getScoresForQuizCreator = async (req, res) => {
     } catch (err) {
         // Check if this is a memory exhaustion error
         if (err.message && err.message.includes('JavaScript heap out of memory')) {
-            return res.status(500).json({ message: 'Memory exhaustion error' });
+            throw {'statusCode':500,'message':'Memory exhaustion error'};
         }
         console.log('\n\nError retrieving scores for quiz creator: ', err);
         handleError(res, err);
     }
-}
+};
 
 exports.getOneScore = async (req, res) => {
 
     try {
-        const score = await findScoreById(req.params.id, '');
-        if (!score) return res.status(404).json({ message: 'Score not found!' });
-        res.status(200).json(score);
+        let score = await Score.findOne({ id: req.params.id });
+        let scoreObj = null;
+
+        if (score) {
+            // Populate fields
+            scoreObj = score.toObject ? score.toObject() : score;
+            scoreObj = await populateScore(scoreObj);
+        } else {
+            // Try by MongoDB _id
+            score = await Score.findById(req.params.id);
+            scoreObj = score ? (score.toObject ? score.toObject() : score) : null;
+            if (scoreObj) scoreObj = await populateScore(scoreObj);
+        }
+
+        if (!scoreObj) {
+            // Throw an object that the controllers can pass to handleError
+            throw { statusCode: 404, message: 'Score not found!' };
+        }
+
+        // Send the populated score as an HTTP response
+        return res.status(200).json(scoreObj);
     } catch (err) {
-        handleError(res, err);
+        // Re-throw and let the controller's catch call handleError(res, err)
+        throw err;
     }
-}
+};
 
 exports.getQuizRanking = async (req, res) => {
+
     let id = req.params.id;
     const cacheKey = `ranking_${id}`;
 
@@ -140,21 +148,19 @@ exports.getQuizRanking = async (req, res) => {
             scores = await Score.find({ quiz: id }).sort({ marks: -1 }).limit(20).exec();
             if (!scores || scores.length === 0) {
                 console.warn(`No scores found for the ${id} quiz`);
-                return res.status(404).json({ message: 'No scores to display' });
+                throw {'statusCode':404,'message':'No scores to display'};
             }
 
             // Populate scores
-            for (let i = 0; i < scores.length; i++) {
-                scores[i] = await populateScore(scores[i]);
-            };
+            scores = await Promise.all(scores.map(score => populateScore(score)));
             setCachedData(cacheKey, scores);
         }
 
         res.status(200).json(scores);
-    } catch (err) {
-        handleError(res, err);
-    }
-}
+        } catch (err) {
+            handleError(res, err);
+        }
+};
 
 exports.getPopularQuizzes = async (req, res) => {
     const cacheKey = 'popular_quizzes';
@@ -163,7 +169,7 @@ exports.getPopularQuizzes = async (req, res) => {
         // Check cache first
         let popularQuizzes = getCachedData(cacheKey);
 
-        if (!popularQuizzes || popularQuizzes.length === 0) {
+    if (!popularQuizzes || popularQuizzes.length === 0) {
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 
@@ -172,14 +178,14 @@ exports.getPopularQuizzes = async (req, res) => {
 
             const topQuizzes = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
-                { $group: { _id: "$quiz", count: { $sum: 1 } } },
+                { $group: { _id: '$quiz', count: { $sum: 1 } } },
                 { $sort: { count: -1 } },
                 { $limit: 3 }
             ]).exec();
 
             if (topQuizzes.length > 0) {
                 const quizIds = topQuizzes.map(q => q._id);
-                let quizzes = await callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/?ids=${quizIds.join(',')}`);
+                let quizzes = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/?ids=${quizIds.join(',')}`);
 
                 popularQuizzes = topQuizzes.map(pq => {
                     const quiz = quizzes?.find(q => String(q._id) === String(pq._id));
@@ -197,12 +203,12 @@ exports.getPopularQuizzes = async (req, res) => {
             setCachedData(cacheKey, popularQuizzes);
         }
 
-        res.json(popularQuizzes);
+        res.status(200).json(popularQuizzes);
     } catch (err) {
         console.log('\n\nError retrieving popular quizzes: ', err);
         handleError(res, err);
     }
-}
+};
 
 exports.getMonthlyUser = async (req, res) => {
     const cacheKey = 'monthly_user';
@@ -211,7 +217,7 @@ exports.getMonthlyUser = async (req, res) => {
         // Check cache first
         let monthlyUserData = getCachedData(cacheKey);
 
-        if (!monthlyUserData || monthlyUserData.length === 0) {
+    if (!monthlyUserData || monthlyUserData.length === 0) {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
             startOfMonth.setHours(0, 0, 0, 0);
@@ -221,14 +227,14 @@ exports.getMonthlyUser = async (req, res) => {
 
             const monthlyUser = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
-                { $group: { _id: "$taken_by", count: { $sum: 1 } } },
+                { $group: { _id: '$taken_by', count: { $sum: 1 } } },
                 { $sort: { count: -1 } },
                 { $limit: 1 }
             ]).exec();
 
             if (monthlyUser.length > 0) {
                 try {
-                    const user = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${monthlyUser[0]._id}`, 60000);
+                    const user = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${monthlyUser[0]._id}`, 60000);
 
                     monthlyUserData = user && {
                         uName: user.name,
@@ -246,23 +252,22 @@ exports.getMonthlyUser = async (req, res) => {
             setCachedData(cacheKey, monthlyUserData);
         }
 
-        res.json(monthlyUserData);
+        res.status(200).json(monthlyUserData);
     } catch (err) {
         console.log('\n\nError retrieving monthly user: ', err);
         handleError(res, err);
     }
-}
+};
 
 exports.createScore = async (req, res) => {
 
-    const { id, out_of, category, quiz, review, taken_by } = req.body
-    const marks = req.body.marks ? req.body.marks : 0
-    var now = new Date()
+    const { id, out_of, category, quiz, review, taken_by } = req.body;
+    const marks = req.body.marks ? req.body.marks : 0;
+    var now = new Date();
 
     // Simple validation
     if (!id || !out_of || !review || !taken_by) {
-        const missing = !id ? 'Error' : !out_of ? 'No total' : !review ? 'No review' : !taken_by ? 'Not logged in' : 'Wrong'
-        return res.status(400).json({ message: missing + '!' })
+        throw { statusCode: 400, message: '400' };
     }
 
     else {
@@ -274,20 +279,16 @@ exports.createScore = async (req, res) => {
             ]);
 
             if (existingScore.length > 0) {
-                return res.status(400).json({
-                    message: 'Score duplicate! You have already saved this score!'
-                })
+                throw {'statusCode':400,'message':'Score duplicate! You have already saved this score!'};
             }
 
             if (recentScoreExist.length > 0) {
                 // Check if the score was saved within 60 seconds
-                let testDate = new Date(recentScoreExist[0].test_date)
-                let seconds = Math.round((now - testDate) / 1000)
+                let testDate = new Date(recentScoreExist[0].test_date);
+                let seconds = Math.round((now - testDate) / 1000);
 
                 if (seconds < 60) {
-                    return res.status(400).json({
-                        message: 'Score duplicate! You took this quiz in less than a minute ago!'
-                    })
+                    throw {'statusCode':400,'message':'Score duplicate! You took this quiz in less than a minute ago!'};
                 }
             }
 
@@ -300,9 +301,9 @@ exports.createScore = async (req, res) => {
                 quiz,
                 review,
                 taken_by
-            })
+            });
 
-            const savedScore = await newScore.save()
+            const savedScore = await newScore.save();
 
             if (!savedScore) throw new Error('Something went wrong during creation!');
 
@@ -345,34 +346,34 @@ exports.createScore = async (req, res) => {
                 quiz: savedScore.quiz,
                 review: savedScore.review,
                 taken_by: savedScore.taken_by
-            })
+            });
         } catch (err) {
             console.log('Error creating score: ', err);
             handleError(res, err);
         }
     }
-}
+};
 
 exports.deleteScore = async (req, res) => {
     try {
         //Find the Score to delete by id first
-        const score = await Score.findOne({ _id: req.params.id })
+        const score = await Score.findOne({ _id: req.params.id });
 
-        if (!score) return res.status(404).json({ message: 'No scores found' });
+    if (!score) throw {'statusCode':404,'message':'No scores found'};
 
         // Delete the Score
-        const removedScore = await Score.deleteOne({ _id: req.params.id })
+        const removedScore = await Score.deleteOne({ _id: req.params.id });
 
         if (removedScore.deletedCount === 0) throw new Error('Something went wrong while deleting!');
 
-        res.status(200).json(score)
+        res.status(200).json(score);
     }
 
     catch (err) {
         console.log('Error deleting score: ', err);
         handleError(res, err);
     }
-}
+};
 
 
 // STATISTICS CONTROLLERS
@@ -386,7 +387,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
         if (!topUsers || topUsers.length === 0) {
 
             let topUsers = await Score.aggregate([
-                { $group: { _id: "$taken_by", totalQuizzes: { $sum: 1 }, avgMarks: { $avg: "$marks" } } },
+                { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
                 { $sort: { totalQuizzes: -1 } },
                 { $limit: 10 }
             ]).exec();
@@ -409,7 +410,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
                 setCachedData(cacheKey, topUsers);
             }
         }
-        res.json(topUsers);
+        res.status(200).json(topUsers);
     } catch (err) {
         console.log('\n\nError retrieving top users by quizzes:', err);
         handleError(res, err);
@@ -426,7 +427,7 @@ exports.getTop10Quizzes = async (req, res) => {
         if (!topQuizzes || topQuizzes.length === 0) {
 
             const topQuizzesData = await Score.aggregate([
-                { $group: { _id: "$quiz", totalTaken: { $sum: 1 } } },
+                { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
                 { $sort: { totalTaken: -1 } },
                 { $limit: 10 }
             ]).exec();
@@ -449,9 +450,9 @@ exports.getTop10Quizzes = async (req, res) => {
                 setCachedData(cacheKey, topQuizzes);
             }
         }
-        res.json(topQuizzes);
+        res.status(200).json(topQuizzes);
     } catch (err) {
         console.log('\n\nError retrieving top quizzes:', err);
         handleError(res, err);
     }
-}
+};

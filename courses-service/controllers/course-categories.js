@@ -1,15 +1,15 @@
-const CourseCategory = require("../models/CourseCategory");
-const Course = require("../models/Course");
-const Chapter = require("../models/Chapter");
-const Notes = require("../models/Notes");
+const CourseCategory = require('../models/CourseCategory');
+const Course = require('../models/Course');
+const Chapter = require('../models/Chapter');
+const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
-const { validateRequiredFields, findCourseCategoryById } = require('../utils/helpers');
+const { validateRequiredFields } = require('../utils/helpers');
 
 exports.getCategories = async (req, res) => {
 
     try {
         const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
-        if (!courseCategories) return res.status(204).json({ message: 'No course categories found!' });
+        if (!courseCategories) throw {'message':'No course categories found!','statusCode':204};
         res.status(200).json(courseCategories);
     } catch (err) {
         handleError(res, err);
@@ -18,9 +18,9 @@ exports.getCategories = async (req, res) => {
 
 exports.getOneCategory = async (req, res) => {
     try {
-        const category = await findCourseCategoryById(req.params.id);
+        const category = await CourseCategory.findById(req.params.id);
 
-        if (!category) throw new Error('Category not found');
+        if (!category) throw {'message':'Category not found','statusCode':404};
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);
@@ -39,11 +39,11 @@ exports.createCategory = async (req, res) => {
         ]);
 
         const category = await CourseCategory.findOne({ title });
-        if (category) return res.status(403).json({ message: 'Category already exists!' });
+        if (category) throw {'message':'Category with this title already exists!','statusCode':409};
 
         const newCategory = new CourseCategory({ title, description, created_by });
         const savedCategory = await newCategory.save();
-        if (!savedCategory) return res.status(503).json({ message: 'Something went wrong during creation!' });
+        if (!savedCategory) throw {'message':'Something went wrong during creation!','statusCode':503};
 
         res.status(200).json(savedCategory);
     } catch (err) {
@@ -53,8 +53,8 @@ exports.createCategory = async (req, res) => {
 
 exports.updateCategory = async (req, res) => {
     try {
-        const category = await findCourseCategoryById(req.params.id);
-        if (!category) return;
+        const category = await CourseCategory.findById(req.params.id);
+        if (!category) throw {'message':'Category not found!','statusCode':404};
 
         const updatedCategory = await CourseCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedCategory);
@@ -65,8 +65,8 @@ exports.updateCategory = async (req, res) => {
 
 exports.deleteCategory = async (req, res) => {
     try {
-        const category = await findCourseCategoryById(req.params.id);
-        if (!category) return;
+        const category = await CourseCategory.findById(req.params.id);
+        if (!category) throw {'message':'Category not found!','statusCode':404};
 
         // Delete related data
         await Promise.all([
@@ -75,8 +75,8 @@ exports.deleteCategory = async (req, res) => {
             Notes.deleteMany({ category: category._id })
         ]);
 
-        const removedCategory = await CourseCategory.deleteOne();
-        if (removedCategory.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
+        const removedCategory = await CourseCategory.deleteOne({ _id: req.params.id });
+        if (removedCategory.deletedCount === 0) throw {'message':'Something went wrong while deleting!','statusCode':503};
 
         res.status(200).json(category);
     } catch (err) {

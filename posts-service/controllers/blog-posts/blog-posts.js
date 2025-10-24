@@ -1,6 +1,6 @@
-const BlogPost = require("../../models/blog-posts/BlogPost.js");
+const BlogPost = require('../../models/blog-posts/BlogPost.js');
 const { handleError } = require('../../utils/error');
-const { deleteImageFromS3, populateBlogPost, populateBlogPosts, validateRequiredFields } = require('../../utils/helpers');
+const { deleteImageFromS3, populateUser, validateRequiredFields } = require('../../utils/helpers');
 
 exports.getBlogPosts = async (req, res) => {
 
@@ -9,22 +9,21 @@ exports.getBlogPosts = async (req, res) => {
             .populate('postCategory', 'title');
 
         if (!blogPosts || blogPosts.length === 0) {
-            return res.status(204).json({
-                success: false,
-                error: 'No Blog Posts Found',
-                message: 'No blog posts found',
-                code: 'NO_POSTS_FOUND',
-                timestamp: new Date().toISOString()
-            });
+            throw {'message':'No blog posts found','statusCode':204};
         }
 
-        // Populate creator data for each blog post
-        blogPosts = await populateBlogPosts(res, blogPosts);
+        // Populate creator data for each blog post (keep full post object, only replace creator)
+        blogPosts = await Promise.all(blogPosts.map(async (post) => {
+            const postObj = post.toObject ? post.toObject() : post;
+            const creator = await populateUser(postObj.creator);
+            return { ...postObj, creator: creator || { _id: postObj.creator, name: 'Unknown User' } };
+        }));
+
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.getOneBlogPost = async (req, res) => {
 
@@ -36,26 +35,23 @@ exports.getOneBlogPost = async (req, res) => {
             .populate('postCategory', 'title');
 
         if (!blogPost) {
-            return res.status(404).json({
-                success: false,
-                error: 'Blog Post Not Found',
-                message: 'Blog post not found',
-                code: 'BLOG_POST_NOT_FOUND',
-                timestamp: new Date().toISOString()
-            });
+            throw {'message':'Blog post not found','statusCode':404};
         }
 
-        // Populate creator data for the blog post
-        blogPost = await populateBlogPost(res, blogPost);
+        // Populate creator data for the blog post (keep full post object, only replace creator)
+        const blogPostObj = blogPost.toObject ? blogPost.toObject() : blogPost;
+        const creator = await populateUser(blogPostObj.creator);
+        blogPostObj.creator = creator || { _id: blogPostObj.creator, name: 'Unknown User' };
+
         res.status(200).json({
             success: true,
-            data: blogPost,
+            data: blogPostObj,
             timestamp: new Date().toISOString()
         });
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.getBlogPostsByCategory = async (req, res) => {
 
@@ -63,50 +59,38 @@ exports.getBlogPostsByCategory = async (req, res) => {
         const id = req.params.id;
 
         if (!id) {
-            return res.status(400).json({
-                success: false,
-                error: 'Bad Request',
-                message: 'Category id not provided',
-                code: 'MISSING_CATEGORY_ID',
-                timestamp: new Date().toISOString()
-            });
+            throw {'message':'Category id not provided','statusCode':400};
         }
 
         let blogPosts = await BlogPost.find({ postCategory: id }).sort({ createdAt: -1 })
             .populate('postCategory', 'title');
 
         if (!blogPosts || blogPosts.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: 'Blog Posts Not Found For This Category',
-                message: 'No blog posts found for this category',
-                code: 'NO_POSTS_IN_CATEGORY',
-                timestamp: new Date().toISOString()
-            });
+            throw {'message':'No blog posts found for this category','statusCode':404};
         }
 
         // Populate creator data for each blog post
-        blogPosts = await populateBlogPosts(res, blogPosts);
+        blogPosts = await Promise.all(blogPosts.map(post => populateUser(post.creator)));
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.getCreatedBy = async (req, res) => {
     try {
         const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
-        if (!blogPosts) return res.status(404).json({ message: 'No blogPosts found!' });
+        if (!blogPosts) throw {'message':'No blogPosts found!','statusCode':404};
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.createBlogPost = async (req, res) => {
 
-    const bp_image = req.file ? req.file : null
-    const { title, markdown, postCategory, creator, bgColor } = req.body
+    const bp_image = req.file ? req.file : null;
+    const { title, markdown, postCategory, creator, bgColor } = req.body;
 
     try {
         // Validate required fields
@@ -124,15 +108,12 @@ exports.createBlogPost = async (req, res) => {
             postCategory,
             creator,
             bgColor
-        })
+        });
 
-        const savedBlogPost = await newBlogPost.save()
+        const savedBlogPost = await newBlogPost.save();
 
         if (!savedBlogPost) {
-            return res.status(500).json({
-                success: false,
-                message: 'Something went wrong during creation! file size should not exceed 1MB'
-            });
+            throw {'message':'Something went wrong during creation! file size should not exceed 1MB','statusCode':500};
         }
 
         res.status(200).json({
@@ -144,17 +125,17 @@ exports.createBlogPost = async (req, res) => {
             creator: savedBlogPost.creator,
             bgColor: savedBlogPost.bgColor,
             slug: savedBlogPost.slug
-        })
+        });
 
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.updateBlogPost = async (req, res) => {
     try {
         const blogPost = await BlogPost.findById(req.params.id);
-        if (!blogPost) return res.status(404).json({ message: 'BlogPost not found!' });
+        if (!blogPost) throw {'message':'BlogPost not found!','statusCode':404};
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedBlogPost);
@@ -166,7 +147,7 @@ exports.updateBlogPost = async (req, res) => {
 exports.updateBlogPostStatus = async (req, res) => {
     try {
         const blogPost = await BlogPost.findById(req.params.id);
-        if (!blogPost) return res.status(404).json({ message: 'BlogPost not found!' });
+        if (!blogPost) throw {'message':'BlogPost not found!','statusCode':404};
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
         res.status(200).json(updatedBlogPost);
@@ -178,13 +159,13 @@ exports.updateBlogPostStatus = async (req, res) => {
 exports.deleteBlogPost = async (req, res) => {
 
     try {
-        const blogPost = await BlogPost.findById(req.params.id)
+        const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw new Error('BlogPost is not found!');
 
         blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
-        const removedBlogPost = await blogPost.deleteOne()
+        const removedBlogPost = await blogPost.deleteOne();
 
-        if (removedBlogPost.deletedCount === 0) throw new Error('Something went wrong while deleting!')
+        if (removedBlogPost.deletedCount === 0) throw new Error('Something went wrong while deleting!');
         res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);
@@ -194,7 +175,7 @@ exports.deleteBlogPost = async (req, res) => {
 exports.deleteBlogPostImage = async (req, res) => {
     try {
         const blogPost = await BlogPost.findById(req.params.id);
-        if (!blogPost) return res.status(404).json({ message: 'BlogPost not found!' });
+        if (!blogPost) throw {'message':'BlogPost not found!','statusCode':404};
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { new: true });
         res.status(200).json(updatedBlogPost);

@@ -1,6 +1,6 @@
-const School = require("../models/School");
-const Level = require("../models/Level");
-const Faculty = require("../models/Faculty");
+const School = require('../models/School');
+const Level = require('../models/Level');
+const Faculty = require('../models/Faculty');
 const { handleError } = require('../utils/error');
 const { validateRequiredFields } = require('../utils/helpers');
 
@@ -15,13 +15,13 @@ exports.getSchools = async (req, res) => {
 
 exports.getOneSchool = async (req, res) => {
     try {
-        let school = await School.findById(req.params.id).select('_id title');
-        if (!school) return res.status(404).json({ message: 'School not found!' });
-        res.status(200).json(school)
+    let school = await School.findById(req.params.id).select('_id title');
+    if (!school) throw {'statusCode':404,'message':'School not found!'};
+    res.status(200).json(school);
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.createSchool = async (req, res) => {
     try {
@@ -62,18 +62,18 @@ exports.updateSchool = async (req, res) => {
 
 exports.deleteSchool = async (req, res) => {
     try {
-        const school = await School.findById(req.params.id);
-        if (!school) return res.status(404).json({ message: 'School not found!' });
+    const school = await School.findById(req.params.id);
+    if (!school) throw {'statusCode':404,'message':'School not found!'};
 
-        // Delete levels and faculties belonging to this School
-        await Level.deleteMany({ school: school._id });
-        await Faculty.deleteMany({ school: school._id });
+    // Delete levels and faculties belonging to this School
+    await Level.deleteMany({ school: school._id });
+    await Faculty.deleteMany({ school: school._id });
 
-        // Delete this school
-        const removedSchool = await school.deleteOne();
-        if (removedSchool.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
+    // Delete this school
+    const removedSchool = await school.deleteOne();
+    if (removedSchool.deletedCount === 0) throw {'statusCode':503,'message':'Something went wrong while deleting!'};
 
-        res.status(200).json(school);
+    res.status(200).json(school);
     } catch (err) {
         handleError(res, err);
     }

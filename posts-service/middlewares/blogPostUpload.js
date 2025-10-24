@@ -1,7 +1,6 @@
-const { S3 } = require("@aws-sdk/client-s3")
-const path = require('path')
+const { S3 } = require('@aws-sdk/client-s3');
 const multer = require('multer');
-const multerS3 = require('multer-s3')
+const multerS3 = require('multer-s3');
 
 // AWS S3 Configuration
 const s3Config = new S3({
@@ -20,18 +19,8 @@ const fileFilter = (req, file, callback) => {
     } else {
         callback(null, false);
     }
-}
+};
 
-// Uploading image locally if multer is working.
-const storage = multer.diskStorage({
-    destination: (req, file, callback) => {
-        callback(null, path.join(__dirname, 'blogPosts'));
-    },
-    filename: (req, file, callback) => {
-        const fileName = file.originalname.toLowerCase().split(' ').join('-').replace(/[^a-zA-Z0-9.]/g, '-');
-        callback(null, req.params.id + '-' + fileName)
-    }
-});
 
 // Uploading image to aws S3
 const multerS3Config = multerS3({
@@ -54,6 +43,6 @@ const upload = multer({
     limits: {
         fileSize: 2000000 // 1000000 Bytes = 1 MB (2MB)
     }
-})
+});
 
 exports.blogPostUpload = upload;

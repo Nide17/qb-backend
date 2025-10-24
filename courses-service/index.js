@@ -1,28 +1,28 @@
-const express = require('express')
-const mongoose = require('mongoose')
-const os = require('os')
-const process = require('process')
-const cors = require('cors')
-const { handleError } = require('./utils/error')
-const dotenv = require('dotenv')
-const { corsOptions } = require('./utils/helpers')
+const express = require('express');
+const mongoose = require('mongoose');
+const os = require('os');
+const process = require('process');
+const cors = require('cors');
+const { handleError } = require('./utils/error');
+const dotenv = require('dotenv');
+const { corsOptions } = require('./utils/helpers');
 
 // Config
-dotenv.config()
-const app = express()
+dotenv.config();
+const app = express();
 
 // Middlewares
-app.use(cors(corsOptions))
-app.use(express.json())
+app.use(cors(corsOptions));
+app.use(express.json());
 
 // Routes
-app.use("/api/course-categories", require('./routes/course-categories'))
-app.use("/api/courses", require('./routes/courses'))
-app.use("/api/chapters", require('./routes/chapters'))
-app.use("/api/notes", require('./routes/notes'))
+app.use('/api/course-categories', require('./routes/course-categories'));
+app.use('/api/courses', require('./routes/courses'));
+app.use('/api/chapters', require('./routes/chapters'));
+app.use('/api/notes', require('./routes/notes'));
 
 // home route
-app.get('/', (req, res) => { res.send('Welcome to QB courses API') })
+app.get('/', (req, res) => { res.send('Welcome to QB courses API'); });
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -33,7 +33,7 @@ app.get('/health', async (req, res) => {
         // ✅ Await the stats
         const stats = await db.stats();
 
-        res.json({
+        res.status(200).json({
             service: 'courses-service',
             status: 'healthy',
             database: dbStatus ? 'connected' : 'disconnected',
@@ -87,17 +87,17 @@ app.get('/health', async (req, res) => {
 });
 
 // Handle errors: takes res, err, status
-app.use((err, req, res, next) => handleError(res, err))
+app.use((err, req, res, _next) => handleError(res, err));
 
 mongoose
     .connect(process.env.MONGODB_URI)
     .then(async (conn) => {
         app.listen(process.env.PORT || 5005, async () => {
-            const db = conn.connection.db
-            console.log(`Courses service is running on port ${process.env.PORT || 5005}, and MongoDB ${db.databaseName} is connected`)
-        })
+            const db = conn.connection.db;
+            console.log(`Courses service is running on port ${process.env.PORT || 5005}, and MongoDB ${db.databaseName} is connected`);
+        });
     })
-    .catch((err) => console.log(err))
+    .catch((err) => console.log(err));
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

@@ -7,12 +7,12 @@ class RedisCacheManager {
         this.defaultTTL = 300; // 5 minutes in seconds
         this.retryDelay = 30000; // 30 seconds
         this.maxRetries = 1;
-        
+
         // Fallback in-memory cache
         this.memoryCache = new Map();
         this.memoryTTL = new Map();
         this.useMemoryFallback = true;
-        
+
         console.log('🧠 Memory cache fallback enabled');
     }
 
@@ -47,8 +47,8 @@ class RedisCacheManager {
 
             await this.redis.connect();
             return true;
-        } catch (error) {
-            console.log('📦 Using memory cache (Redis unavailable)');
+        } catch (err) {
+            console.log('📦 Using memory cache (Redis unavailable)', err.message);
             this.isConnected = false;
             return false;
         }
@@ -78,7 +78,8 @@ class RedisCacheManager {
             try {
                 const value = await this.redis.get(key);
                 return value ? JSON.parse(value) : null;
-            } catch (error) {
+            } catch (_error) {
+                void _error;
                 // Silent fallback to memory cache
             }
         }
@@ -104,7 +105,8 @@ class RedisCacheManager {
                     await this.redis.set(key, serializedValue);
                 }
                 return true;
-            } catch (error) {
+            } catch (_error) {
+                void _error;
                 // Silent fallback to memory cache
             }
         }
@@ -127,7 +129,8 @@ class RedisCacheManager {
             try {
                 await this.redis.del(key);
                 return true;
-            } catch (error) {
+            } catch (_error) {
+                void _error;
                 // Silent fallback to memory cache
             }
         }
@@ -148,7 +151,8 @@ class RedisCacheManager {
             try {
                 const result = await this.redis.exists(key);
                 return result === 1;
-            } catch (error) {
+            } catch (_error) {
+                void _error;
                 // Silent fallback to memory cache
             }
         }
@@ -170,8 +174,9 @@ class RedisCacheManager {
         try {
             await this.redis.expire(key, ttl);
             return true;
-        } catch (error) {
-            console.error('Redis expire error:', error);
+        } catch (_error) {
+            void _error;
+            // Silent fallback to memory cache
             return false;
         }
     }
@@ -264,10 +269,10 @@ class RedisCacheManager {
     async invalidateRelated(key) {
         const patterns = [
             `*${key}*`,
-            `quiz_*`,
-            `user_*`,
-            `category_*`,
-            `search_*`
+            'quiz_*',
+            'user_*',
+            'category_*',
+            'search_*'
         ];
 
         for (const pattern of patterns) {

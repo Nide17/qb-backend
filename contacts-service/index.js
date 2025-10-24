@@ -1,33 +1,33 @@
 
-const express = require('express')
-const mongoose = require('mongoose')
-const cors = require('cors')
-const os = require('os')
-const process = require('process')
-const { createServer } = require("http")
-const { Server } = require("socket.io")
-const dotenv = require('dotenv')
-const contactsSocketManager = require('./utils/enhanced-socket')
-const { handleError } = require('./utils/error')
-const { corsOptions } = require('./utils/helpers')
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const os = require('os');
+const process = require('process');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const dotenv = require('dotenv');
+const contactsSocketManager = require('./utils/enhanced-socket');
+const { handleError } = require('./utils/error');
+const { corsOptions } = require('./utils/helpers');
 
 // Config
-dotenv.config()
-const app = express()
-const httpServer = createServer(app)
+dotenv.config();
+const app = express();
+const httpServer = createServer(app);
 
 // Middlewares
-app.use(cors(corsOptions))
-app.use(express.json())
+app.use(cors(corsOptions));
+app.use(express.json());
 
 // Routes
-app.use("/api/contacts", require('./routes/contacts'))
-app.use("/api/broadcasts", require('./routes/broadcasts'))
-app.use("/api/chat-rooms", require('./routes/chat-rooms'))
-app.use("/api/room-messages", require('./routes/room-messages'))
+app.use('/api/contacts', require('./routes/contacts'));
+app.use('/api/broadcasts', require('./routes/broadcasts'));
+app.use('/api/chat-rooms', require('./routes/chat-rooms'));
+app.use('/api/room-messages', require('./routes/room-messages'));
 
 // home route
-app.get('/', (req, res) => { res.send('Welcome to QB contacts API') })
+app.get('/', (req, res) => { res.send('Welcome to QB contacts API'); });
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -38,7 +38,7 @@ app.get('/health', async (req, res) => {
         // ✅ Await the stats
         const stats = await db.stats();
 
-        res.json({
+        res.status(200).json({
             service: 'contacts-service',
             status: 'healthy',
             database: dbStatus ? 'connected' : 'disconnected',
@@ -92,15 +92,15 @@ app.get('/health', async (req, res) => {
 });
 
 // Handle errors: takes res, err, status
-app.use((err, req, res, next) => handleError(res, err))
+app.use((err, req, res, _next) => handleError(res, err));
 
 // Database connection and server start
 mongoose
     .connect(process.env.MONGODB_URI)
     .then(async (conn) => {
         httpServer.listen(process.env.PORT || 5008, async () => {
-            const db = conn.connection.db
-            console.log(`Contacts service is running on port ${process.env.PORT || 5008}, and MongoDB ${db.databaseName} is connected`)
+            const db = conn.connection.db;
+            console.log(`Contacts service is running on port ${process.env.PORT || 5008}, and MongoDB ${db.databaseName} is connected`);
 
             // Initialize Socket.io with enhanced contacts functionality
             const io = new Server(httpServer, {
@@ -110,11 +110,11 @@ mongoose
 
             contactsSocketManager.initialize(io);
             console.log('🔌 Enhanced contacts socket manager initialized');
-        })
+        });
     })
     .catch((err) => {
-        console.error('Failed to connect to MongoDB:', err)
-    })
+        console.error('Failed to connect to MongoDB:', err);
+    });
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

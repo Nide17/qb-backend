@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Helper function to call other services
-const callService = async (url, timeout = 60000, token) => {
+const getFromService = async (url, timeout = 60000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -35,8 +35,8 @@ const populateDownload = async (download) => {
     let downloadObj = download.toObject ? download.toObject() : download;
     try {
         let [notes, downloaded_by] = await Promise.all([
-            callService(`${process.env.COURSES_SERVICE_URL}/api/notes/${download.notes}`),
-            callService(`${process.env.USERS_SERVICE_URL}/api/users/${download.downloaded_by}`)
+            getFromService(`${process.env.COURSES_SERVICE_URL}/api/notes/${download.notes}`),
+            getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${download.downloaded_by}`)
         ]);
 
         return { ...downloadObj, notes, chapter: notes ? notes.chapter : null, course: notes ? notes.course : null, courseCategory: notes ? notes.courseCategory : null, downloaded_by };
@@ -82,26 +82,26 @@ const allowList = [
         'http://localhost:5000',
         'https://www.quizblog.rw',
         'https://www.quizblog.online',
-    ]
+    ];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
     populateDownload,
-    callService,
+    getFromService,
     validateRequiredFields,
     getCachedData,
     setCachedData,

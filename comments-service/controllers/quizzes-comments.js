@@ -1,6 +1,9 @@
-const QuizComment = require("../models/QuizComment");
+const QuizComment = require('../models/QuizComment');
 const { handleError } = require('../utils/error');
-const { populateSenderAndQuiz } = require('../utils/helpers');
+const { populateSenderAndQuiz, validateRequiredFields } = require('../utils/helpers');
+
+// default selectFields (adjust later if you need specific field projections)
+const selectFields = '';
 
 exports.getQuizzesComments = async (req, res) => {
     try {
@@ -91,7 +94,7 @@ exports.approveRejectComment = async (req, res) => {
     } catch (err) {
         handleError(res, err);
     }
-}
+};
 
 exports.deleteQuizComment = async (req, res) => {
     try {

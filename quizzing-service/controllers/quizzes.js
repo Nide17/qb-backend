@@ -1,13 +1,15 @@
-const Quiz = require("../models/Quiz");
-const Category = require("../models/Category");
-const Question = require("../models/Question");
+const Quiz = require('../models/Quiz');
+const Category = require('../models/Category');
+const Question = require('../models/Question');
 const { handleError } = require('../utils/error');
-const { callService, populateQuiz, populateQuizzes } = require('../utils/helpers');
+const { getFromService, populateQuiz, populateQuizzes } = require('../utils/helpers');
+const { sendEmail } = require('../utils/emails/sendEmail');
+const { isValidObjectId } = require('mongoose');
 
 exports.getQuizzes = async (req, res) => {
 
-    var pageNo = parseInt(req.query.pageNo)
-    const totalQuizzes = await Quiz.countDocuments({})
+    var pageNo = parseInt(req.query.pageNo);
+    const totalQuizzes = await Quiz.countDocuments({});
 
     try {
         // If limit & skip are defined
@@ -23,7 +25,7 @@ exports.getQuizzes = async (req, res) => {
                 .skip(skip);
 
             if (!limitedQuizzes.length) {
-                return res.status(204).json({ message: 'No quizzes found!' });
+                throw {'message':'No quizzes found!','statusCode':204};
             }
 
             // Populate user data using simple direct calls
@@ -40,28 +42,26 @@ exports.getQuizzes = async (req, res) => {
         else if (pageNo && pageNo > 0) {
 
             // If limit & skip undefined: Pagination - ENFORCE pagination to prevent memory exhaustion
-            var PAGE_SIZE = 20
-            var query = {}
+            var PAGE_SIZE = 20;
+            var query = {};
 
             // Always enforce pagination - never load all quizzes
-            query.limit = PAGE_SIZE
-            query.skip = PAGE_SIZE * (pageNo - 1)
+            query.limit = PAGE_SIZE;
+            query.skip = PAGE_SIZE * (pageNo - 1);
 
             // Always use pagination to prevent memory exhaustion
             let paginatedQuizzes = await Quiz.find({}, {}, query).populate('category questions').sort({ creation_date: -1 }).lean();
 
             if (!paginatedQuizzes || paginatedQuizzes.length === 0) {
-                return res.status(204).json({
-                    message: 'No quizzes found'
-                });
+                throw {'message':'No quizzes found','statusCode':204};
             }
 
             if (req.query?.filter === 'stats') {
-                return res.status(200).json(totalQuizzes)
+                return res.status(200).json(totalQuizzes);
             }
 
             if (!paginatedQuizzes.length) {
-                return res.status(204).json({ message: 'No quizzes found!' });
+                throw {'message':'No quizzes found!','statusCode':204};
             }
 
             // Populate user data using simple direct calls
@@ -83,7 +83,7 @@ exports.getQuizzes = async (req, res) => {
                 .populate('category questions');
 
             if (!allQuizzes.length) {
-                return res.status(204).json({ message: 'No quizzes found!' });
+                throw {'message':'No quizzes found!','statusCode':204};
             }
 
             // Populate user data using simple direct calls
@@ -103,7 +103,7 @@ exports.getOneQuiz = async (req, res) => {
 
         const quiz = await Quiz.findOne(query).populate('category questions');
         if (!quiz) {
-            return res.status(404).json({ message: `Quiz with id ${id} not found` });
+            throw { statusCode: 404, message: `Quiz with id ${id} not found` };
         }
 
         // Populate user data using simple direct calls
@@ -119,7 +119,7 @@ exports.getQuizzesByCategory = async (req, res) => {
         let quizzes = await Quiz.find({ category: req.params.id })
             .populate('category questions');
         if (!quizzes.length) {
-            return res.status(204).json({ message: 'No quizzes found' });
+            throw {'message':'No quizzes found','statusCode':204};
         }
 
         quizzes = await populateQuizzes(quizzes);
@@ -134,7 +134,7 @@ exports.getQuizzesByNotes = async (req, res) => {
         const categories = await Category.find({ category: req.params.id });
         let quizzes = await Quiz.find({ category: { $in: categories } }).populate('category questions');
         if (!quizzes.length) {
-            return res.status(204).json({ message: 'No quizzes found!' });
+            throw {'message':'No quizzes found!','statusCode':204};
         }
 
         quizzes = await populateQuizzes(quizzes);
@@ -149,13 +149,13 @@ exports.getBatchedQuizzes = async (req, res) => {
     try {
         const ids = req.body.quizIds;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ message: 'No quiz IDs provided!' });
+            throw {'message':'No quiz IDs provided!','statusCode':400};
         }
 
         const quizzes = await Quiz.find({ _id: { $in: ids } })
             .populate('category questions');
         if (!quizzes.length) {
-            return res.status(204).json({ message: 'No quizzes found!' });
+            throw {'message':'No quizzes found!','statusCode':204};
         }
 
         res.status(200).json(quizzes);
@@ -168,7 +168,7 @@ exports.createQuiz = async (req, res) => {
     const { title, description, category, created_by } = req.body;
 
     if (!title || !description || !category) {
-        return res.status(400).json({ message: 'There are missing info!' });
+        throw {'message':'There are missing info!','statusCode':400};
     }
 
     try {
@@ -181,7 +181,7 @@ exports.createQuiz = async (req, res) => {
         );
 
         if (!updatedCategory) throw new Error('Cannot update corresponding category!');
-        console.log(updatedCategory)
+        console.log(updatedCategory);
         const savedQuiz = await newQuiz.save();
         if (!savedQuiz) throw new Error('Something went wrong during creation!');
 
@@ -198,10 +198,10 @@ exports.notifying = async (req, res) => {
         let subscribers = [];
 
         try {
-            const { data } = await callService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
-            subscribers = data;
-        } catch (err) {
-            console.error('Error fetching subscribers:', error.message);
+            const { data } = await getFromService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
+                subscribers = data;
+            } catch (err) {
+                console.error('Error fetching subscribers:', err.message);
         }
 
         const clientURL = req.headers.origin;
@@ -213,11 +213,11 @@ exports.notifying = async (req, res) => {
                 {
                     name: sub.name,
                     author: created_by,
-                    newQuiz: title,
-                    quizzesLink: `${clientURL}/view-quiz/${slug}`,
-                    unsubscribeLink: `${clientURL}/unsubscribe`
+                    quizTitle: title,
+                    quizLink: `${clientURL}/view-quiz/${slug}`,
+                    unsubLink: `${clientURL}/unsubscribe`
                 },
-                "./template/newquiz.handlebars"
+                './template/newquiz.handlebars'
             );
         });
 
@@ -229,8 +229,8 @@ exports.notifying = async (req, res) => {
 
 exports.updateQuiz = async (req, res) => {
     try {
-        const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) return;
+    const quiz = await Quiz.findById(req.params.id);
+    if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
 
         Object.assign(quiz, req.body);
         await quiz.save();
@@ -242,7 +242,7 @@ exports.updateQuiz = async (req, res) => {
 
         await Category.updateOne(
             { _id: req.body.category },
-            { $addToSet: { "quizes": quiz._id } }
+            { $addToSet: { 'quizes': quiz._id } }
         );
 
         res.status(200).json(quiz);
@@ -253,8 +253,8 @@ exports.updateQuiz = async (req, res) => {
 
 exports.addVidLink = async (req, res) => {
     try {
-        const quiz = await Quiz.findById(req.params.id)
-        if (!quiz) return;
+        const quiz = await Quiz.findById(req.params.id);
+        if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
 
         quiz.video_links.push(req.body);
         await quiz.save();
@@ -268,7 +268,7 @@ exports.addVidLink = async (req, res) => {
 exports.deleteQuiz = async (req, res) => {
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) return;
+        if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
 
         await Category.updateOne(
             { _id: quiz.category },
@@ -287,11 +287,11 @@ exports.deleteQuiz = async (req, res) => {
 
 exports.deleteVideo = async (req, res) => {
     if (!isValidObjectId(req.body.qID)) {
-        return res.status(400).json({ message: 'Invalid quiz ID' });
+        throw {'message':'Invalid quiz ID','statusCode':400};
     }
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) return;
+        if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
 
         quiz.video_links.id(req.body.vId).remove();
         await quiz.save();
@@ -334,13 +334,13 @@ exports.getDatabaseStats = async (req, res) => {
                     activeQuizzes: {
                         $sum: {
                             $cond: [
-                                { $gte: ["$creation_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
+                                { $gte: ['$creation_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
                                 1,
                                 0
                             ]
                         }
                     },
-                    avgQuestionsPerQuiz: { $avg: { $size: "$questions" } }
+                    avgQuestionsPerQuiz: { $avg: { $size: '$questions' } }
                 }
             }
         ];

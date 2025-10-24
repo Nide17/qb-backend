@@ -1,6 +1,6 @@
-const Broadcast = require("../models/Broadcast");
+const Broadcast = require('../models/Broadcast');
 const { handleError } = require('../utils/error');
-const { findBroadcastById, validateRequiredFields, notifyAdmins, sendEmails, callService } = require('../utils/helpers');
+const { validateRequiredFields, notifyAdmins, sendEmails, getFromService } = require('../utils/helpers');
 
 exports.getBroadcasts = async (req, res) => {
     try {
@@ -13,7 +13,7 @@ exports.getBroadcasts = async (req, res) => {
 
 exports.getOneBroadcast = async (req, res) => {
     try {
-        const broadcast = await findBroadcastById(req.params.id, res);
+        const broadcast = await Broadcast.findById(req.params.id);
         if (broadcast) res.status(200).json(broadcast);
     } catch (err) {
         handleError(res, err);
@@ -33,12 +33,12 @@ exports.createBroadcast = async (req, res) => {
 
         const clientURL = process.env.NODE_ENV === 'production' ? 'https://quizblog.rw' : 'http://localhost:5173';
 
-        const newBroadcast = new Broadcast({ title, sent_by, message });
-        const savedBroadcast = await newBroadcast.save();
-        if (!savedBroadcast) return res.status(503).json({ message: 'Something went wrong during creation!' });
+    const newBroadcast = new Broadcast({ title, sent_by, message });
+    const savedBroadcast = await newBroadcast.save();
+    if (!savedBroadcast) throw {'statusCode':503,'message':'Something went wrong during creation!'};
 
-        const subscribers = await callService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`, res);
-        const allUsers = await callService(`${process.env.USERS_SERVICE_URL}/api/users`, res);
+    const subscribers = await getFromService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
+    const allUsers = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users`);
 
         sendEmails(subscribers, title, message, clientURL);
         sendEmails(allUsers, title, message, clientURL);
@@ -60,8 +60,8 @@ exports.createBroadcast = async (req, res) => {
 
 exports.updateBroadcast = async (req, res) => {
     try {
-        const broadcast = await findBroadcastById(req.params.id, res);
-        if (!broadcast) return;
+        const broadcast = await Broadcast.findById(req.params.id);
+    if (!broadcast) return;
 
         const updatedBroadcast = await Broadcast.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedBroadcast);
@@ -72,8 +72,8 @@ exports.updateBroadcast = async (req, res) => {
 
 exports.deleteBroadcast = async (req, res) => {
     try {
-        const broadcast = await findBroadcastById(req.params.id, res);
-        if (!broadcast) return;
+        const broadcast = await Broadcast.findById(req.params.id);
+    if (!broadcast) return;
 
         const removedBroadcast = await Broadcast.findByIdAndDelete(req.params.id);
         res.status(200).json(removedBroadcast);

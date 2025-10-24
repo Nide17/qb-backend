@@ -16,4 +16,4 @@ const ImageUploadSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model("ImageUpload", ImageUploadSchema);
+module.exports = mongoose.model('ImageUpload', ImageUploadSchema);

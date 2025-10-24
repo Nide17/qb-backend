@@ -1,9 +1,7 @@
 const axios = require('axios');
-const Score = require("../models/Score");
-const { handleError } = require('./error');
 
 // Helper function to call other services
-const callService = async (url, timeout = 70000, token) => {
+const getFromService = async (url, timeout = 70000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -54,7 +52,7 @@ setInterval(() => {
 // Simple population function for users
 const populateUser = async (userId) => {
     if (!userId) return null;
-    const data = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+    const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
     return data ? {
         _id: data._id,
@@ -64,19 +62,19 @@ const populateUser = async (userId) => {
 
 // Populate score 
 const populateScore = async (score) => {
-    if (!score) return null;
 
+    if (!score) return null;
     let scoreObj = score.toObject ? score.toObject() : score;
 
     try {
         // Fetch category 
         if (score.category) {
-            const categoryData = await callService(`${process.env.QUIZZING_SERVICE_URL}/api/categories/${score.category}`);
+            const categoryData = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/categories/${score.category}`);
             if (categoryData) {
                 scoreObj.category = categoryData;
 
                 if (score.quiz) {
-                    const quizData = await callService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${score.quiz}`);
+                    const quizData = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${score.quiz}`);
                     if (quizData) {
                         scoreObj.quiz = quizData;
                     }
@@ -98,77 +96,33 @@ const populateScore = async (score) => {
     }
 };
 
-// Populate array of scores
-const populateScores = async (scores) => {
-    if (!scores || scores.length === 0) return scores;
-
-    let populatedScores = [];
-    for (const score of scores) {
-        let populated = await populateScore(score);
-        populatedScores.push(populated);
-    }
-
-    return populatedScores;
-};
-
-// Helper function to find score by ID
-const findScoreById = async (id, res, selectFields = '') => {
-    try {
-
-        let score = await Score.findOne({ id: id }).select(selectFields);
-        let scoreObj = null;
-
-        if (score) {
-
-            // Populate fields
-            scoreObj = score.toObject ? score.toObject() : score;
-            scoreObj = await populateScore(scoreObj);
-        } else {
-
-            // Populate fields
-            score = await Score.findById(id).select(selectFields).exec();
-            scoreObj = score.toObject ? score.toObject() : score;
-            scoreObj = await populateScore(scoreObj);
-        }
-
-        if (!scoreObj) return res.status(404).json({ message: 'Score not found!' });
-
-        return scoreObj;
-    } catch (err) {
-        handleError(res, err);
-        return null;
-    }
-};
-
 const allowList = [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
     getCachedData,
     setCachedData,
     populateScore,
-    populateScores,
-    findScoreById,
-    callService,
+    getFromService,
     corsOptions,
 };

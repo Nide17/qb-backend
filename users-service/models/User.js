@@ -1,9 +1,8 @@
 // Bring in Mongo
-const mongoose = require('mongoose')
-const bcrypt = require('bcryptjs')
+const mongoose = require('mongoose');
 
 // Initialize Mongo schema
-const Schema = mongoose.Schema
+const Schema = mongoose.Schema;
 
 // Create a schema object
 const UserSchema = new Schema({
@@ -71,6 +70,6 @@ const UserSchema = new Schema({
     type: Date,
     default: Date.now
   }
-})
+});
 
-module.exports = mongoose.model("User", UserSchema);
+module.exports = mongoose.model('User', UserSchema);

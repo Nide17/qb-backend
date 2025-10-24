@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Helper function to call other services
-const callService = async (url, timeout = 40000, token) => {
+const getFromService = async (url, timeout = 40000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -55,26 +55,31 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
-    callService,
+    getFromService,
     getCachedData,
     setCachedData,
     corsOptions,
 };
+
+// expose cache utilities for controllers that need to clear or delete specific keys
+module.exports.cache = cache;
+module.exports.clearCache = () => cache.clear();
+module.exports.deleteCacheKey = (key) => cache.delete(key);

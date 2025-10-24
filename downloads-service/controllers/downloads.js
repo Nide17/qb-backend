@@ -1,6 +1,6 @@
 const axios = require('axios');
-const Download = require("../models/Download");
-const { populateDownload, validateRequiredFields, getCachedData, setCachedData, cache } = require('../utils/helpers');
+const Download = require('../models/Download');
+const { populateDownload, validateRequiredFields, getCachedData, setCachedData } = require('../utils/helpers');
 const { handleError } = require('../../contacts-service/utils/error');
 
 exports.getDownloads = async (req, res) => {
@@ -9,7 +9,7 @@ exports.getDownloads = async (req, res) => {
         // Pagination - ENFORCE pagination to prevent memory exhaustion
         const totalDownloads = await Download.countDocuments({});
         var PAGE_SIZE = 20;
-        var pageNo = parseInt(req.query.pageNo || "1");
+        var pageNo = parseInt(req.query.pageNo || '1');
         var query = {};
 
         query.limit = PAGE_SIZE;
@@ -18,10 +18,10 @@ exports.getDownloads = async (req, res) => {
         let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();
 
         if (!downloads || downloads.length === 0) {
-            return res.status(204).json({ message: 'No downloads found!' });
+            throw {'message':'No downloads found!','statusCode':204};
         }
 
-        if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads)
+    if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads);
 
         // Populate downloads
         for (let i = 0; i < downloads.length; i++) {
@@ -36,7 +36,7 @@ exports.getDownloads = async (req, res) => {
             downloads
         });
     } catch (err) {
-        console.log('Error getting downloads:', error.message);
+        console.log('Error getting downloads:', err.message);
         handleError(res, err);
     }
 };
@@ -45,11 +45,11 @@ exports.getOneDownload = async (req, res) => {
     try {
         let download = await Download.findById(req.params.id).lean();
         if (!download) {
-            return res.status(404).json({ message: 'Download not found!' });
+            throw {'message':'Download not found!','statusCode':404};
         }
-        res.stats(200).json(download)
+        res.status(200).json(download);
     } catch (err) {
-        console.log('Error getting download:', error.message);
+        console.log('Error getting download:', err.message);
         handleError(res, err);
     }
 };
@@ -59,7 +59,7 @@ exports.getNotesDownloader = async (req, res) => {
         let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
 
         if (!downloads || downloads.length === 0) {
-            return res.status(404).json({ message: 'No downloads found for this user' });
+            throw {'message':'No downloads found for this user','statusCode':404};
         }
 
         // Populate downloads
@@ -68,7 +68,7 @@ exports.getNotesDownloader = async (req, res) => {
         }
         res.status(200).json(downloads);
     } catch (err) {
-        console.log('Error getting downloads by user:', error.message);
+        console.log('Error getting downloads by user:', err.message);
         handleError(res, err);
     }
 };
@@ -77,7 +77,7 @@ exports.getCreatorDownloads = async (req, res) => {
     try {
         let downloads = await Download.find().lean();
         if (!downloads || downloads.length === 0) {
-            return res.status(404).json({ message: 'No downloads found for this course' });
+            throw {'message':'No downloads found for this course','statusCode':404};
         }
 
         // Populate downloads
@@ -89,7 +89,7 @@ exports.getCreatorDownloads = async (req, res) => {
         downloads = downloads.filter(download => download.notes.uploaded_by === req.params.id);
         res.status(200).json(downloads);
     } catch (err) {
-        console.log('Error getting downloads by course:', error.message);
+        console.log('Error getting downloads by course:', err.message);
         handleError(res, err);
     }
 };
@@ -115,9 +115,7 @@ exports.createDownload = async (req, res) => {
             let seconds = Math.round((now - downDate) / 1000);
 
             if (seconds < 5) {
-                return res.status(400).json({
-                    message: 'Download with same time saved already!'
-                });
+                throw {'message':'Download with same time saved already!','statusCode':400};
             }
         }
 
@@ -131,7 +129,7 @@ exports.createDownload = async (req, res) => {
 
         const savedDownload = await newDownload.save();
         if (!savedDownload) {
-            return res.status(400).json({ message: 'Something went wrong during creation!' });
+            throw {'message':'Something went wrong during creation!','statusCode':400};
         }
 
         res.status(200).json({
@@ -153,7 +151,7 @@ exports.deleteDownload = async (req, res) => {
         if (!download) throw new Error('Download not found!');
 
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
-        if (removedDownload.deletedCount === 0) throw new Error('Something went wrong while deleting!')
+        if (removedDownload.deletedCount === 0) throw new Error('Something went wrong while deleting!');
         res.status(200).json(download);
     } catch (err) {
         handleError(res, err);
@@ -165,12 +163,12 @@ exports.getTop10Downloaders = async (req, res) => {
     try {
         // Get top downloaders aggregation
         let topDownloaders = await Download.aggregate([
-            { $group: { _id: "$downloaded_by", totalDownloads: { $sum: 1 } } },
+            { $group: { _id: '$downloaded_by', totalDownloads: { $sum: 1 } } },
             { $sort: { totalDownloads: -1 } },
             { $limit: 10 }
         ]);
 
-        if (topDownloaders.length > 0) {
+    if (topDownloaders.length > 0) {
 
             const userIds = topDownloaders.map(u => u?._id?.toString());
             const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, 200000);
@@ -199,9 +197,9 @@ exports.getTop10Notes = async (req, res) => {
         let topNotes = getCachedData(cacheKey);
 
         if (!topNotes || topNotes.length === 0) {
-
+            
             const topNotesData = await Download.aggregate([
-                { $group: { _id: "$notes", totalDownloaded: { $sum: 1 } } },
+                { $group: { _id: '$notes', totalDownloaded: { $sum: 1 } } },
                 { $sort: { totalDownloaded: -1 } },
                 { $limit: 10 }
             ]).exec();
@@ -224,12 +222,12 @@ exports.getTop10Notes = async (req, res) => {
                 setCachedData(cacheKey, topNotes);
             }
         }
-        res.json(topNotes);
+        res.status(200).json(topNotes);
     } catch (err) {
         console.log('\n\nError retrieving top notes:', err);
         handleError(res, err);
     }
-}
+};
 
 
 // Get database statistics for downloads service
@@ -256,22 +254,22 @@ exports.getDatabaseStats = async (req, res) => {
                     recentDownloads: {
                         $sum: {
                             $cond: [
-                                { $gte: ["$createdAt", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
+                                { $gte: ['$createdAt', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
                                 1,
                                 0
                             ]
                         }
                     },
-                    uniqueUsers: { $addToSet: "$downloaded_by" },
-                    uniqueNotes: { $addToSet: "$notes" }
+                    uniqueUsers: { $addToSet: '$downloaded_by' },
+                    uniqueNotes: { $addToSet: '$notes' }
                 }
             },
             {
                 $project: {
                     totalDownloads: 1,
                     recentDownloads: 1,
-                    uniqueUsersCount: { $size: "$uniqueUsers" },
-                    uniqueNotesCount: { $size: "$uniqueNotes" }
+                    uniqueUsersCount: { $size: '$uniqueUsers' },
+                    uniqueNotesCount: { $size: '$uniqueNotes' }
                 }
             }
         ];
@@ -308,7 +306,7 @@ exports.getDatabaseStats = async (req, res) => {
 
         res.status(200).json(dbStats);
     } catch (err) {
-        console.log('Error getting database stats:', error.message);
-        res.status(500).json({ message: 'Failed to get database statistics' });
+        console.log('Error getting database stats:', err.message);
+        throw {'message':'Failed to get database statistics','statusCode':500};
     }
 };

@@ -325,7 +325,7 @@ class SocketManager {
         this.io.on('connection', (socket) => {
             // Join quiz session
             socket.on('joinQuiz', (data) => {
-                const { quizId, userId } = data;
+                const { quizId } = data;
                 
                 if (!quizId) return;
 

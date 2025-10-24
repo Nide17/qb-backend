@@ -13,12 +13,12 @@ const MAX_HISTORY_SIZE = 100;
  * Memory monitoring middleware
  * Monitors memory usage and logs warnings when thresholds are exceeded
  */
-const memoryMonitorMiddleware = (req, res, next) => {
+const memoryMonitorMiddleware = (req, res, _next) => {
     // Only check memory on certain requests to avoid overhead
     if (Math.random() < 0.1) { // Check on 10% of requests
         checkMemoryUsage();
     }
-    next();
+    _next();
 };
 
 /**
@@ -138,7 +138,7 @@ const startMemoryMonitoring = () => {
 /**
  * Middleware to track request information for memory debugging
  */
-const requestTrackerMiddleware = (req, res, next) => {
+const requestTrackerMiddleware = (req, res, _next) => {
     // Store request info for memory debugging
     global.currentRequestInfo = {
         method: req.method,
@@ -150,13 +150,13 @@ const requestTrackerMiddleware = (req, res, next) => {
 
     // Clear after 30 seconds
     setTimeout(() => {
-        if (global.currentRequestInfo &&
-            global.currentRequestInfo.timestamp === new Date().toISOString()) {
+        // clear the stored request info after 30 seconds if it still exists
+        if (global.currentRequestInfo) {
             delete global.currentRequestInfo;
         }
     }, 30000);
 
-    next();
+    _next();
 };
 
 module.exports = {

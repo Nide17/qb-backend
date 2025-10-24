@@ -1,9 +1,9 @@
 const axios = require('axios');
-const jwt = require('jsonwebtoken')
-const bcrypt = require('bcryptjs')
-const { S3 } = require("@aws-sdk/client-s3")
-const User = require("../models/User")
-const { sendEmail } = require("../utils/emails/sendEmail")
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { S3 } = require('@aws-sdk/client-s3');
+const User = require('../models/User');
+const { sendEmail } = require('../utils/emails/sendEmail');
 
 // Configure S3
 const s3Config = new S3({
@@ -11,10 +11,10 @@ const s3Config = new S3({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     Bucket: process.env.S3_BUCKET,
     region: process.env.AWS_REGION,
-})
+});
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const getFromService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -35,27 +35,27 @@ const callService = async (url, timeout = 20000, token) => {
 
 // Helper functions
 const generateToken = (user) => {
-    return jwt.sign({ _id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' })
-}
+    return jwt.sign({ _id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' });
+};
 
 const updateUserToken = async (user) => {
-    const token = generateToken(user)
-    return await User.findByIdAndUpdate({ _id: user._id }, { $set: { current_token: token } }, { new: true })
-}
+    const token = generateToken(user);
+    return await User.findByIdAndUpdate({ _id: user._id }, { $set: { current_token: token } }, { new: true });
+};
 
 const sendOtpEmail = async (user, otp) => {
     await sendEmail(user.email,
-        "One Time Password (OTP) verification for Quiz Blog account",
-        { name: user.name, otp }, "./template/otp.handlebars")
-}
+        'One Time Password (OTP) verification for Quiz Blog account',
+        { name: user.name, otp }, './template/otp.handlebars');
+};
 
 const hashPassword = async (password) => {
-    const salt = await bcrypt.genSalt(10)
-    if (!salt) return res.status(500).json({ message: 'Something went wrong with bcrypt' })
-    const hash = await bcrypt.hash(password, salt)
-    if (!hash) return res.status(500).json({ message: 'Something went wrong hashing the password' })
-    return hash
-}
+    const salt = await bcrypt.genSalt(10);
+    if (!salt) throw new Error('Something went wrong with bcrypt');
+    const hash = await bcrypt.hash(password, salt);
+    if (!hash) throw new Error('Something went wrong hashing the password');
+    return hash;
+};
 
 // Populate user details
 const populateSchoolDetails = async (user) => {
@@ -67,7 +67,7 @@ const populateSchoolDetails = async (user) => {
 
         // Fetch school, level, and faculty details
         if (user.school && user.level && user.faculty) {
-            const faculty = await callService(`${process.env.SCHOOLS_SERVICE_URL}/api/faculties/${user.faculty}`);
+            const faculty = await getFromService(`${process.env.SCHOOLS_SERVICE_URL}/api/faculties/${user.faculty}`);
             userObj.faculty = { _id: faculty?._id, title: faculty?.title };
             userObj.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
             userObj.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
@@ -95,12 +95,12 @@ const sendSubscriptionEmail = (subscriber) => {
 
     sendEmail(
         subscriber.email,
-        "Thank you for subscribing to Quiz-Blog!",
+        'Thank you for subscribing to Quiz-Blog!',
         {
             name: subscriber.name,
             unsubscribeLink: `${clientURL}/unsubscribe`
         },
-        "./template/subscribe.handlebars"
+        './template/subscribe.handlebars'
     );
 };
 
@@ -110,22 +110,22 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 // Helper function to delete image from S3
 const deleteImageFromS3 = async (imagePath) => {
@@ -136,18 +136,18 @@ const deleteImageFromS3 = async (imagePath) => {
         };
         s3Config.deleteObject(deleteParams, function (err, data) {
             if (err) {
-                console.error("Error deleting object:", err);
+                console.error('Error deleting object:', err);
             } else {
-                console.log("Object deleted successfully:", data);
+                console.log('Object deleted successfully:', data);
             }
-        })
+        });
     } catch (err) {
         throw new Error(`Error deleting image: ${err.message}`);
     }
 };
 
 module.exports = {
-    callService,
+    getFromService,
     populateSchoolDetails,
     s3Config,
     generateToken,

@@ -1,24 +1,23 @@
-const Faq = require("../models/Faq");
+const Faq = require('../models/Faq');
 const { handleError } = require('../utils/error');
 const { validateRequiredFields } = require('../utils/helpers');
 
-// Helper function to handle findByIdAndUpdate operations
-const handleFindByIdAndUpdate = async (id, update, res) => {
+const handleFindByIdAndUpdate = async (id, update) => {
     try {
-        const faq = await Faq.findById(req.params.id);
-        if (!faq) return res.status(404).json({ message: 'Faq not found!' });
+        const faq = await Faq.findById(id);
+        if (!faq) throw { status: 404, message: 'Faq not found!' };
 
         const updatedFaq = await Faq.findByIdAndUpdate(id, update, { new: true });
-        res.status(200).json(updatedFaq);
+        return updatedFaq ? (updatedFaq.toObject ? updatedFaq.toObject() : updatedFaq) : null;
     } catch (err) {
-        handleError(res, err);
+        throw err;
     }
 };
 
 exports.getFaqs = async (req, res) => {
     try {
         let faqs = await Faq.find().sort({ createdAt: -1 });
-        if (!faqs) return res.status(204).json({ message: 'No faqs found!' });
+        if (!faqs) throw { status: 204, message: 'No faqs found!' };
         res.status(200).json(faqs);
     } catch (err) {
         handleError(res, err);
@@ -29,7 +28,7 @@ exports.getOneFaq = async (req, res) => {
     try {
         const faq = await Faq.findById(req.params.id);
 
-        if (!faq) return res.status(404).json({ message: 'Faq not found!' });
+        if (!faq) throw { status: 404, message: 'Faq not found!' };
         res.status(200).json(faq);
     } catch (err) {
         handleError(res, err);
@@ -39,7 +38,7 @@ exports.getOneFaq = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
         const faqs = await Faq.find({ created_by: req.params.id }).sort({ createdAt: -1 });
-        if (!faqs) return res.status(404).json({ message: 'No faqs found!' });
+        if (!faqs) throw { status: 404, message: 'No faqs found!' };
         res.status(200).json(faqs);
     } catch (err) {
         handleError(res, err);
@@ -59,7 +58,7 @@ exports.createFaq = async (req, res) => {
 
         const newFaq = new Faq({ title, answer, created_by });
         const savedFaq = await newFaq.save();
-        if (!savedFaq) return res.status(503).json({ message: 'Something went wrong during creation!' });
+        if (!savedFaq) throw { status: 503, message: 'Something went wrong during creation!' };
 
         res.status(200).json({
             _id: savedFaq._id,
@@ -74,20 +73,30 @@ exports.createFaq = async (req, res) => {
 };
 
 exports.addFaqVidLink = async (req, res) => {
-    await handleFindByIdAndUpdate(req.params.id, { $push: { video_links: req.body } });
+    try {
+        const updated = await handleFindByIdAndUpdate(req.params.id, { $push: { video_links: req.body } });
+        res.status(200).json(updated);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.updateFaq = async (req, res) => {
-    await handleFindByIdAndUpdate(req.params.id, req.body);
+    try {
+        const updated = await handleFindByIdAndUpdate(req.params.id, req.body);
+        res.status(200).json(updated);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.deleteFaq = async (req, res) => {
     try {
         const faq = await Faq.findById(req.params.id);
-        if (!faq) return res.status(404).json({ message: 'Faq not found!' });
+        if (!faq) throw { status: 404, message: 'Faq not found!' };
 
         const removedFaq = await faq.deleteOne();
-        if (removedFaq.deletedCount === 0) return res.status(503).json({ message: 'Something went wrong while deleting!' });
+        if (removedFaq.deletedCount === 0) throw { status: 503, message: 'Something went wrong while deleting!' };
 
         res.status(200).json(faq);
     } catch (err) {
@@ -96,5 +105,10 @@ exports.deleteFaq = async (req, res) => {
 };
 
 exports.deleteFaqVideo = async (req, res) => {
-    await handleFindByIdAndUpdate(req.params.id, { $pull: { video_links: req.body } });
+    try {
+        const updated = await handleFindByIdAndUpdate(req.params.id, { $pull: { video_links: req.body } });
+        res.status(200).json(updated);
+    } catch (err) {
+        handleError(res, err);
+    }
 };

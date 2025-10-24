@@ -1,8 +1,8 @@
 // Bring in Mongo
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
 // initialize Mongo schema 
-const Schema = mongoose.Schema
+const Schema = mongoose.Schema;
 
 // Create Schema for blogPostsView 
 const BlogPostsViewSchema = new Schema({
@@ -25,6 +25,6 @@ const BlogPostsViewSchema = new Schema({
         required: false,
         default: null
     }
-}, { timestamps: true, })
+}, { timestamps: true, });
 
-module.exports = mongoose.model("BlogPostsView", BlogPostsViewSchema)
+module.exports = mongoose.model('BlogPostsView', BlogPostsViewSchema);

@@ -20,4 +20,4 @@ const BroadcastSchema = new Schema({
 },
     { timestamps: true });
 
-module.exports = mongoose.model("Broadcast", BroadcastSchema);
+module.exports = mongoose.model('Broadcast', BroadcastSchema);

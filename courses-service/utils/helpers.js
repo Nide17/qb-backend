@@ -1,11 +1,7 @@
 const axios = require('axios');
-const { handleError } = require('./error');
-const Course = require("../models/Course");
-const CourseCategory = require("../models/CourseCategory");
-const Chapter = require("../models/Chapter");
 
 // Helper function to call other services
-const callService = async (url, timeout = 20000, token) => {
+const getFromService = async (url, timeout = 20000, token) => {
 
     if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
 
@@ -27,7 +23,7 @@ const callService = async (url, timeout = 20000, token) => {
 // Simple population function for users
 const populateUser = async (userId) => {
     if (!userId) return null;
-    const data = await callService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+    const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
     return data ? {
         _id: data._id,
@@ -44,92 +40,32 @@ const validateRequiredFields = (fields) => {
     }
 };
 
-// Helper function to find course by ID
-const findCourseById = async (id, res, selectFields = '') => {
-
-    try {
-        let course = await Course.findById(id).populate('courseCategory', 'title').select(selectFields);
-        if (!course) return res.status(404).json({ message: 'Course not found!' });
-
-        if (course.created_by) {
-            const user = await populateUser(course.created_by);
-            course = course.toObject ? course.toObject() : course;
-            course.created_by = user;
-        }
-        return course;
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-// Helper function to find category by ID
-const findCourseCategoryById = async (id, res, selectFields = '') => {
-
-    try {
-        const category = await CourseCategory.findById(id).select(selectFields);
-        if (!category) return res.status(404).json({ message: 'No category found!' });
-
-        if (category.created_by) {
-            const user = await populateUser(category.created_by);
-            const categoryObj = category.toObject ? category.toObject() : category;
-            categoryObj.created_by = user;
-            return categoryObj;
-        }
-        return category;
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-// Helper function to find chapter by ID
-const findChapterById = async (id, res, selectFields = '') => {
-
-    try {
-        let chapter = await Chapter.findById(id).populate('course courseCategory', 'title').select(selectFields);
-        if (!chapter) return res.status(404).json({ message: 'Chapter not found!' });
-
-        if (chapter.created_by) {
-            const user = await populateUser(chapter.created_by);
-            chapter = chapter.toObject ? chapter.toObject() : chapter;
-            chapter.created_by = user;
-        }
-
-        return chapter;
-    } catch (err) {
-        handleError(res, err);
-        return null;
-    }
-};
-
 const allowList = [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
-]
+];
 
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowList.includes(origin)) {
-            callback(null, true)
+            callback(null, true);
         } else {
-            console.log(origin + ' is not allowed by CORS')
-            callback(new Error('Not allowed by CORS'))
+            console.log(origin + ' is not allowed by CORS');
+            callback(new Error('Not allowed by CORS'));
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     preflightContinue: false,
     optionsSuccessStatus: 200,
     maxAge: 3600
-}
+};
 
 module.exports = {
-    callService,
+    getFromService,
     populateUser,
     validateRequiredFields,
-    findCourseById,
-    findCourseCategoryById,
-    findChapterById,
     corsOptions,
 };

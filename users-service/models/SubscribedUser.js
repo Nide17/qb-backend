@@ -17,4 +17,4 @@ const SubscribedUserSchema = new Schema({
   }
 }, { timestamps: true });
 
-module.exports = mongoose.model("SubscribedUser", SubscribedUserSchema);
+module.exports = mongoose.model('SubscribedUser', SubscribedUserSchema);

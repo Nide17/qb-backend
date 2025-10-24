@@ -1,6 +1,6 @@
 // Bring in Mongo
-const mongoose = require('mongoose')
-const slugify = require("slugify")//initialize Mongo schema
+const mongoose = require('mongoose');
+const slugify = require('slugify');//initialize Mongo schema
 const Schema = mongoose.Schema;
 
 //create a schema object
@@ -37,15 +37,15 @@ const CategorySchema = new Schema({
     type: String,
     required: true,
   },
-})
+});
 
-CategorySchema.pre("validate", function (next) {
-  const category = this
+CategorySchema.pre('validate', function (next) {
+  const category = this;
 
   if (category.title) {
-    category.slug = slugify(`${category.title}`, { replacement: '-', lower: true, strict: true })
+    category.slug = slugify(`${category.title}`, { replacement: '-', lower: true, strict: true });
   }
-  next()
-})
+  next();
+});
 
-module.exports = mongoose.model("Category", CategorySchema);
+module.exports = mongoose.model('Category', CategorySchema);

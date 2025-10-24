@@ -1,45 +1,38 @@
-const jwt = require("jsonwebtoken")
+const jwt = require('jsonwebtoken');
+const { handleError } = require('../utils/error');
 
-const handleTokenError = (req, res, status, message) => {
-  res.status(status).json({ message })
-}
+const verifyToken = (req) => {
+  const token = req.header('x-auth-token');
+  if (!token) throw { status: 401, message: 'Token missing: Authorization denied!' };
 
-const verifyToken = (req, res) => {
-  const token = req.header('x-auth-token')
-
-  if (!token) {
-    return handleTokenError(req, res, 401, 'No token, authorization Denied')
-  }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    req.user = decoded
-    return decoded
-  } catch (e) {
-    console.log(e)
-    return handleTokenError(req, res, 400, 'Session Expired, login again!')
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (!decoded) throw { status: 401, message: 'Token is not valid' };
+    req.user = decoded;
+    return decoded;
+  } catch {
+    throw { status: 401, message: 'Token is not valid or expired' };
   }
-}
+};
 
-const auth = async (req, res, next) => {
-  if (verifyToken(req, res)) {
-    next()
+const auth = (req, res, next) => {
+  try {
+    verifyToken(req);
+    return next();
+  } catch (_err) {
+    return handleError(res, _err);
   }
-}
+};
 
 const authRole = (roles) => (req, res, next) => {
-  const decoded = verifyToken(req, res)
-  if (!decoded) return
-
-  if (!req.user) {
-    return res.status(401).json({ message: 'Session expired' })
+  try {
+    verifyToken(req);
+    if (!req.user) throw { status: 401, message: 'Session expired' };
+    if (Array.isArray(roles) && roles.includes(req.user.role)) return next();
+    throw { status: 403, message: 'Unauthorized' };
+  } catch (_err) {
+    return handleError(res, _err);
   }
+};
 
-  const allowedUser = roles.find(rol => rol === req.user.role)
-  if (allowedUser === req.user.role) {
-    return next()
-  }
-
-  return res.status(401).json({ message: 'Unauthorized' })
-}
-
-module.exports = { auth, authRole }
+module.exports = { auth, authRole };

@@ -1,12 +1,12 @@
-const ImageUpload = require("../../models/blog-posts/ImageUpload");
+const ImageUpload = require('../../models/blog-posts/ImageUpload');
 const { handleError } = require('../../utils/error');
 const { populateUser, findImageUploadById, validateRequiredFields, deleteImageFromS3 } = require('../../utils/helpers');
 
 // Refactored code to use reusable utilities and align with patterns from other services.
 exports.getImageUploads = async (req, res) => {
     try {
-        let imageUploads = await ImageUpload.find().sort({ createdAt: -1 });
-        if (!imageUploads) return res.status(204).json({ message: 'No image uploads found!' });
+    let imageUploads = await ImageUpload.find().sort({ createdAt: -1 });
+    if (!imageUploads) throw {'message':'No image uploads found!','statusCode':204};
 
         imageUploads = await Promise.all(imageUploads.map(async (imgUp) => await populateUser(imgUp.owner) || imgUp));
         res.status(200).json(imageUploads);
@@ -16,14 +16,18 @@ exports.getImageUploads = async (req, res) => {
 };
 
 exports.getOneImageUpload = async (req, res) => {
-    const imageUpload = await findImageUploadById(req.params.id, ImageUpload, res);
-    if (imageUpload) res.status(200).json(imageUpload);
+    try {
+        const imageUpload = await findImageUploadById(req.params.id);
+        if (imageUpload) res.status(200).json(imageUpload);
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
-        let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 });
-        if (!imageUploads) return res.status(404).json({ message: 'No image uploads found!' });
+    let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 });
+    if (!imageUploads) throw {'message':'No image uploads found!','statusCode':404};
 
         imageUploads = await Promise.all(imageUploads.map(async (imgUp) => await populateUser(imgUp.owner) || imgUp));
 
@@ -79,7 +83,7 @@ exports.createImageUpload = async (req, res) => {
 exports.updateImageUpload = async (req, res) => {
     try {
         const imageUpload = await ImageUpload.findById(req.params.id);
-        if (!imageUpload) return res.status(404).json({ message: 'Image upload not found!' });
+    if (!imageUpload) throw {'message':'Image upload not found!','statusCode':404};
 
         const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedImageUpload);
@@ -91,14 +95,14 @@ exports.updateImageUpload = async (req, res) => {
 exports.deleteImageUpload = async (req, res) => {
 
     try {
-        const imageUpload = await ImageUpload.findById(req.params.id)
-        if (!imageUpload) return res.status(404).json({ message: 'Image upload is not found!' })
+        const imageUpload = await ImageUpload.findById(req.params.id);
+    if (!imageUpload) throw {'message':'Image upload is not found!','statusCode':404};
 
         imageUpload.uploadImage && await deleteImageFromS3(imageUpload.uploadImage);
-        const removedImageUpload = await imageUpload.deleteOne()
+        const removedImageUpload = await imageUpload.deleteOne();
 
         if (removedImageUpload.deletedCount === 0)
-            return res.status(503).json({ message: 'Something went wrong while deleting!' });
+            throw {'message':'Something went wrong while deleting!','statusCode':503};
 
     } catch (err) {
         handleError(res, err);
