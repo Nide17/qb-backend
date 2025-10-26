@@ -6,7 +6,7 @@ const { validateRequiredFields } = require('../utils/helpers');
 
 exports.getSchools = async (req, res) => {
     try {
-        const schools = await School.find();
+        const schools = await School.find().sort({ createdAt: -1 });
         res.status(200).json(schools);
     } catch (err) {
         handleError(res, err);

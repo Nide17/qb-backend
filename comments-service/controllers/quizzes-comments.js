@@ -4,7 +4,7 @@ const { populateComment, validateRequiredFields } = require('../utils/helpers');
 
 exports.getQuizzesComments = async (req, res) => {
     try {
-        let quizComments = await QuizComment.find();
+        let quizComments = await QuizComment.find().sort({ createdAt: -1 });
         quizComments = await Promise.all(quizComments.map(quizComment => populateComment(quizComment)));
         res.status(200).json(quizComments);
     } catch (err) {
@@ -26,7 +26,7 @@ exports.getOneQuizComment = async (req, res) => {
 
 exports.getCommentsByQuiz = async (req, res) => {
     try {
-        let quizComments = await QuizComment.find({ quiz: req.params.id });
+        let quizComments = await QuizComment.find({ quiz: req.params.id }).sort({ createdAt: -1 });
         quizComments = await Promise.all(quizComments.map(quizComment => populateComment(quizComment)));
         res.status(200).json(quizComments);
     } catch (err) {

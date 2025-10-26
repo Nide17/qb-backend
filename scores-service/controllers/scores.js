@@ -107,7 +107,7 @@ exports.getScoresForQuizCreator = async (req, res) => {
 exports.getOneScore = async (req, res) => {
 
     try {
-        let score = await Score.findOne({ id: req.params.id });
+        let score = await Score.findOne({ id: req.params?.id });
         let scoreObj = null;
 
         if (score) {
@@ -116,21 +116,21 @@ exports.getOneScore = async (req, res) => {
             scoreObj = await populateScore(scoreObj);
         } else {
             // Try by MongoDB _id
-            score = await Score.findById(req.params.id);
+            score = await Score.findById(req.params?.id);
             scoreObj = score ? (score.toObject ? score.toObject() : score) : null;
             if (scoreObj) scoreObj = await populateScore(scoreObj);
         }
 
         if (!scoreObj) {
             // Throw an object that the controllers can pass to handleError
+            console.log('Score not found!');
             throw { statusCode: 404, message: 'Score not found!' };
         }
 
         // Send the populated score as an HTTP response
         return res.status(200).json(scoreObj);
     } catch (err) {
-        // Re-throw and let the controller's catch call handleError(res, err)
-        throw err;
+        handleError(res, err);
     }
 };
 

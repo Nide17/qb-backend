@@ -40,23 +40,22 @@ exports.getOnePostCategory = async (req, res) => {
 exports.createPostCategory = async (req, res) => {
 
     try {
-        const { title, answer, created_by } = req.body;
+        const { title, description, creator } = req.body;
 
         // Validate required fields
         validateRequiredFields([
             { name: 'title', value: title },
-            { name: 'answer', value: answer },
-            { name: 'created_by', value: created_by }
+            { name: 'description', value: description },
+            { name: 'creator', value: creator }
         ]);
         // Check for duplicate title
         const postCat = await PostCategory.findOne({ title });
         if (postCat) {
             throw { 'message': 'Failed! Post category with that title already exists!', 'statusCode': 400 };
         }
-        const newPostCategory = new PostCategory({ title, answer, created_by });
-        const savedPostCategory = await newPostCategory.save().catch(() => {
-            throw { 'message': 'Could not save post category, try again!', 'statusCode': 500 };
-        });
+        const newPostCategory = new PostCategory({ title, description, creator });
+        const savedPostCategory = await newPostCategory.save();
+
         if (!savedPostCategory) throw { 'statusCode': 500, 'message': 'Could not save post category, try again!' };
         res.status(200).json(savedPostCategory);
     } catch (err) {

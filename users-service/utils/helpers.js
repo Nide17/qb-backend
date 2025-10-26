@@ -138,7 +138,7 @@ const deleteImageFromS3 = async (imagePath) => {
             if (err) {
                 console.error('Error deleting object:', err);
             } else {
-                console.log('Object deleted successfully:', data);
+                console.log('Deleted Object:', data);
             }
         });
     } catch (err) {

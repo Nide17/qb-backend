@@ -14,17 +14,6 @@ const fileFilter = (req, file, callback) => {
     }
 };
 
-// // Uploading image locally if multer is working.
-// const storage = multer.diskStorage({
-//     destination: (req, file, callback) => {
-//         callback(null, path.join(__dirname, 'profiles'));
-//     },
-//     filename: (req, file, callback) => {
-//         const fileName = file.originalname.toLowerCase().split(' ').join('-').replace(/[^a-zA-Z0-9.]/g, '-');
-//         callback(null, req.params.id + '-' + fileName);
-//     }
-// });
-
 // Uploading image to aws
 const multerS3Config = multerS3({
     s3: s3Config,
@@ -35,14 +24,12 @@ const multerS3Config = multerS3({
     key: (req, file, callback) => {
         const folderName = 'profiles/';
         const fileName = file.originalname.toLowerCase().split(' ').join('-').replace(/[^a-zA-Z0-9.]/g, '-');
-        callback(null, folderName + (req.params?.id ? req.params.id + '-' : '') + fileName);
+        callback(null, folderName + (req.params?.id ? req.params.id + 'qb-' : '') + fileName);
     }
 });
 
 // Multer Configuration for uploading image on AWS S3 or locally
 const upload = multer({
-    // LOCAL UPLOAD
-    // storage: storage,
     storage: multerS3Config,
     fileFilter: fileFilter,
     limits: {

@@ -44,9 +44,10 @@ exports.getCreatedBy = async (req, res) => {
 };
 
 exports.createAdvert = async (req, res) => {
-    const { caption, phone, owner, email, link } = req.body;
 
     try {
+        const { caption, phone, owner, email, link } = req.body;
+
         // Validate required fields
         validateRequiredFields([
             { name: 'caption', value: caption },
@@ -57,16 +58,16 @@ exports.createAdvert = async (req, res) => {
 
         if (!req.file) throw { message: 'Advert image file is required!', statusCode: 400 };
 
-        const ad_file = req.file;
-
         const newAdvert = new Advert({
             caption,
             phone,
             owner,
             email,
             link,
-            advert_image: ad_file.location ? ad_file.location : ad_file.path
+            advert_image: req.file.location ? req.file.location : req.file.path
         });
+
+        console.log('File exist.');
 
         const savedAdvert = await newAdvert.save();
         if (!savedAdvert) throw { message: 'Something went wrong during creation!', statusCode: 500 };

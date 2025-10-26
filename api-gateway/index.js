@@ -518,7 +518,7 @@ process.on('uncaughtException', (err) => {
     process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
     console.error('Unhandled Rejection:', reason);
     // Consider sending notification to monitoring system
 });

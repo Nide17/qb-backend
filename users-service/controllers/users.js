@@ -353,12 +353,9 @@ exports.updateProfileImage = async (req, res) => {
         if (!req.file) throw { 'statusCode': 400, 'message': 'Profile image is required!' };
 
         const img_file = req.file;
-        const profile = await User.findOne({ _id: req.params.id });
-        if (!profile) {
-            throw { 'statusCode': 404, 'message': 'Failed! profile not exists!' };
-        }
-
-        profile.image && await deleteImageFromS3(profile.image);
+        const user = await User.findOne({ _id: req.params.id });
+        if (!user) throw { 'statusCode': 404, 'message': 'Failed! user not exists!' };
+        user.image && await deleteImageFromS3(user.image);
 
         let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true });
         updatedUserProfile = await populateSchoolDetails(updatedUserProfile);

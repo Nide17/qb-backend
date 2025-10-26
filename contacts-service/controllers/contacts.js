@@ -115,8 +115,8 @@ exports.updateContact = async (req, res) => {
 
 exports.deleteContact = async (req, res) => {
     try {
-        await Contact.findByIdAndDelete(req.params.id);
-        res.status(200).json({ message: 'Contact deleted successfully' });
+        const contact = await Contact.findByIdAndDelete(req.params.id);
+        res.status(200).json(contact);
     } catch (err) {
         handleError(res, err);
     }

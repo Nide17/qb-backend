@@ -6,7 +6,7 @@ const { populateUser, validateRequiredFields } = require('../utils/helpers');
 // NOTE: this helper returns data or throws; it MUST NOT call handleError or accept `res`.
 const findNotes = async (query, limit = 0) => {
     let notesQuery = Notes.find(query).sort({ createdAt: -1 })
-        .select('title description notes_file chapter course courseCategory quizzes uploaded_by slug createdAt')
+        .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
         .populate('course chapter courseCategory', 'title');
 
     if (limit > 0) notesQuery = notesQuery.limit(limit);

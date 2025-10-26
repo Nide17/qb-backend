@@ -4,7 +4,7 @@ const { populateComment } = require('../utils/helpers');
 
 exports.getQuestionsComments = async (req, res) => {
     try {
-        let questionComments = await QuestionComment.find();
+        let questionComments = await QuestionComment.find().sort({ createdAt: -1 });
         questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
 
         res.status(200).json(questionComments);
@@ -19,6 +19,7 @@ exports.getPaginatedComments = async (req, res) => {
         let paginatedQuestionsComments = await QuestionComment.find()
             .limit(limit * 1)
             .skip((page - 1) * limit)
+            .sort({ createdAt: -1 })
             .exec();
 
         const count = await QuestionComment.countDocuments();
@@ -37,7 +38,7 @@ exports.getPaginatedComments = async (req, res) => {
 
 exports.getPendingComments = async (req, res) => {
     try {
-        let questionComments = await QuestionComment.find({ status: 'Pending' });
+        let questionComments = await QuestionComment.find({ status: 'Pending' }).sort({ createdAt: -1 });
         questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
         res.status(200).json(questionComments);
 
@@ -48,7 +49,7 @@ exports.getPendingComments = async (req, res) => {
 
 exports.getCommentsByQuestion = async (req, res) => {
     try {
-        const questionComments = await QuestionComment.find({ question: req.params.id });
+        const questionComments = await QuestionComment.find({ question: req.params.id }).sort({ createdAt: -1 });
         res.status(200).json(await Promise.all(questionComments.map(questionComment => populateComment(questionComment))));
     } catch (err) {
         handleError(res, err);
@@ -68,7 +69,7 @@ exports.getOneQuestionComment = async (req, res) => {
 
 exports.getCommentsByQuiz = async (req, res) => {
     try {
-        let questionComments = await QuestionComment.find({ quiz: req.params.id });
+        let questionComments = await QuestionComment.find({ quiz: req.params.id }).sort({ createdAt: -1 });
         questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
         res.status(200).json(questionComments);
     } catch (err) {

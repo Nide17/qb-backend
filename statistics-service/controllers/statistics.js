@@ -203,16 +203,17 @@ exports.updateDashboardStats = async (req, res) => {
         // prefer helper delete function
         deleteCacheKey('dashboard_stats');
 
-        // Emit real-time update if socket.io is available
+        // Build fresh stats and emit real-time update if socket.io is available
+        const stats = await this.getDashboardStats({ query: {} }, { json: (data) => data });
+
         if (req.io) {
-            const stats = await this.getDashboardStats({ query: {} }, { json: (data) => data });
             req.io.emit('dashboard-stats-update', {
                 type: 'refresh',
                 data: stats
             });
         }
 
-        res.status(200).json({ message: 'Dashboard stats updated successfully' });
+        res.status(200).json(stats);
     } catch (err) {
         handleError(res, err);
     }
@@ -343,7 +344,6 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
             if (quizStats) {
                 setCachedData(cacheKey, quizStats);
-                console.log('✅ Successfully fetched and cached quiz ranking statistics');
             }
         } else {
             console.log('📦 Returning cached quiz ranking statistics');
@@ -386,8 +386,6 @@ exports.getTop10Downloaders = async (req, res) => {
             downloadStats = await getFromService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/top-10-downloaders`, null, req?.header('x-auth-token'));
 
             setCachedData(cacheKey, downloadStats);
-            console.log('✅ Successfully fetched and cached download statistics');
-            console.log(downloadStats);
         } else {
             console.log('📦 Returning cached download statistics');
         }

@@ -51,11 +51,11 @@ const populateComment = async (comment) => {
                 commentObj.question = {
                     _id: questionData._id,
                     questionText: questionData.questionText
-                }
+                };
                 commentObj.quiz = {
                     _id: questionData.quiz._id,
                     title: questionData.quiz.title
-                }
+                };
             }
             // Quizzes Comments
         } else if (!comment.question && comment.quiz) {
@@ -64,7 +64,7 @@ const populateComment = async (comment) => {
                 commentObj.quiz = {
                     _id: quizData._id,
                     title: quizData.title
-                }
+                };
             }
         }
 

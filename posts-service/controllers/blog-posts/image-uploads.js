@@ -113,6 +113,7 @@ exports.deleteImageUpload = async (req, res) => {
         if (removedImageUpload.deletedCount === 0)
             throw { 'message': 'Something went wrong while deleting!', 'statusCode': 503 };
 
+        res.status(200).json(imageUpload);
     } catch (err) {
         handleError(res, err);
     }

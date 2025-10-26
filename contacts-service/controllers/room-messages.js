@@ -117,7 +117,7 @@ exports.deleteRoomMessage = async (req, res) => {
         const deletedMessage = await RoomMessage.findByIdAndDelete(req.params.id);
         if (!deletedMessage) throw { message: 'Something went wrong during deletion!', statusCode: 500 };
 
-        res.status(200).json({ message: 'RoomMessage deleted successfully!' });
+        res.status(200).json(roomMessage);
     } catch (err) {
         handleError(res, err);
     }

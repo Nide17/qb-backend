@@ -84,20 +84,44 @@ const makeRequest = async (req, serviceName, serviceUrl) => {
 
     const makeAttempt = async () => {
         try {
-            const headers = {
-                'x-auth-token': req.header('x-auth-token')
-            };
+            // Forward original headers to preserve Content-Type (including multipart boundary)
+            const forwardedHeaders = Object.assign({}, req.headers);
+            // Ensure our gateway auth header is present / preferred
+            forwardedHeaders['x-auth-token'] = req.header('x-auth-token') || forwardedHeaders['x-auth-token'];
+            // Remove/override host header so axios sets it correctly for the target
+            delete forwardedHeaders.host;
 
-            // Set timeout and keep-alive properties
+            // Decide whether to forward the parsed JSON body (if express.json ran)
+            // or stream the raw request for multipart/file uploads.
+            const contentType = forwardedHeaders['content-type'] || forwardedHeaders['Content-Type'] || '';
+            const isJson = typeof contentType === 'string' && contentType.includes('application/json');
+
+            // If the gateway already parsed JSON (express.json middleware), forward req.body
+            // as the data so axios can serialize it correctly. For multipart/form-data or
+            // other streaming endpoints, stream the original request.
+            const bodyToSend = isJson ? req.body : req;
+
+            // Remove content-length/transfer-encoding when forwarding parsed bodies so axios
+            // computes the correct Content-Length for the proxied request. For streamed
+            // raw requests we keep headers intact.
+            if (isJson) {
+                delete forwardedHeaders['content-length'];
+                delete forwardedHeaders['Content-Length'];
+                delete forwardedHeaders['transfer-encoding'];
+                delete forwardedHeaders['Transfer-Encoding'];
+            }
+
             const response = await axios({
                 method: req.method,
                 url: `${serviceUrl}${req.originalUrl}`,
-                data: req.body,
-                headers,
+                data: bodyToSend,
+                headers: forwardedHeaders,
                 validateStatus: function (status) {
                     return status >= 200 && status < 600;
                 },
                 timeout: 5000, // 5-second timeout
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
                 httpAgent: new http.Agent({
                     keepAlive: true,
                     keepAliveMsecs: 1000

@@ -97,6 +97,16 @@ const handleError = (res, err, status) => {
         });
     }
 
+    // Handle BadRequestError
+    else if (err.code === 'BAD_REQUEST') {
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'Bad Request',
+            code: 'BAD_REQUEST',
+            timestamp: new Date().toISOString()
+        });
+    }
+
     // Default error response
     const statusCode = status || err.statusCode || 500;
 

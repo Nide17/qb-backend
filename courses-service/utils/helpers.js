@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { S3 } = require('@aws-sdk/client-s3');
 
 // Helper function to call other services
 const getFromService = async (url, timeout = 20000, token) => {
@@ -63,9 +64,19 @@ const corsOptions = {
     maxAge: 3600
 };
 
+// AWS S3 Configuration
+const s3Config = new S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    Bucket: process.env.S3_BUCKET,
+    region: process.env.AWS_REGION
+});
+
+
 module.exports = {
     getFromService,
     populateUser,
     validateRequiredFields,
     corsOptions,
+    s3Config,
 };

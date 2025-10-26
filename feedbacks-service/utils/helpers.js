@@ -27,22 +27,16 @@ const populateFeedbackDetails = async (feedback) => {
 
     let feedbackObj = feedback.toObject ? feedback.toObject() : feedback;
 
-    // Populate feedback score, and quiz details
-    const [quiz, score] = await Promise.all([
-        getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${feedback.quiz}`),
-        getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores/${feedback.score}`)
-    ]);
+    // Fetch related quiz and user data
+    const quiz = feedback?.quiz ? await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${feedback.quiz}`) : null;
+    const user = feedback?.user ? await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${feedback.user}`) : null;
 
-    const user = score?.taken_by ? await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${score.taken_by}`) : null;
-
-    // Attach populated data to feedback
+    // Attach populated data to feedback object
     feedbackObj.quiz = quiz ? { _id: quiz._id, title: quiz.title } : feedbackObj.quiz;
-    feedbackObj.score = score ? {
-        _id: score._id,
-        marks: score.marks,
-        out_of: score.out_of,
-        taken_by: user ? { _id: user._id, name: user.name } : score.taken_by
-    } : feedbackObj.score;
+    feedbackObj.user = user ? { _id: user._id, name: user.name, email: user.email } : {
+        _id: feedbackObj.user,
+        name: 'N/A',
+    };
 
     return feedbackObj;
 };
