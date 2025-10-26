@@ -56,7 +56,7 @@ function setupContactsEvents() {
 // Export functions for compatibility with existing code
 exports.getIO = () => {
     if (!io) {
-        throw new Error('Socket.io not initialized!');
+        throw { message: 'Socket.io not initialized!', statusCode: 500 };
     }
     return io;
 };

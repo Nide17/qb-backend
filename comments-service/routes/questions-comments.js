@@ -8,8 +8,8 @@ const router = express.Router();
 router.get('/', getQuestionsComments);
 router.get('/paginated', authRole(['Admin', 'SuperAdmin']), getPaginatedComments);
 router.get('/pending', authRole(['Admin', 'SuperAdmin']), getPendingComments);
-router.get('/quiz/:quizId', getCommentsByQuiz);
-router.get('/question/:questionId', auth, getCommentsByQuestion);
+router.get('/quiz/:id', getCommentsByQuiz);
+router.get('/question/:id', auth, getCommentsByQuestion);
 router.get('/:id', getOneQuestionComment);
 
 // POST routes

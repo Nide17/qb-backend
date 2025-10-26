@@ -6,7 +6,7 @@ const router = express.Router();
 
 // GET routes
 router.get('/', getQuizzesComments);
-router.get('/quiz/:quizId', getCommentsByQuiz);
+router.get('/quiz/:id', getCommentsByQuiz);
 router.get('/:id', getOneQuizComment);
 
 // POST routes

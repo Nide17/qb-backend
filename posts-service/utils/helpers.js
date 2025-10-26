@@ -1,6 +1,4 @@
 const axios = require('axios');
-const PostCategory = require('../models/blog-posts/PostCategory');
-const ImageUpload = require('../models/blog-posts/ImageUpload');
 const { S3 } = require('@aws-sdk/client-s3');
 
 const s3Config = new S3({
@@ -42,59 +40,11 @@ const populateUser = async (userId) => {
     } : { _id: userId, name: 'Unknown User' };
 };
 
-// Helper function to find postCategory by ID
-// Helpers should not depend on `res`. They should throw and let controllers
-// call handleError(res, err) to centralize HTTP responses.
-const findPostCategoryById = async (id, selectFields = '') => {
-    try {
-        const postCategory = await PostCategory.findById(id).select(selectFields);
-        if (!postCategory) {
-            throw { statusCode: 404, message: 'No postCategory found!' };
-        }
-
-        // Populate creator details
-        let postCategoryObj = postCategory.toObject ? postCategory.toObject() : postCategory;
-        if (postCategory.creator) {
-            const userData = await populateUser(postCategory.creator);
-            if (userData) {
-                postCategoryObj.creator = { _id: userData._id, name: userData.name };
-            }
-        }
-
-        return postCategoryObj;
-    } catch (err) {
-        throw err;
-    }
-};
-
-// Helper function to find image upload by ID
-const findImageUploadById = async (id, selectFields = '') => {
-    try {
-        const imageUpload = await ImageUpload.findById(id).select(selectFields);
-        if (!imageUpload) {
-            throw { statusCode: 404, message: 'Image upload not found!' };
-        }
-
-        // Populate owner details
-        let imageUploadObj = imageUpload.toObject ? imageUpload.toObject() : imageUpload;
-        if (imageUpload.owner) {
-            const userData = await populateUser(imageUpload.owner);
-            if (userData) {
-                imageUploadObj.owner = { _id: userData._id, name: userData.name };
-            }
-        }
-
-        return imageUploadObj;
-    } catch (err) {
-        throw err;
-    }
-};
-
 // Helper function to validate required fields
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw new Error(`Missing required field: ${field.name}`);
+            throw { 'message': `Missing required field: ${field.name}`, 'statusCode': 400 };
         }
     }
 };
@@ -114,7 +64,7 @@ const deleteImageFromS3 = async (imagePath) => {
             }
         });
     } catch (err) {
-        throw new Error(`Error deleting image: ${err.message}`);
+        throw { 'message': `Error deleting image: ${err.message}`, 'statusCode': 500 };
     }
 };
 
@@ -145,8 +95,6 @@ module.exports = {
     s3Config,
     populateUser,
     getFromService,
-    findPostCategoryById,
-    findImageUploadById,
     validateRequiredFields,
     deleteImageFromS3,
     corsOptions,

@@ -11,10 +11,9 @@ const { deleteImageFromS3, populateSchoolDetails, hashPassword, updateUserToken 
 // Get all users
 exports.getUsers = async (req, res) => {
 
-    const limit = req.query.limit ? parseInt(req.query.limit) : 0;
-    const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
-
     try {
+        const limit = req.query.limit ? parseInt(req.query.limit) : 0;
+        const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
         let users = await User.find(filter ? { [filter]: { $exists: true } } : {}).limit(limit).sort({ register_date: -1 }).select('name email role register_date' + (filter ? ` ${filter}` : ''));
         if (!users.length) throw { 'message': 'No users found!', 'statusCode': 204 };
 
@@ -139,10 +138,11 @@ exports.getDailyUserRegistration = async (req, res) => {
 
 // User login
 exports.login = async (req, res) => {
-    const { email, password, confirmLogin } = req.body;
-    if (!email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
 
     try {
+        const { email, password, confirmLogin } = req.body;
+        if (!email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
+
         const user = await User.findOne({ email });
         if (!user) throw { 'statusCode': 404, 'message': 'User not found' };
 
@@ -160,7 +160,7 @@ exports.login = async (req, res) => {
             if (!user.current_token || err) {
 
                 const updatedUser = await updateUserToken(user);
-                if (!updatedUser) throw new Error('Could not log you in, try again later!');
+                if (!updatedUser) throw { 'statusCode': 500, 'message': 'Could not log you in, try again later!' };
 
                 res.status(200).json({
                     current_token: updatedUser.current_token,
@@ -171,7 +171,7 @@ exports.login = async (req, res) => {
                     throw { 'statusCode': 401, 'message': 'Already logged in, Log out & use here', 'code': 'CONFIRM_ERR' };
                 } else {
                     const confirmedUser = await updateUserToken(user);
-                    if (!confirmedUser) throw new Error('Could not log you in, try again later!');
+                    if (!confirmedUser) throw { 'statusCode': 500, 'message': 'Could not log you in, try again later!' };
 
                     res.status(200).json({
                         current_token: confirmedUser.current_token,
@@ -203,14 +203,15 @@ exports.logout = async (req, res) => {
 // User registration
 exports.register = async (req, res) => {
 
-    const { name, email, password } = req.body;
-    const emailTest = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    if (!name || !email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
-    if (!emailTest.test(email)) throw { 'statusCode': 400, 'message': 'Please provide a valid email!' };
-
     try {
+
+        const { name, email, password } = req.body;
+        const emailTest = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        if (!name || !email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
+        if (!emailTest.test(email)) throw { 'statusCode': 400, 'message': 'Please provide a valid email!' };
+
         const user = await User.findOne({ email });
         const hash = await hashPassword(password);
 
@@ -244,10 +245,11 @@ exports.register = async (req, res) => {
 // Verify OTP
 exports.verifyOTP = async (req, res) => {
 
-    const { email, otp } = req.body;
-    if (!email || !otp) throw { 'statusCode': 400, 'message': 'Email and OTP are required!' };
-
     try {
+
+        const { email, otp } = req.body;
+        if (!email || !otp) throw { 'statusCode': 400, 'message': 'Email and OTP are required!' };
+
         const usr = await User.findOne({ email }).select('-password');
 
         if (!usr) throw { 'statusCode': 400, 'message': 'User does not exist' };
@@ -276,8 +278,8 @@ exports.verifyOTP = async (req, res) => {
 
 // Send password reset link
 exports.sendResetLink = async (req, res) => {
-    const email = req.body.email;
     try {
+        const email = req.body.email;
         const userToReset = await User.findOne({ email });
         if (!userToReset) {
             throw { 'statusCode': 404, 'message': 'User with that email does not exist!' };
@@ -347,12 +349,10 @@ exports.sendNewPassword = async (req, res) => {
 
 // Update profile image
 exports.updateProfileImage = async (req, res) => {
-    if (!req.file) {
-        throw { 'statusCode': 400, 'message': 'FILE_MISSING' };
-    }
-
-    const img_file = req.file;
     try {
+        if (!req.file) throw { 'statusCode': 400, 'message': 'Profile image is required!' };
+
+        const img_file = req.file;
         const profile = await User.findOne({ _id: req.params.id });
         if (!profile) {
             throw { 'statusCode': 404, 'message': 'Failed! profile not exists!' };
@@ -375,7 +375,7 @@ exports.updateProfile = async (req, res) => {
         user = await populateSchoolDetails(user);
         res.status(200).json(user);
     } catch (err) {
-        console.log(err);
+
         handleError(res, err);
     }
 };
@@ -400,7 +400,7 @@ exports.deleteUser = async (req, res) => {
         if (!user) throw { 'statusCode': 404, 'message': 'User not found!' };
 
         const removedUser = await User.deleteOne({ _id: req.params.id });
-        if (removedUser.deletedCount === 0) throw new Error('Failed to delete user!');
+        if (removedUser.deletedCount === 0) throw { 'statusCode': 500, 'message': 'Failed to delete user!' };
 
         res.status(200).json(user);
     } catch (err) {

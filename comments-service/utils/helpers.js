@@ -1,63 +1,84 @@
 const axios = require('axios');
 
+// Helper function to call other services
+const getFromService = async (url, timeout = 60000) => {
+
+    if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
+
+    try {
+        const response = await axios.get(url, {
+            timeout, // 60 seconds default timeout for normal requests, longer for long running tasks
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        return response.data;
+    } catch (err) {
+        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
+        return null;
+    }
+};
+
 // Helper function to validate required fields
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw new Error(`Missing required field: ${field.name}`);
+            throw { message: `Missing required field: ${field.name}`, statusCode: 400 };
         }
     }
 };
 
-// Generalized function to populate sender and quiz fields
-const populateSenderAndQuiz = async (entity, entityType) => {
+const populateUser = async (userId) => {
+    if (!userId) return null;
+    const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+
+    return data ? {
+        _id: data._id,
+        name: data.name
+    } : { _id: userId, name: 'Unknown User' };
+};
+
+const populateComment = async (comment) => {
+
+    if (!comment) return null;
+    let commentObj = comment.toObject ? comment.toObject() : comment;
+
     try {
-        const fetchPromises = [];
-
-        if (entityType === 'questionComment') {
-            fetchPromises.push(
-                entity.sender ? axios.get(`${process.env.USERS_SERVICE_URL}/api/users/${entity.sender}`) : Promise.resolve(null),
-                entity.question ? axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/questions/${entity.question}`) : Promise.resolve(null),
-                entity.quiz ? axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${entity.quiz}`) : Promise.resolve(null)
-            );
-        } else if (entityType === 'quizComment') {
-            fetchPromises.push(
-                entity.sender ? axios.get(`${process.env.USERS_SERVICE_URL}/api/users/${entity.sender}`) : Promise.resolve(null),
-                entity.quiz ? axios.get(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${entity.quiz}`) : Promise.resolve(null)
-            );
+        // Fetch question - Questions Comments
+        if (comment.question && comment.quiz) {
+            const questionData = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/questions/${comment.question}`);
+            if (questionData) {
+                commentObj.question = {
+                    _id: questionData._id,
+                    questionText: questionData.questionText
+                }
+                commentObj.quiz = {
+                    _id: questionData.quiz._id,
+                    title: questionData.quiz.title
+                }
+            }
+            // Quizzes Comments
+        } else if (!comment.question && comment.quiz) {
+            const quizData = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${comment.quiz}`);
+            if (quizData) {
+                commentObj.quiz = {
+                    _id: quizData._id,
+                    title: quizData.title
+                }
+            }
         }
 
-        const results = await Promise.allSettled(fetchPromises);
-
-        entity = entity.toObject ? entity.toObject() : entity;
-        if (entityType === 'questionComment') {
-            entity.sender = results[0].status === 'fulfilled' && results[0].value ? {
-                _id: results[0].value.data._id,
-                name: results[0].value.data.name
-            } : null;
-            entity.question = results[1].status === 'fulfilled' && results[1].value ? {
-                _id: results[1].value.data._id,
-                questionText: results[1].value.data.questionText
-            } : null;
-            entity.quiz = results[2].status === 'fulfilled' && results[2].value ? {
-                _id: results[2].value.data._id,
-                title: results[2].value.data.title
-            } : null;
-        } else if (entityType === 'quizComment') {
-            entity.sender = results[0].status === 'fulfilled' && results[0].value ? {
-                _id: results[0].value.data._id,
-                name: results[0].value.data.name
-            } : null;
-            entity.quiz = results[1].status === 'fulfilled' && results[1].value ? {
-                _id: results[1].value.data._id,
-                title: results[1].value.data.title
-            } : null;
+        if (comment.sender) {
+            const userData = await populateUser(comment.sender);
+            if (userData) {
+                commentObj.sender = userData;
+            }
         }
 
-        return entity;
+        return commentObj;
     } catch (error) {
-        console.log('Error in populateEntityDetails:', error.message);
-        return entity.toObject ? entity.toObject() : entity;
+        console.log('Error populating comment :', error.message);
+        return commentObj;
     }
 };
 
@@ -86,6 +107,6 @@ const corsOptions = {
 
 module.exports = {
     validateRequiredFields,
-    populateSenderAndQuiz,
+    populateComment,
     corsOptions,
 };

@@ -8,10 +8,10 @@ const { isValidObjectId } = require('mongoose');
 
 exports.getQuizzes = async (req, res) => {
 
-    var pageNo = parseInt(req.query.pageNo);
-    const totalQuizzes = await Quiz.countDocuments({});
-
     try {
+        var pageNo = parseInt(req.query.pageNo);
+        const totalQuizzes = await Quiz.countDocuments({});
+
         // If limit & skip are defined
         let limit = parseInt(req.query.limit);
         let skip = parseInt(req.query.skip) || 0;
@@ -25,7 +25,7 @@ exports.getQuizzes = async (req, res) => {
                 .skip(skip);
 
             if (!limitedQuizzes.length) {
-                throw {'message':'No quizzes found!','statusCode':204};
+                throw { 'message': 'No quizzes found!', 'statusCode': 204 };
             }
 
             // Populate user data using simple direct calls
@@ -53,7 +53,7 @@ exports.getQuizzes = async (req, res) => {
             let paginatedQuizzes = await Quiz.find({}, {}, query).populate('category questions').sort({ creation_date: -1 }).lean();
 
             if (!paginatedQuizzes || paginatedQuizzes.length === 0) {
-                throw {'message':'No quizzes found','statusCode':204};
+                throw { message: 'No quizzes found', statusCode: 204 };
             }
 
             if (req.query?.filter === 'stats') {
@@ -61,7 +61,7 @@ exports.getQuizzes = async (req, res) => {
             }
 
             if (!paginatedQuizzes.length) {
-                throw {'message':'No quizzes found!','statusCode':204};
+                throw { message: 'No quizzes found!', statusCode: 204 };
             }
 
             // Populate user data using simple direct calls
@@ -83,7 +83,7 @@ exports.getQuizzes = async (req, res) => {
                 .populate('category questions');
 
             if (!allQuizzes.length) {
-                throw {'message':'No quizzes found!','statusCode':204};
+                throw { message: 'No quizzes found!', statusCode: 204 };
             }
 
             // Populate user data using simple direct calls
@@ -96,8 +96,8 @@ exports.getQuizzes = async (req, res) => {
 };
 
 exports.getOneQuiz = async (req, res) => {
-    try {
 
+    try {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
 
@@ -119,7 +119,7 @@ exports.getQuizzesByCategory = async (req, res) => {
         let quizzes = await Quiz.find({ category: req.params.id })
             .populate('category questions');
         if (!quizzes.length) {
-            throw {'message':'No quizzes found','statusCode':204};
+            throw { message: 'No quizzes found', statusCode: 204 };
         }
 
         quizzes = await populateQuizzes(quizzes);
@@ -134,7 +134,7 @@ exports.getQuizzesByNotes = async (req, res) => {
         const categories = await Category.find({ category: req.params.id });
         let quizzes = await Quiz.find({ category: { $in: categories } }).populate('category questions');
         if (!quizzes.length) {
-            throw {'message':'No quizzes found!','statusCode':204};
+            throw { message: 'No quizzes found!', statusCode: 204 };
         }
 
         quizzes = await populateQuizzes(quizzes);
@@ -149,13 +149,13 @@ exports.getBatchedQuizzes = async (req, res) => {
     try {
         const ids = req.body.quizIds;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            throw {'message':'No quiz IDs provided!','statusCode':400};
+            throw { message: 'No quiz IDs provided!', statusCode: 400 };
         }
 
         const quizzes = await Quiz.find({ _id: { $in: ids } })
             .populate('category questions');
         if (!quizzes.length) {
-            throw {'message':'No quizzes found!','statusCode':204};
+            throw { message: 'No quizzes found!', statusCode: 204 };
         }
 
         res.status(200).json(quizzes);
@@ -165,25 +165,25 @@ exports.getBatchedQuizzes = async (req, res) => {
 };
 
 exports.createQuiz = async (req, res) => {
-    const { title, description, category, created_by } = req.body;
-
-    if (!title || !description || !category) {
-        throw {'message':'There are missing info!','statusCode':400};
-    }
 
     try {
+        const { title, description, category, created_by } = req.body;
+
+        if (!title || !description || !category) {
+            throw { message: 'There are missing info!', statusCode: 400 };
+        }
+
         const existingQuiz = await Quiz.findOne({ title });
-        if (existingQuiz) throw new Error('Quiz already exists!');
+        if (existingQuiz) throw { message: 'Quiz already exists!', statusCode: 400 };
 
         const newQuiz = new Quiz({ title, description, category, created_by });
         const updatedCategory = await Category.findByIdAndUpdate(category, { $addToSet: { quizes: newQuiz._id } },
             { new: true }
         );
 
-        if (!updatedCategory) throw new Error('Cannot update corresponding category!');
-        console.log(updatedCategory);
+        if (!updatedCategory) throw { message: 'Cannot update corresponding category!', statusCode: 400 };
         const savedQuiz = await newQuiz.save();
-        if (!savedQuiz) throw new Error('Something went wrong during creation!');
+        if (!savedQuiz) throw { message: 'Something went wrong during creation!', statusCode: 400 };
 
         res.status(200).json(savedQuiz);
     } catch (err) {
@@ -199,9 +199,9 @@ exports.notifying = async (req, res) => {
 
         try {
             const { data } = await getFromService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
-                subscribers = data;
-            } catch (err) {
-                console.error('Error fetching subscribers:', err.message);
+            subscribers = data;
+        } catch (err) {
+            console.error('Error fetching subscribers:', err.message);
         }
 
         const clientURL = req.headers.origin;
@@ -228,24 +228,29 @@ exports.notifying = async (req, res) => {
 };
 
 exports.updateQuiz = async (req, res) => {
+
     try {
-    const quiz = await Quiz.findById(req.params.id);
-    if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
+        const quiz = await Quiz.findById(req.params.id);
+        if (!quiz) throw { message: 'Quiz not found!', statusCode: 404 };
 
-        Object.assign(quiz, req.body);
-        await quiz.save();
+        // If updating quiz
+        const updatedQuiz = await Quiz.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
-        await Category.updateOne(
-            { _id: req.body.oldCategoryID },
-            { $pull: { quizes: quiz._id } }
-        );
+        // If moving quiz from one category to another
+        if (req.body?.oldCategoryID) {
+            Category.updateOne(
+                { _id: req.body.oldCategoryID },
+                { $pull: { quizes: quiz._id } }
+            )
+                .then(() => {
+                    Category.updateOne(
+                        { _id: req.body.category },
+                        { $addToSet: { 'quizes': quiz._id } }
+                    );
+                });
+        }
 
-        await Category.updateOne(
-            { _id: req.body.category },
-            { $addToSet: { 'quizes': quiz._id } }
-        );
-
-        res.status(200).json(quiz);
+        res.status(200).json(updatedQuiz);
     } catch (err) {
         handleError(res, err);
     }
@@ -254,7 +259,7 @@ exports.updateQuiz = async (req, res) => {
 exports.addVidLink = async (req, res) => {
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
+        if (!quiz) throw { message: 'Quiz not found!', statusCode: 404 };
 
         quiz.video_links.push(req.body);
         await quiz.save();
@@ -268,7 +273,7 @@ exports.addVidLink = async (req, res) => {
 exports.deleteQuiz = async (req, res) => {
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
+        if (!quiz) throw { message: 'Quiz not found!', statusCode: 404 };
 
         await Category.updateOne(
             { _id: quiz.category },
@@ -287,11 +292,11 @@ exports.deleteQuiz = async (req, res) => {
 
 exports.deleteVideo = async (req, res) => {
     if (!isValidObjectId(req.body.qID)) {
-        throw {'message':'Invalid quiz ID','statusCode':400};
+        throw { message: 'Invalid quiz ID', statusCode: 400 };
     }
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw {'message':'Quiz not found!','statusCode':404};
+        if (!quiz) throw { message: 'Quiz not found!', statusCode: 404 };
 
         quiz.video_links.id(req.body.vId).remove();
         await quiz.save();

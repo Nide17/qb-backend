@@ -3,9 +3,9 @@ const { handleError } = require('../utils/error');
 
 const verifyToken = (req) => {
   const token = req.header('x-auth-token');
-  if (!token) throw { status: 401, message: 'Token missing: Authorization denied!' };
 
   try {
+    if (!token) throw { status: 401, message: 'Token missing: Authorization denied!' };
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     if (!decoded) throw { status: 401, message: 'Token is not valid' };
     req.user = decoded;

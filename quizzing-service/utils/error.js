@@ -99,9 +99,10 @@ const handleError = (res, err, status) => {
 
     // Default error response
     const statusCode = status || err.statusCode || 500;
+
     res.status(statusCode).json({
         success: false,
-        message: err?.message || typeof err === 'string' ? err : 'Internal server error',
+        message: err?.message || 'Internal server error',
         code: err.code || 'INTERNAL_ERROR',
         timestamp: new Date().toISOString()
     });

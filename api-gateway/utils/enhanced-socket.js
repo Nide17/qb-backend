@@ -544,7 +544,7 @@ class SocketManager {
     // Public methods
     getIO() {
         if (!this.io) {
-            throw new Error('Socket.IO not initialized!');
+            throw { message: 'Socket.IO not initialized!', statusCode: 500 };
         }
         return this.io;
     }

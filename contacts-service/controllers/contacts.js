@@ -7,13 +7,13 @@ const { notifyAdmins } = require('../utils/helpers');
 
 exports.getContacts = async (req, res) => {
 
-    // Pagination
-    const totalPages = await Contact.countDocuments({});
-    const PAGE_SIZE = 10;
-    const pageNo = parseInt(req.query.pageNo || '0');
-    const query = { limit: PAGE_SIZE, skip: PAGE_SIZE * (pageNo - 1) };
-
     try {
+        // Pagination
+        const totalPages = await Contact.countDocuments({});
+        const PAGE_SIZE = 10;
+        const pageNo = parseInt(req.query.pageNo || '0');
+        const query = { limit: PAGE_SIZE, skip: PAGE_SIZE * (pageNo - 1) };
+
         const contacts = pageNo > 0 ?
             await Contact.find({}, {}, query).sort({ contact_date: -1 }) :
             await Contact.find().sort({ contact_date: -1 });
@@ -43,7 +43,7 @@ exports.getContactsBySender = async (req, res) => {
 exports.getOneContact = async (req, res) => {
     try {
         const contact = await Contact.findById(req.params.id);
-    res.status(200).json(contact);
+        res.status(200).json(contact);
     } catch (err) {
         handleError(res, err);
     }
@@ -53,7 +53,7 @@ exports.createContact = async (req, res) => {
     try {
         const newContact = await Contact.create(req.body);
         if (!newContact) {
-            throw {'statusCode':500,'message':'Something went wrong!'};
+            throw { 'statusCode': 500, 'message': 'Something went wrong!' };
         }
 
         // Sending e-mail to contacted user
@@ -69,9 +69,9 @@ exports.createContact = async (req, res) => {
         }
 
         // Notify admins
-    await notifyAdmins(newContact);
+        await notifyAdmins(newContact);
 
-    res.status(200).json(newContact);
+        res.status(200).json(newContact);
     } catch (err) {
         handleError(res, err);
     }
@@ -92,7 +92,7 @@ exports.updateContact = async (req, res) => {
         );
 
         if (!newMessage) {
-            throw {'statusCode':500,'message':'Something went wrong while trying to update the contact'};
+            throw { 'statusCode': 500, 'message': 'Something went wrong while trying to update the contact' };
         }
 
         // Send Reply email
@@ -115,8 +115,8 @@ exports.updateContact = async (req, res) => {
 
 exports.deleteContact = async (req, res) => {
     try {
-    await Contact.findByIdAndDelete(req.params.id);
-    res.status(200).json({ message: 'Contact deleted successfully' });
+        await Contact.findByIdAndDelete(req.params.id);
+        res.status(200).json({ message: 'Contact deleted successfully' });
     } catch (err) {
         handleError(res, err);
     }

@@ -233,7 +233,7 @@ exports.get50NewUsers = async (req, res) => {
         res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in get50NewUsers:', err.message);
-        throw {'statusCode':503,'message':'Users temporarily unavailable'};
+        throw { 'statusCode': 503, 'message': 'Users temporarily unavailable' };
     }
 };
 
@@ -243,7 +243,7 @@ exports.getAllUsers = async (req, res) => {
         res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in getAllUsers:', err.message);
-        throw {'statusCode':503,'message':'Users temporarily unavailable'};
+        throw { 'statusCode': 503, 'message': 'Users temporarily unavailable' };
     }
 };
 
@@ -251,9 +251,9 @@ exports.getUsersWithImage = async (req, res) => {
     try {
         const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=image`);
 
-    if (!users) throw {'statusCode':404,'message':'No users found with images'};
+        if (!users) throw { 'statusCode': 404, 'message': 'No users found with images' };
 
-    res.status(200).json(users);
+        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }
@@ -263,9 +263,9 @@ exports.getUsersWithSchool = async (req, res) => {
     try {
         const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=school`);
 
-    if (!users) throw {'statusCode':404,'message':'No users found with that school'};
+        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that school' };
 
-    res.status(200).json(users);
+        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }
@@ -275,9 +275,9 @@ exports.getUsersWithLevel = async (req, res) => {
     try {
         const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=level`);
 
-    if (!users) throw {'statusCode':404,'message':'No users found with that level'};
+        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that level' };
 
-    res.status(200).json(users);
+        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }
@@ -287,9 +287,9 @@ exports.getUsersWithFaculty = async (req, res) => {
     try {
         const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=faculty`);
 
-    if (!users) throw {'statusCode':404,'message':'No users found with that faculty'};
+        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that faculty' };
 
-    res.status(200).json(users);
+        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }
@@ -299,9 +299,9 @@ exports.getUsersWithYear = async (req, res) => {
     try {
         const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=year`);
 
-    if (!users) throw {'statusCode':404,'message':'No users found with that year'};
+        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that year' };
 
-    res.status(200).json(users);
+        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }
@@ -311,9 +311,9 @@ exports.getUsersWithInterests = async (req, res) => {
     try {
         const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=interests`);
 
-    if (!users) throw {'statusCode':404,'message':'No users found with that interest'};
+        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that interest' };
 
-    res.status(200).json(users);
+        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }
@@ -323,9 +323,9 @@ exports.getUsersWithAbout = async (req, res) => {
     try {
         const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=about`);
 
-    if (!users) throw {'statusCode':404,'message':'No users found with that about'};
+        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that about' };
 
-    res.status(200).json(users);
+        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }

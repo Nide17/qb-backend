@@ -10,9 +10,13 @@ const ImageUploadSchema = new Schema({
         type: String,
         required: true,
     },
-    uploadImage: String,
+    uploadImage: {
+        type: String,
+        required: true,
+    },
     owner: {
-        type: Schema.Types.ObjectId
+        type: Schema.Types.ObjectId,
+        required: true,
     }
 }, { timestamps: true });
 

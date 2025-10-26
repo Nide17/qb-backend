@@ -96,11 +96,11 @@ exports.updateBlogPostsView = async (req, res) => {
 exports.deleteBlogPostsView = async (req, res) => {
     try {
         const blogPost = await BlogPostsView.findById(req.params.id);
-        if (!blogPost) throw new Error('BlogPost not found!');
+        if (!blogPost) throw {'message':'BlogPost not found!','statusCode':404};
         blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne();
 
-        if (removedBlogPost.deletedCount === 0) throw new Error('Something went wrong while deleting!');
+        if (removedBlogPost.deletedCount === 0) throw {'message':'Something went wrong while deleting!','statusCode':500};
 
         res.status(200).json(blogPost);
     } catch (err) {

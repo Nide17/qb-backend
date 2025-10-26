@@ -12,7 +12,7 @@ const s3Config = new S3({
 
 // File Filter for multer to check if the file is an image
 const fileFilter = (req, file, callback) => {
-    const allowedFileTypes = ['image/jpeg', 'image/png', 'image/svg'];
+    const allowedFileTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/svg'];
 
     if (allowedFileTypes.includes(file.mimetype)) {
         callback(null, true);
@@ -32,7 +32,7 @@ const multerS3Config = multerS3({
     key: (req, file, callback) => {
         const folderName = 'blogPosts/';
         const fileName = file.originalname.toLowerCase().split(' ').join('-').replace(/[^a-zA-Z0-9.]/g, '-');
-        callback(null, folderName + req.params.id + '-' + fileName);
+        callback(null, folderName + (req.params?.id ? req.params.id + '-' : '') + fileName);
     }
 });
 

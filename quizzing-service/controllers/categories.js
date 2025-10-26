@@ -7,7 +7,7 @@ const { validateRequiredFields, populateCategory } = require('../utils/helpers')
 exports.getCategories = async (req, res) => {
     try {
         let categories = await Category.find().sort({ creation_date: -1 }).populate('quizes', '_id title questions slug');
-    if (!categories) throw {'message':'No categories found!','statusCode':204};
+        if (!categories) throw { 'message': 'No categories found!', 'statusCode': 204 };
 
         for (let i = 0; i < categories.length; i++) {
             categories[i] = await populateCategory(categories[i]);
@@ -23,7 +23,7 @@ exports.getOneCategory = async (req, res) => {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
         let category = await Category.findOne(query).populate('quizes', '_id title questions slug');
-        if (!category) throw new Error('Unexistent category!');
+        if (!category) throw { 'message': 'Unexistent category!', 'statusCode': 404 };
 
         category = await populateCategory(category);
         res.status(200).json(category);
@@ -43,13 +43,13 @@ exports.createCategory = async (req, res) => {
         // Check for duplicate title
         const existingCategory = await Category.findOne({ title: req.body.title });
         if (existingCategory) {
-            throw {'message':'Failed! Category with that title already exists!','statusCode':400};
+            throw { 'message': 'Failed! Category with that title already exists!', 'statusCode': 400 };
         }
 
         const newCategory = new Category(req.body);
         let savedCategory = await newCategory.save();
 
-        if (!savedCategory) throw new Error('Something went wrong during creation!');
+        if (!savedCategory) throw { 'message': 'Something went wrong during creation!', 'statusCode': 500 };
 
         savedCategory = await populateCategory(savedCategory);
         res.status(200).json(savedCategory);
@@ -73,7 +73,7 @@ exports.updateCategory = async (req, res) => {
 exports.deleteCategory = async (req, res) => {
     try {
         const category = await Category.findById(req.params.id);
-        if (!category) throw new Error('Category does not exist!');
+        if (!category) throw { 'message': 'Category does not exist!', 'statusCode': 404 };
 
         // Delete all quizzes associated with this category
         await Quiz.deleteMany({ category: category._id });
@@ -82,7 +82,7 @@ exports.deleteCategory = async (req, res) => {
         await Question.deleteMany({ category: category._id });
 
         const removedCategory = await Category.deleteOne({ _id: req.params.id });
-        if (removedCategory.deletedCount === 0) throw new Error('Something went wrong while deleting!');
+        if (removedCategory.deletedCount === 0) throw { 'message': 'Something went wrong while deleting the category!', 'statusCode': 500 };
 
         res.status(200).json(category);
     } catch (err) {

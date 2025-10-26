@@ -6,7 +6,7 @@ const { populateUser, validateRequiredFields } = require('../utils/helpers');
 exports.getChapters = async (req, res) => {
     try {
         const chapters = await Chapter.find().populate('course courseCategory', 'title').sort({ createdAt: -1 }).select('title description course courseCategory created_by');
-        if (!chapters) throw {'message':'No chapters found!','statusCode':204};
+        if (!chapters) throw { 'message': 'No chapters found!', 'statusCode': 204 };
 
         // Populate created_by field for each chapter
         const populatedChapters = await Promise.all(
@@ -42,7 +42,7 @@ exports.getChaptersByCourse = async (req, res) => {
 exports.getOneChapter = async (req, res) => {
     try {
         let chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by');
-        if (!chapter) throw {'message':'Chapter not found!','statusCode':404};
+        if (!chapter) throw { 'message': 'Chapter not found!', 'statusCode': 404 };
 
         // Populate user
         chapter = chapter.toObject ? chapter.toObject() : chapter;
@@ -69,7 +69,7 @@ exports.createChapter = async (req, res) => {
 
         // Check for duplicate title
         const chapter = await Chapter.findOne({ title });
-        if (chapter) throw {'message':'Chapter with this title already exists!','statusCode':409};
+        if (chapter) throw { 'message': 'Chapter with this title already exists!', 'statusCode': 409 };
 
         const newChapter = new Chapter({
             title,
@@ -80,7 +80,7 @@ exports.createChapter = async (req, res) => {
         });
 
         const savedChapter = await newChapter.save();
-        if (!savedChapter) throw {'message':'Something went wrong during creation!','statusCode':503};
+        if (!savedChapter) throw { 'message': 'Something went wrong during creation!', 'statusCode': 503 };
 
         res.status(200).json(savedChapter);
     } catch (err) {
@@ -99,9 +99,8 @@ exports.updateChapter = async (req, res) => {
 
 exports.deleteChapter = async (req, res) => {
     try {
-
         let chapter = await Chapter.findById(req.params.id);
-        if (!chapter) throw {'message':'Chapter not found!','statusCode':404};
+        if (!chapter) throw { 'message': 'Chapter not found!', 'statusCode': 404 };
 
         // Delete notes belonging to this chapter
         await Notes.deleteMany({ chapter: chapter._id });

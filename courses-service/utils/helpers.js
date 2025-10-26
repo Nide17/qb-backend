@@ -35,7 +35,7 @@ const populateUser = async (userId) => {
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw new Error(`Missing required field: ${field.name}`);
+            throw { message: `Missing required field: ${field.name}`, statusCode: 400 };
         }
     }
 };

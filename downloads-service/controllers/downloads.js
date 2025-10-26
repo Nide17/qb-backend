@@ -148,10 +148,10 @@ exports.createDownload = async (req, res) => {
 exports.deleteDownload = async (req, res) => {
     try {
         const download = await Download.findById(req.params.id);
-        if (!download) throw new Error('Download not found!');
+        if (!download) throw { message: 'Download not found!', statusCode: 404 };
 
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
-        if (removedDownload.deletedCount === 0) throw new Error('Something went wrong while deleting!');
+        if (removedDownload.deletedCount === 0) throw { message: 'Something went wrong while deleting!', statusCode: 500 };
         res.status(200).json(download);
     } catch (err) {
         handleError(res, err);

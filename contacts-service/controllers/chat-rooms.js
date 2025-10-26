@@ -64,11 +64,11 @@ exports.createOpenChatRoom = async (req, res) => {
         // Validation
         validateRequiredFields([{ name: 'name', value: name }, { name: 'users', value: users }]);
         if (!Array.isArray(users)) {
-            throw new Error('Users must be an array');
+            throw { message: 'Users must be an array', statusCode: 400 };
         }
 
         if (users.length < 2) {
-            throw new Error('No room users provided');
+            throw { message: 'No room users provided', statusCode: 400 };
         }
 
         const newRoom = new ChatRoom({ name, users });

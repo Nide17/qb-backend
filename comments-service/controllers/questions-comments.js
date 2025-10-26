@@ -1,14 +1,11 @@
 const QuestionComment = require('../models/QuestionComment');
 const { handleError } = require('../utils/error');
-const { populateSenderAndQuiz } = require('../utils/helpers');
+const { populateComment } = require('../utils/helpers');
 
 exports.getQuestionsComments = async (req, res) => {
     try {
         let questionComments = await QuestionComment.find();
-
-        for (let i = 0; i < questionComments.length; i++) {
-            questionComments[i] = await populateSenderAndQuiz(questionComments[i], 'questionComment');
-        }
+        questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
 
         res.status(200).json(questionComments);
     } catch (err) {
@@ -19,19 +16,17 @@ exports.getQuestionsComments = async (req, res) => {
 exports.getPaginatedComments = async (req, res) => {
     try {
         const { page = 1, limit = 10 } = req.query;
-        let questionComments = await QuestionComment.find()
+        let paginatedQuestionsComments = await QuestionComment.find()
             .limit(limit * 1)
             .skip((page - 1) * limit)
             .exec();
 
         const count = await QuestionComment.countDocuments();
 
-        for (let i = 0; i < questionComments.length; i++) {
-            questionComments[i] = await populateSenderAndQuiz(questionComments[i]);
-        }
+        paginatedQuestionsComments = await Promise.all(paginatedQuestionsComments.map(questionComment => populateComment(questionComment)));
 
         res.status(200).json({
-            questionComments,
+            paginatedQuestionsComments,
             totalPages: Math.ceil(count / limit),
             currentPage: page
         });
@@ -43,11 +38,7 @@ exports.getPaginatedComments = async (req, res) => {
 exports.getPendingComments = async (req, res) => {
     try {
         let questionComments = await QuestionComment.find({ status: 'Pending' });
-
-        for (let i = 0; i < questionComments.length; i++) {
-            questionComments[i] = await populateSenderAndQuiz(questionComments[i]);
-        }
-
+        questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
         res.status(200).json(questionComments);
 
     } catch (err) {
@@ -57,8 +48,8 @@ exports.getPendingComments = async (req, res) => {
 
 exports.getCommentsByQuestion = async (req, res) => {
     try {
-        const questionComments = await QuestionComment.find({ question: req.params.questionId });
-        res.status(200).json(questionComments);
+        const questionComments = await QuestionComment.find({ question: req.params.id });
+        res.status(200).json(await Promise.all(questionComments.map(questionComment => populateComment(questionComment))));
     } catch (err) {
         handleError(res, err);
     }
@@ -67,8 +58,8 @@ exports.getCommentsByQuestion = async (req, res) => {
 exports.getOneQuestionComment = async (req, res) => {
     try {
         let questionComment = await QuestionComment.findById(req.params.id).select('comment sender question quiz status createdAt updatedAt');
-    if (!questionComment) throw {'message':'QuestionComment not found!','statusCode':404};
-        questionComment = await populateSenderAndQuiz(questionComment) || questionComment;
+        if (!questionComment) throw { 'message': 'QuestionComment not found!', 'statusCode': 404 };
+        questionComment = await populateComment(questionComment) || questionComment;
         res.status(200).json(questionComment);
     } catch (err) {
         handleError(res, err);
@@ -77,12 +68,8 @@ exports.getOneQuestionComment = async (req, res) => {
 
 exports.getCommentsByQuiz = async (req, res) => {
     try {
-        let questionComments = await QuestionComment.find({ quiz: req.params.quizId });
-
-        for (let i = 0; i < questionComments.length; i++) {
-            questionComments[i] = await populateSenderAndQuiz(questionComments[i]);
-        }
-
+        let questionComments = await QuestionComment.find({ quiz: req.params.id });
+        questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
         res.status(200).json(questionComments);
     } catch (err) {
         handleError(res, err);
@@ -94,7 +81,7 @@ exports.createQuestionComment = async (req, res) => {
 
     // Simple validation
     if (!comment || !sender || !quiz || !question) {
-        throw {'message':'There are empty fields','statusCode':400};
+        throw { 'message': 'There are empty fields', 'statusCode': 400 };
     }
 
     try {
@@ -105,8 +92,8 @@ exports.createQuestionComment = async (req, res) => {
             quiz
         });
 
-    const savedQuestionComment = await newQuestionComment.save();
-    if (!savedQuestionComment) throw {'message':'Something went wrong during creation!','statusCode':500};
+        const savedQuestionComment = await newQuestionComment.save();
+        if (!savedQuestionComment) throw { 'message': 'Something went wrong during creation!', 'statusCode': 500 };
 
         res.status(200).json({
             _id: savedQuestionComment._id,

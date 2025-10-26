@@ -42,7 +42,7 @@ const populateUser = async (userId) => {
 
 // Simple population function for category
 const populateCategory = async (category) => {
-    
+
     if (!category) return null;
 
     let categoryObj = category.toObject ? category.toObject() : category;
@@ -74,7 +74,7 @@ const populateCategory = async (category) => {
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw new Error(`Missing required field: ${field.name}`);
+            throw { 'message': `Missing required field: ${field.name}`, 'statusCode': 400 };
         }
     }
 };
@@ -84,7 +84,7 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
     try {
         const quiz = await Quiz.findById(quizId);
 
-        if (!quiz) throw new Error('Quiz not found while updating questions!');
+        if (!quiz) throw { 'message': 'Quiz not found while updating questions!', 'statusCode': 404 };
 
         if (action === 'add') {
             quiz.questions.push(questionId);
@@ -95,7 +95,7 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
         return true;
     } catch (err) {
         console.error(err.message);
-        throw new Error('Error updating quiz questions!');
+        throw { 'message': 'Error updating quiz questions!', 'statusCode': 500 };
     }
 };
 
@@ -114,7 +114,7 @@ const deleteImageFromS3 = async (imagePath) => {
             }
         });
     } catch (err) {
-        throw new Error(`Error deleting image: ${err.message}`);
+        throw { 'message': `Error deleting image: ${err.message}`, 'statusCode': 500 };
     }
 };
 
@@ -167,7 +167,7 @@ const corsOptions = {
             callback(null, true);
         } else {
             console.log(origin + ' is not allowed by CORS');
-            callback(new Error('Not allowed by CORS'));
+            callback({ 'message': 'Not allowed by CORS', 'statusCode': 403 });
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],

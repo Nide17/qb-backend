@@ -20,7 +20,7 @@ exports.getScores = async (req, res) => {
         let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
 
         if (!scores || scores.length === 0) {
-            throw {'statusCode':204,'message':'No scores found'};
+            throw { 'statusCode': 204, 'message': 'No scores found' };
         }
 
         if (req.query?.filter === 'stats') {
@@ -41,7 +41,7 @@ exports.getScores = async (req, res) => {
     } catch (err) {
         // Check if this is a memory exhaustion error
         if (err.message && err.message.includes('JavaScript heap out of memory')) {
-            throw {'statusCode':500,'message':'Memory exhaustion error'};
+            throw { 'statusCode': 500, 'message': 'Memory exhaustion error' };
         }
         handleError(res, err);
     }
@@ -49,16 +49,15 @@ exports.getScores = async (req, res) => {
 
 exports.getScoresByTaker = async (req, res) => {
 
-    let id = req.params.id;
-    const cacheKey = `scores_user_${id}`;
-
     try {
+        const cacheKey = `scores_user_${req.params.id}`;
+
         // Check cache first
         let scores = getCachedData(cacheKey);
 
         if (!scores || scores.length === 0) {
-            scores = await Score.find({ taken_by: id }).sort({ test_date: -1 }).exec();
-                if (!scores || scores.length === 0) throw {'statusCode':404,'message':'You have no scores. Take some quizzes!'};
+            scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).exec();
+            if (!scores || scores.length === 0) throw { 'statusCode': 404, 'message': 'You have no scores. Take some quizzes!' };
 
             // Populate scores
             scores = await Promise.all(scores.map(score => populateScore(score)));
@@ -98,7 +97,7 @@ exports.getScoresForQuizCreator = async (req, res) => {
     } catch (err) {
         // Check if this is a memory exhaustion error
         if (err.message && err.message.includes('JavaScript heap out of memory')) {
-            throw {'statusCode':500,'message':'Memory exhaustion error'};
+            throw { 'statusCode': 500, 'message': 'Memory exhaustion error' };
         }
         console.log('\n\nError retrieving scores for quiz creator: ', err);
         handleError(res, err);
@@ -137,18 +136,18 @@ exports.getOneScore = async (req, res) => {
 
 exports.getQuizRanking = async (req, res) => {
 
-    let id = req.params.id;
-    const cacheKey = `ranking_${id}`;
 
     try {
+        const cacheKey = `ranking_${req.params.id}`;
+
         // Check cache first
         let scores = getCachedData(cacheKey);
 
         if (!scores || scores.length === 0) {
-            scores = await Score.find({ quiz: id }).sort({ marks: -1 }).limit(20).exec();
+            scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).exec();
             if (!scores || scores.length === 0) {
-                console.warn(`No scores found for the ${id} quiz`);
-                throw {'statusCode':404,'message':'No scores to display'};
+                console.warn(`No scores found for the ${req.params.id} quiz`);
+                throw { 'statusCode': 404, 'message': 'No scores to display' };
             }
 
             // Populate scores
@@ -157,19 +156,20 @@ exports.getQuizRanking = async (req, res) => {
         }
 
         res.status(200).json(scores);
-        } catch (err) {
-            handleError(res, err);
-        }
+    } catch (err) {
+        handleError(res, err);
+    }
 };
 
 exports.getPopularQuizzes = async (req, res) => {
-    const cacheKey = 'popular_quizzes';
 
     try {
+        const cacheKey = 'popular_quizzes';
+
         // Check cache first
         let popularQuizzes = getCachedData(cacheKey);
 
-    if (!popularQuizzes || popularQuizzes.length === 0) {
+        if (!popularQuizzes || popularQuizzes.length === 0) {
             const startOfDay = new Date();
             startOfDay.setHours(0, 0, 0, 0);
 
@@ -211,13 +211,14 @@ exports.getPopularQuizzes = async (req, res) => {
 };
 
 exports.getMonthlyUser = async (req, res) => {
-    const cacheKey = 'monthly_user';
 
     try {
+        const cacheKey = 'monthly_user';
+
         // Check cache first
         let monthlyUserData = getCachedData(cacheKey);
 
-    if (!monthlyUserData || monthlyUserData.length === 0) {
+        if (!monthlyUserData || monthlyUserData.length === 0) {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
             startOfMonth.setHours(0, 0, 0, 0);
@@ -261,17 +262,17 @@ exports.getMonthlyUser = async (req, res) => {
 
 exports.createScore = async (req, res) => {
 
-    const { id, out_of, category, quiz, review, taken_by } = req.body;
-    const marks = req.body.marks ? req.body.marks : 0;
-    var now = new Date();
+    try {
+        const { id, out_of, category, quiz, review, taken_by } = req.body;
+        const marks = req.body.marks ? req.body.marks : 0;
+        var now = new Date();
 
-    // Simple validation
-    if (!id || !out_of || !review || !taken_by) {
-        throw { statusCode: 400, message: '400' };
-    }
+        // Simple validation
+        if (!id || !out_of || !review || !taken_by) {
+            throw { statusCode: 400, message: '400' };
+        }
 
-    else {
-        try {
+        else {
             // Use Promise.all for parallel queries to improve performance
             const [existingScore, recentScoreExist] = await Promise.all([
                 Score.find({ id: id }),
@@ -279,7 +280,7 @@ exports.createScore = async (req, res) => {
             ]);
 
             if (existingScore.length > 0) {
-                throw {'statusCode':400,'message':'Score duplicate! You have already saved this score!'};
+                throw { 'statusCode': 400, 'message': 'Score duplicate! You have already saved this score!' };
             }
 
             if (recentScoreExist.length > 0) {
@@ -288,7 +289,7 @@ exports.createScore = async (req, res) => {
                 let seconds = Math.round((now - testDate) / 1000);
 
                 if (seconds < 60) {
-                    throw {'statusCode':400,'message':'Score duplicate! You took this quiz in less than a minute ago!'};
+                    throw { 'statusCode': 400, 'message': 'Score duplicate! You took this quiz in less than a minute ago!' };
                 }
             }
 
@@ -305,11 +306,11 @@ exports.createScore = async (req, res) => {
 
             const savedScore = await newScore.save();
 
-            if (!savedScore) throw new Error('Something went wrong during creation!');
+            if (!savedScore) throw { 'message': 'Something went wrong during creation!', 'statusCode': 500 };
 
             // Clear relevant cache entries
             const cacheKeysToDelete = [`scores_user_${taken_by}`, `ranking_${quiz}`, 'popular_quizzes', 'monthly_user'];
-            cacheKeysToDelete.forEach(key => cache.delete(key));
+            cacheKeysToDelete.forEach(key => cache?.delete(key));
 
             // Emit real-time update if socket.io is available
             if (req.io) {
@@ -347,10 +348,10 @@ exports.createScore = async (req, res) => {
                 review: savedScore.review,
                 taken_by: savedScore.taken_by
             });
-        } catch (err) {
-            console.log('Error creating score: ', err);
-            handleError(res, err);
         }
+    } catch (err) {
+        console.log('Error creating score: ', err);
+        handleError(res, err);
     }
 };
 
@@ -359,12 +360,12 @@ exports.deleteScore = async (req, res) => {
         //Find the Score to delete by id first
         const score = await Score.findOne({ _id: req.params.id });
 
-    if (!score) throw {'statusCode':404,'message':'No scores found'};
+        if (!score) throw { 'statusCode': 404, 'message': 'No scores found' };
 
         // Delete the Score
         const removedScore = await Score.deleteOne({ _id: req.params.id });
 
-        if (removedScore.deletedCount === 0) throw new Error('Something went wrong while deleting!');
+        if (removedScore.deletedCount === 0) throw { 'statusCode': 500, 'message': 'Something went wrong while deleting!' };
 
         res.status(200).json(score);
     }
@@ -379,8 +380,9 @@ exports.deleteScore = async (req, res) => {
 // STATISTICS CONTROLLERS
 exports.getTop10QuizzingUsers = async (req, res) => {
 
-    const cacheKey = 'top_10_quizzing_users';
     try {
+        const cacheKey = 'top_10_quizzing_users';
+
         // Check cache first
         let topUsers = getCachedData(cacheKey);
 
@@ -419,9 +421,10 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
 // Get top quizzes by activity (by number of times taken in scores) - for statistics service
 exports.getTop10Quizzes = async (req, res) => {
-    const cacheKey = 'top_10_quizzes';
     try {
         // Check cache first
+        const cacheKey = 'top_10_quizzes';
+
         let topQuizzes = getCachedData(cacheKey);
 
         if (!topQuizzes || topQuizzes.length === 0) {

@@ -85,8 +85,9 @@ exports.getOneNotes = async (req, res) => {
 exports.createNotes = async (req, res) => {
 
     try {
-
         const not_file = req.file;
+
+        if (!not_file) throw { message: 'Notes file is required!', statusCode: 400 };
 
         const { title, description, chapter, course, courseCategory, uploaded_by } = req.body;
         validateRequiredFields([
@@ -99,7 +100,7 @@ exports.createNotes = async (req, res) => {
         ]);
 
         const notes = await Notes.findOne({ title });
-        if (notes) throw new Error('Notes with that title arleady exists!');
+        if (notes) throw { message: 'Notes with that title arleady exists!', statusCode: 400 };
 
         const newNotes = new Notes({
             title,
@@ -111,7 +112,7 @@ exports.createNotes = async (req, res) => {
         });
 
         const savedNotes = await newNotes.save();
-        if (!savedNotes) throw new Error('Could not save notes, try again!');
+        if (!savedNotes) throw { message: 'Could not save notes, try again!', statusCode: 500 };
 
         res.status(200).json(savedNotes);
 

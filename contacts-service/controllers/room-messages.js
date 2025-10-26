@@ -89,7 +89,7 @@ exports.createRoomMessage = async (req, res) => {
 
         const savedMessage = await newRoomMessage.save();
         if (!savedMessage) {
-            throw {'statusCode':500,'message':'Something went wrong during creation!'};
+            throw { 'statusCode': 500, 'message': 'Something went wrong during creation!' };
         }
 
         // Notify admins about the new room message
@@ -115,7 +115,7 @@ exports.deleteRoomMessage = async (req, res) => {
         if (!roomMessage) return;
 
         const deletedMessage = await RoomMessage.findByIdAndDelete(req.params.id);
-        if (!deletedMessage) throw new Error('Something went wrong during deletion!');
+        if (!deletedMessage) throw { message: 'Something went wrong during deletion!', statusCode: 500 };
 
         res.status(200).json({ message: 'RoomMessage deleted successfully!' });
     } catch (err) {
@@ -129,7 +129,7 @@ exports.updateRoomMessage = async (req, res) => {
         validateRoomMessageData(req.body);
 
         const updatedRoomMessage = await RoomMessage.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedRoomMessage) throw new Error('Something went wrong during update!');
+        if (!updatedRoomMessage) throw { message: 'Something went wrong during update!', statusCode: 500 };
 
         res.status(200).json(updatedRoomMessage);
     } catch (err) {
