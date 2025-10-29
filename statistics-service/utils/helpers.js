@@ -55,6 +55,7 @@ const allowList = [
     'http://localhost:5000',
     'https://www.quizblog.rw',
     'https://www.quizblog.online',
+    'https://qb-api-gateway-faaa805537e5.herokuapp.com',
 ];
 
 const corsOptions = {

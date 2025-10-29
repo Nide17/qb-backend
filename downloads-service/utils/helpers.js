@@ -77,12 +77,13 @@ setInterval(() => {
 }, CACHE_TTL);
 
 const allowList = [
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://localhost:5000',
-        'https://www.quizblog.rw',
-        'https://www.quizblog.online',
-    ];
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'https://www.quizblog.rw',
+    'https://www.quizblog.online',
+    'https://qb-api-gateway-faaa805537e5.herokuapp.com',
+];
 
 const corsOptions = {
     origin: (origin, callback) => {

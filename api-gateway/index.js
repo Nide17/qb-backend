@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const process = require('process');
-const { routeToService, getFromService, setCachedData, getCachedData, redisCache, memoryCache } = require('./utils/helpers');
+const { routeToService, getFromService, setCachedData, getCachedData, redisCache, memoryCache, corsOptions } = require('./utils/helpers');
 const { handleError } = require('./utils/error');
 const HealthMonitor = require('./utils/health-monitor');
 const socketManager = require('./utils/enhanced-socket');
@@ -13,7 +13,10 @@ const server = http.createServer(app);
 const io = socketManager.initialize(server);
 
 app.use(express.json());
-app.use(cors());
+// Use the shared corsOptions from utils/helpers to allow the frontend origins
+app.use(cors(corsOptions));
+// Also respond to preflight requests explicitly
+app.options('*', cors(corsOptions));
 
 // Users Service
 app.use('/api/users', routeToService('Users', process.env.USERS_SERVICE_URL));
