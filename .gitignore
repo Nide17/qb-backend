@@ -97,3 +97,5 @@ npm-debug.log*
 /client/src/components/questions/* copy 4.js*
 .eslintcache
 commands.md
+# local backups from convert-to-submodules
+*.local-backup-*
