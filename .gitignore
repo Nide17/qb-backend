@@ -99,3 +99,6 @@ npm-debug.log*
 commands.md
 # local backups from convert-to-submodules
 *.local-backup-*
+
+# ignore env variants
+.env.*
