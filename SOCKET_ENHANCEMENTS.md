@@ -195,21 +195,6 @@ MONGODB_URI=mongodb://localhost:27017/quizblog_contacts
 PORT=5008
 ```
 
-### CORS Configuration
-```javascript
-const corsOptions = {
-    origin: [
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'http://localhost:8080',
-        'https://quizblog.rw',
-        'https://www.quizblog.rw'
-    ],
-    methods: ['GET', 'POST'],
-    credentials: true
-};
-```
-
 ## 📈 Performance Metrics
 
 The enhanced system tracks various performance metrics:

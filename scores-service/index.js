@@ -6,7 +6,6 @@ const cors = require('cors');
 const compression = require('compression');
 const dotenv = require('dotenv');
 const { handleError, startMemoryMonitoring } = require('./utils/error');
-const { corsOptions } = require('./utils/helpers');
 const { memoryMonitorMiddleware, requestTrackerMiddleware, startMemoryMonitoring: startMiddlewareMonitoring } = require('./middlewares/memory-monitor');
 
 // Config
@@ -14,9 +13,10 @@ dotenv.config();
 const app = express();
 
 // Middlewares
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(compression());
+app.use(cors());
+app.options('*', cors());
 
 // Memory monitoring middleware
 app.use(requestTrackerMiddleware);

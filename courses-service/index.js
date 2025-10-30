@@ -5,15 +5,15 @@ const process = require('process');
 const cors = require('cors');
 const { handleError } = require('./utils/error');
 const dotenv = require('dotenv');
-const { corsOptions } = require('./utils/helpers');
 
 // Config
 dotenv.config();
 const app = express();
 
 // Middlewares
-app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cors());
+app.options('*', cors());
 
 // Routes
 app.use('/api/course-categories', require('./routes/course-categories'));

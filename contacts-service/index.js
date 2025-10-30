@@ -9,7 +9,6 @@ const { Server } = require('socket.io');
 const dotenv = require('dotenv');
 const contactsSocketManager = require('./utils/enhanced-socket');
 const { handleError } = require('./utils/error');
-const { corsOptions } = require('./utils/helpers');
 
 // Config
 dotenv.config();
@@ -17,8 +16,9 @@ const app = express();
 const httpServer = createServer(app);
 
 // Middlewares
-app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cors());
+app.options('*', cors());
 
 // Routes
 app.use('/api/contacts', require('./routes/contacts'));
@@ -104,8 +104,12 @@ mongoose
 
             // Initialize Socket.io with enhanced contacts functionality
             const io = new Server(httpServer, {
-                cors: corsOptions,
-                transports: ['websocket', 'polling']
+                transports: ['websocket', 'polling'],
+                cors: {
+                    // Allow all origins for development
+                    origin: '*',
+                    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+                }
             });
 
             contactsSocketManager.initialize(io);

@@ -20,23 +20,12 @@ class SocketManager {
     }
 
     initialize(httpServer) {
-        const corsOptions = {
-            origin: [
-                'http://localhost:3000',
-                'http://localhost:5173',
-                'http://localhost:8080',
-                'https://quizblog.rw',
-                'https://www.quizblog.rw',
-                process.env.CLIENT_URL,
-                process.env.FRONTEND_URL
-            ].filter(Boolean),
-            methods: ['GET', 'POST'],
-            credentials: true,
-            allowedHeaders: ['Content-Type', 'Authorization']
-        };
 
         this.io = socketIO(httpServer, {
-            cors: corsOptions,
+            cors: {
+                origin: '*',
+                methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+            },
             transports: ['websocket', 'polling'],
             pingTimeout: 600000,
             pingInterval: 25000,
@@ -59,9 +48,9 @@ class SocketManager {
         // Authentication middleware
         this.io.use((socket, next) => {
             try {
-                const token = socket.handshake.auth.token || 
-                             socket.handshake.headers.authorization?.replace('Bearer ', '');
-                
+                const token = socket.handshake.auth.token ||
+                    socket.handshake.headers.authorization?.replace('Bearer ', '');
+
                 if (token) {
                     const decoded = jwt.verify(token, process.env.JWT_SECRET);
                     socket.userId = decoded.id;
@@ -69,7 +58,7 @@ class SocketManager {
                     socket.userName = decoded.name;
                     socket.userRole = decoded.role;
                 }
-                
+
                 next();
             } catch (error) {
                 console.log('Socket auth failed:', error.message);
@@ -108,7 +97,7 @@ class SocketManager {
         this.io.on('connection', (socket) => {
             this.connectionStats.totalConnections++;
             this.connectionStats.currentConnections++;
-            
+
             if (this.connectionStats.currentConnections > this.connectionStats.peakConnections) {
                 this.connectionStats.peakConnections = this.connectionStats.currentConnections;
                 this.connectionStats.lastPeak = new Date();
@@ -130,7 +119,7 @@ class SocketManager {
 
                 // Join user-specific room
                 socket.join(`user-${socket.userId}`);
-                
+
                 // Notify other users about new user online
                 socket.broadcast.emit('userOnline', {
                     userId: socket.userId,
@@ -149,7 +138,7 @@ class SocketManager {
 
                 if (socket.userId) {
                     this.onlineUsers.delete(socket.id);
-                    
+
                     // Notify others about user going offline
                     socket.broadcast.emit('userOffline', {
                         userId: socket.userId,
@@ -246,11 +235,11 @@ class SocketManager {
             // Join room
             socket.on('joinRoom', (data) => {
                 const { roomId, roomType = 'chat' } = data;
-                
+
                 if (!roomId) return;
 
                 socket.join(roomId);
-                
+
                 // Track user rooms
                 if (!this.userRooms.has(socket.id)) {
                     this.userRooms.set(socket.id, new Set());
@@ -266,7 +255,7 @@ class SocketManager {
                         lastActivity: new Date()
                     });
                 }
-                
+
                 const room = this.chatRooms.get(roomId);
                 room.members.add(socket.id);
                 room.lastActivity = new Date();
@@ -297,7 +286,7 @@ class SocketManager {
             // Room message
             socket.on('roomMessage', (data) => {
                 const { roomId, message, type = 'text' } = data;
-                
+
                 if (!roomId || !message) return;
 
                 const messageData = {
@@ -326,7 +315,7 @@ class SocketManager {
             // Join quiz session
             socket.on('joinQuiz', (data) => {
                 const { quizId } = data;
-                
+
                 if (!quizId) return;
 
                 const roomId = `quiz-${quizId}`;
@@ -372,7 +361,7 @@ class SocketManager {
             socket.on('submitAnswer', (data) => {
                 const { quizId, questionId, answer, timeSpent } = data;
                 const session = this.quizSessions.get(quizId);
-                
+
                 if (!session) return;
 
                 const participant = session.participants.get(socket.id);
@@ -453,7 +442,7 @@ class SocketManager {
 
     leaveRoom(socket, roomId) {
         socket.leave(roomId);
-        
+
         if (this.userRooms.has(socket.id)) {
             this.userRooms.get(socket.id).delete(roomId);
         }
@@ -461,7 +450,7 @@ class SocketManager {
         if (this.chatRooms.has(roomId)) {
             const room = this.chatRooms.get(roomId);
             room.members.delete(socket.id);
-            
+
             if (room.members.size === 0) {
                 this.chatRooms.delete(roomId);
             } else {
@@ -489,14 +478,14 @@ class SocketManager {
         for (const [quizId, session] of this.quizSessions) {
             if (session.participants.has(socket.id)) {
                 session.participants.delete(socket.id);
-                
+
                 const roomId = `quiz-${quizId}`;
                 socket.to(roomId).emit('participantLeft', {
                     userId: socket.userId,
                     userName: socket.userName,
                     participantCount: session.participants.size
                 });
-                
+
                 if (session.participants.size === 0) {
                     this.quizSessions.delete(quizId);
                 }
