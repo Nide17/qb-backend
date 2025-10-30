@@ -23,8 +23,10 @@ class SocketManager {
 
         this.io = socketIO(httpServer, {
             cors: {
-                origin: '*',
-                methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+                allowedHeaders: ["Content-Type", "Authorization", "x-auth-token", "Access-Control-Allow-Origin", "Access-Control-Allow-Methods", "Access-Control-Allow-Headers"],
+                methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+                origin: "*",
+                credentials: true
             },
             transports: ['websocket', 'polling'],
             pingTimeout: 600000,

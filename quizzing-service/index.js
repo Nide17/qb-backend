@@ -95,53 +95,16 @@ app.get('/health', async (req, res) => {
 // Handle errors: takes res, err, status
 app.use((err, req, res, _next) => handleError(res, err));
 
-// Connection helper with retries and event handlers so the service recovers when Mongo restarts
-let server = null;
-let serverStarted = false;
-
-const mongooseOpts = {
-    // useUnifiedTopology handles monitoring servers and reconnects
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    // sensible timeouts
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-};
-
-const startServerIfNeeded = (conn) => {
-    if (serverStarted) return;
-    server = app.listen(process.env.PORT || 5002, () => {
-        serverStarted = true;
-        const db = conn && conn.connection && conn.connection.db;
-        console.log(`Quizzing service is running on port ${process.env.PORT || 5002}${db ? `, and MongoDB ${db.databaseName} is connected` : ''}`);
-    });
-};
-
-const connectWithRetry = () => {
-    mongoose.connect(process.env.MONGODB_URI, mongooseOpts)
-        .then(conn => {
-            console.log('MongoDB connection established');
-            startServerIfNeeded(conn);
-        })
-        .catch(err => {
-            console.error('MongoDB connection error, retrying in 5s', err.message || err);
-            setTimeout(connectWithRetry, 5000);
+// Connect to MongoDB and start server
+mongoose
+    .connect(process.env.MONGODB_URI)
+    .then(async (conn) => {
+        app.listen(process.env.PORT || 5002, async () => {
+            const db = conn.connection.db;
+            console.log(`Quizzing service is running on port ${process.env.PORT || 5002}, and MongoDB ${db.databaseName} is connected`);
         });
-};
-
-// connection event handlers for visibility and auto-reconnect attempts
-mongoose.connection.on('connected', () => console.log('Mongoose connected'));
-mongoose.connection.on('reconnected', () => console.log('Mongoose reconnected'));
-mongoose.connection.on('error', err => console.error('Mongoose connection error', err));
-mongoose.connection.on('disconnected', () => {
-    console.error('Mongoose disconnected — attempting reconnect');
-    // attempt reconnect (connectWithRetry already uses retries)
-    connectWithRetry();
-});
-
-// Start the initial connection attempt
-connectWithRetry();
-
+    })
+    .catch((err) => console.log(err));
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
