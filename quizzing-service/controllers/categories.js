@@ -6,7 +6,7 @@ const { validateRequiredFields, populateCategory } = require('../utils/helpers')
 
 exports.getCategories = async (req, res) => {
     try {
-        let categories = await Category.find().sort({ creation_date: -1 }).populate('quizes', '_id title questions slug');
+        let categories = await Category.find().sort({ creation_date: -1 }).select('_id title description quizes courseCategory').populate('quizes', '_id title slug');
         if (!categories) throw { 'message': 'No categories found!', 'statusCode': 204 };
 
         for (let i = 0; i < categories.length; i++) {

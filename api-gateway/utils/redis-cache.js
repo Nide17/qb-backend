@@ -56,8 +56,20 @@ class RedisCacheManager {
 
     async disconnect() {
         if (this.redis) {
-            await this.redis.quit();
-            this.isConnected = false;
+            try {
+                if (this.isConnected && this.redis.status === 'ready') {
+                    await this.redis.quit();
+                    console.log('✅ Redis disconnected gracefully');
+                } else {
+                    console.log('⚠️ Redis not connected or already closing');
+                    this.redis.disconnect(); // force close without sending commands
+                }
+            } catch (err) {
+                console.error('Redis disconnect error:', err.message);
+                this.redis.disconnect();
+            } finally {
+                this.isConnected = false;
+            }
         }
     }
 

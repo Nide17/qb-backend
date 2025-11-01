@@ -119,22 +119,3 @@ mongoose
     .catch((err) => {
         console.error('Failed to connect to MongoDB:', err);
     });
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM, shutting down gracefully...');
-    await mongoose.connection.close();
-    app.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
-
-process.on('SIGINT', async () => {
-    console.log('Received SIGINT, shutting down gracefully...');
-    await mongoose.connection.close();
-    app.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});

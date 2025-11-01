@@ -105,30 +105,3 @@ mongoose
         });
     })
     .catch((err) => console.log(err));
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM, shutting down gracefully...');
-    await mongoose.connection.close();
-    if (server) {
-        server.close(() => {
-            console.log('Server closed');
-            process.exit(0);
-        });
-    } else {
-        process.exit(0);
-    }
-});
-
-process.on('SIGINT', async () => {
-    console.log('Received SIGINT, shutting down gracefully...');
-    await mongoose.connection.close();
-    if (server) {
-        server.close(() => {
-            console.log('Server closed');
-            process.exit(0);
-        });
-    } else {
-        process.exit(0);
-    }
-});

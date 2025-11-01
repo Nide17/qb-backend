@@ -1,6 +1,6 @@
 const axios = require('axios');
 // const http = require('http');
-const https = require('https');
+const http = require('http');
 const util = require('util');
 const RedisCacheManager = require('./redis-cache');
 
@@ -123,7 +123,7 @@ const makeRequest = async (req, serviceName, serviceUrl) => {
                 timeout: 30000, // 30-second timeout
                 maxContentLength: Infinity,
                 maxBodyLength: Infinity,
-                httpAgent: new https.Agent({
+                httpAgent: new http.Agent({
                     keepAlive: true,
                     keepAliveMsecs: 1000
                 })

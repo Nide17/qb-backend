@@ -5,7 +5,7 @@ const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
 const { validateRequiredFields } = require('../utils/helpers');
 
-exports.getCategories = async (req, res) => {
+exports.getCourseCategories = async (req, res) => {
 
     try {
         const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
@@ -18,7 +18,7 @@ exports.getCategories = async (req, res) => {
 
 exports.getOneCategory = async (req, res) => {
     try {
-        const category = await CourseCategory.findById(req.params.id);
+        const category = await CourseCategory.findById(req.params.id).select('title');
 
         if (!category) throw {'message':'Category not found','statusCode':404};
         res.status(200).json(category);

@@ -1,7 +1,7 @@
 const axios = require('axios');
 const Download = require('../models/Download');
 const { populateDownload, validateRequiredFields, getCachedData, setCachedData } = require('../utils/helpers');
-const { handleError } = require('../../contacts-service/utils/error');
+const { handleError } = require('../utils/error');
 
 exports.getDownloads = async (req, res) => {
 

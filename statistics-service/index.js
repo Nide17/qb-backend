@@ -72,20 +72,3 @@ app.use((err, req, res, _next) => handleError(res, err));
 app.listen(process.env.PORT || 5011, async () => {
     console.log(`Statistics service is running on port ${process.env.PORT || 5011}, No database required.`);
 });
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-    console.log('Received SIGTERM, shutting down gracefully...');
-    app.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
-
-process.on('SIGINT', async () => {
-    console.log('Received SIGINT, shutting down gracefully...');
-    app.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});

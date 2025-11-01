@@ -1,11 +1,11 @@
 const express = require('express');
-const { getCategories, getOneCategory, createCategory, updateCategory, deleteCategory } = require('../controllers/course-categories');
+const { getCourseCategories, getOneCategory, createCategory, updateCategory, deleteCategory } = require('../controllers/course-categories');
 const { authRole } = require('../middlewares/auth');
 
 const router = express.Router();
 
 // GET routes
-router.get('/', getCategories);
+router.get('/', getCourseCategories);
 router.get('/:id', getOneCategory);
 
 // POST routes

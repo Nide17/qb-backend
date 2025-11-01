@@ -12,6 +12,17 @@ const multerS3Config = multerS3({
     key: (req, file, callback) => {
         const folderName = 'comms/'; // This simulates a folder structure within the bucket
         const fileName = file.originalname.toLowerCase().split(' ').join('-').replace(/[^a-zA-Z0-9.]/g, '-');
+
+        // if the filename has 'ad' or 'ads' or 'advert' or 'adverts' in it, then refuse it and ask for a different name
+        // Regex breakdown:
+        // \b matches a word boundary.
+        // (ad|ads|advert|adverts) matches the target keywords.
+        // i makes the match case-insensitive.
+        const adKeywordRegex = /\b(ad|ads|advert|advertisement|advertisements|banner|popup|promo|sale|sponsor|banner)\b/i;
+
+        if (adKeywordRegex.test(fileName)) {
+            callback(new Error('Filename contains ad-related keywords which can cause ad blockers to block the image. Please use a neutral name.'));
+        }
         callback(null, folderName + (req.params?.id ? req.params.id + 'qb-' : '') + fileName);
     }
 });

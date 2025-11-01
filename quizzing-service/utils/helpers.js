@@ -50,9 +50,9 @@ const populateCategory = async (category) => {
     try {
         // Fetch courseCategory details
         if (category.courseCategory) {
-            const categoryData = await getFromService(`${process.env.COURSES_SERVICE_URL}/api/course-categories/${category.courseCategory}`);
-            if (categoryData) {
-                categoryObj.courseCategory = categoryData;
+            const cCategoryData = await getFromService(`${process.env.COURSES_SERVICE_URL}/api/course-categories/${category.courseCategory}`);
+            if (cCategoryData) {
+                categoryObj.courseCategory = cCategoryData;
             }
         }
 
