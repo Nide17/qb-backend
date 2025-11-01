@@ -15,7 +15,6 @@ set -euo pipefail
 #   - Navigates to ../quiz-blog-client and runs `npm run dev` in its own terminal window/tab
 #   - From the backend repo root runs `docker compose up -d mongodb redis` (started in a dedicated window/tab)
 # - Preferred: create a new tmux session with one window per service + client + infra and attach to it
-# - Fallback: open gnome-terminal tabs (one per service + client + infra). Other terminal emulators may be adapted.
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SESSION_BASE="qb-services"

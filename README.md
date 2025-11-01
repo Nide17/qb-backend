@@ -6,7 +6,7 @@ A modern, scalable microservices architecture for the QB platform, designed to e
 
 - **Efficient MongoDB Usage**: Separate databases per service to optimize free tier usage
 - **Advanced Data Aggregation**: 6 comprehensive aggregated endpoints for frontend efficiency
-- **Intelligent Caching**: Redis + in-memory caching with intelligent fallback and pattern invalidation
+- **Intelligent Caching**: Redis caching with pattern invalidation
 - **Health Monitoring**: Real-time service status monitoring with performance metrics
 - **Frontend-Friendly**: Aggregated endpoints that reduce API calls and improve performance
 - **Shared Utilities**: Centralized logging, validation, service communication, and cache management
@@ -110,7 +110,7 @@ The project includes comprehensive shared utilities that can be used across all 
 - **Logger**: Winston-based structured logging with file rotation
 - **ServiceClient**: HTTP client with retry logic and circuit breaker patterns
 - **Validator**: Joi-based request validation with custom schemas
-- **CacheManager**: Redis + in-memory caching with intelligent fallback
+- **CacheManager**: Redis caching
 - **ResponseHandler**: Standardized API response formatting
 - **DatabaseManager**: MongoDB connection management with connection pooling
 

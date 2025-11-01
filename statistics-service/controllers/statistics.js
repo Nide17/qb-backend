@@ -5,77 +5,76 @@ const { getCachedData, setCachedData, getFromService, cache, deleteCacheKey } = 
 
 // Enhanced system monitoring
 exports.getSystemMetrics = async (req, res) => {
+
     const cacheKey = 'system_metrics';
 
     try {
         let metrics = getCachedData(cacheKey);
 
-        // if (!metrics) {
-        // Get system information
-        const cpuUsage = process.cpuUsage();
-        const memoryUsage = process.memoryUsage();
-        const systemInfo = {
-            platform: os.platform(),
-            arch: os.arch(),
-            cpus: os.cpus().length,
-            totalMemory: os.totalmem(),
-            freeMemory: os.freemem(),
-            uptime: os.uptime(),
-        };
+        if (!metrics) {
+            // Get system information
+            const cpuUsage = process.cpuUsage();
+            const memoryUsage = process.memoryUsage();
+            const systemInfo = {
+                platform: os.platform(),
+                arch: os.arch(),
+                cpus: os.cpus().length,
+                totalMemory: os.totalmem(),
+                freeMemory: os.freemem(),
+                uptime: os.uptime(),
+            };
 
-        // Get service health status - Monitor all services
-        const services = [
-            { name: 'users-service', url: `${process.env.USERS_SERVICE_URL}` },
-            { name: 'quizzing-service', url: `${process.env.QUIZZING_SERVICE_URL}` },
-            { name: 'posts-service', url: `${process.env.POSTS_SERVICE_URL}` },
-            { name: 'schools-service', url: `${process.env.SCHOOLS_SERVICE_URL}` },
-            { name: 'courses-service', url: `${process.env.COURSES_SERVICE_URL}` },
-            { name: 'scores-service', url: `${process.env.SCORES_SERVICE_URL}` },
-            { name: 'downloads-service', url: `${process.env.DOWNLOADS_SERVICE_URL}` },
-            { name: 'contacts-service', url: `${process.env.CONTACTS_SERVICE_URL}` },
-            { name: 'feedbacks-service', url: `${process.env.FEEDBACKS_SERVICE_URL}` },
-            { name: 'comments-service', url: `${process.env.COMMENTS_SERVICE_URL}` },
-            { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
-        ];
+            // Get service health status - Monitor all services
+            const services = [
+                { name: 'users-service', url: `${process.env.USERS_SERVICE_URL}` },
+                { name: 'quizzing-service', url: `${process.env.QUIZZING_SERVICE_URL}` },
+                { name: 'posts-service', url: `${process.env.POSTS_SERVICE_URL}` },
+                { name: 'schools-service', url: `${process.env.SCHOOLS_SERVICE_URL}` },
+                { name: 'courses-service', url: `${process.env.COURSES_SERVICE_URL}` },
+                { name: 'scores-service', url: `${process.env.SCORES_SERVICE_URL}` },
+                { name: 'downloads-service', url: `${process.env.DOWNLOADS_SERVICE_URL}` },
+                { name: 'contacts-service', url: `${process.env.CONTACTS_SERVICE_URL}` },
+                { name: 'feedbacks-service', url: `${process.env.FEEDBACKS_SERVICE_URL}` },
+                { name: 'comments-service', url: `${process.env.COMMENTS_SERVICE_URL}` },
+                { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
+            ];
 
-        const servicesHealthChecks = await Promise.allSettled(
-            services.map(service =>
-                getFromService(`${service.url}/health`, 200000)
-            )
-        );
+            const servicesHealthChecks = await Promise.allSettled(
+                services.map(service =>
+                    getFromService(`${service.url}/health`, 200000)
+                )
+            );
 
-        const servicesHealth = servicesHealthChecks.map((result, index) => ({
-            service: services[index].name,
-            status: result.status === 'fulfilled' && result.value && result?.value?.status === 'healthy' ? 'healthy' : 'unhealthy',
-            uptime: result.status === 'fulfilled' && result.value && result?.value?.uptime ? result?.value?.uptime || 0 : 0
-        }));
+            const servicesHealth = servicesHealthChecks.map((result, index) => ({
+                service: services[index].name,
+                status: result.status === 'fulfilled' && result.value && result?.value?.status === 'healthy' ? 'healthy' : 'unhealthy',
+                uptime: result.status === 'fulfilled' && result.value && result?.value?.uptime ? result?.value?.uptime || 0 : 0
+            }));
 
-        metrics = {
-            timestamp: new Date().toISOString(),
-            system: {
-                ...systemInfo,
-                memoryUsagePercent: ((systemInfo.totalMemory - systemInfo.freeMemory) / systemInfo.totalMemory * 100).toFixed(2),
-                process: {
-                    pid: process.pid,
-                    uptime: process.uptime(),
-                    memoryUsage: {
-                        rss: (memoryUsage.rss / 1024 / 1024).toFixed(2) + ' MB',
-                        heapTotal: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2) + ' MB',
-                        heapUsed: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2) + ' MB',
-                        external: (memoryUsage.external / 1024 / 1024).toFixed(2) + ' MB'
-                    },
-                    cpuUsage: {
-                        user: cpuUsage.user,
-                        system: cpuUsage.system
+            metrics = {
+                timestamp: new Date().toISOString(),
+                system: {
+                    ...systemInfo,
+                    memoryUsagePercent: ((systemInfo.totalMemory - systemInfo.freeMemory) / systemInfo.totalMemory * 100).toFixed(2),
+                    process: {
+                        pid: process.pid,
+                        uptime: process.uptime(),
+                        memoryUsage: {
+                            rss: (memoryUsage.rss / 1024 / 1024).toFixed(2) + ' MB',
+                            heapTotal: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2) + ' MB',
+                            heapUsed: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2) + ' MB',
+                            external: (memoryUsage.external / 1024 / 1024).toFixed(2) + ' MB'
+                        },
+                        cpuUsage: {
+                            user: cpuUsage.user,
+                            system: cpuUsage.system
+                        }
                     }
-                }
-            },
-            services: servicesHealth
-        };
-        setCachedData(cacheKey, metrics);
-        // }
-
-        console.log('metrics: ', metrics);
+                },
+                services: servicesHealth
+            };
+            setCachedData(cacheKey, metrics);
+        }
         res.status(200).json(metrics);
     } catch (err) {
         console.log('\n\nError retrieving system metrics:', err);
@@ -86,108 +85,108 @@ exports.getSystemMetrics = async (req, res) => {
 // Aggregated dashboard statistics endpoint
 exports.getDashboardStats = async (req, res) => {
 
-    const cacheKey = 'dashboard_stats';
 
     try {
+        const cacheKey = 'dashboard_stats';
         let stats = getCachedData(cacheKey);
 
-        // if (!stats) {
+        if (!stats) {
 
-        // Get actual data from working endpoints and count them through API Gateway
-        const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
-            getFromService(`${process.env.USERS_SERVICE_URL}/api/users`),
-            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
-            getFromService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads?filter=stats`),
-            getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores?filter=stats`),
-        ]);
+            // Get actual data from working endpoints and count them through API Gateway
+            const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
+                getFromService(`${process.env.USERS_SERVICE_URL}/api/users`),
+                getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes`),
+                getFromService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads?filter=stats`),
+                getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores?filter=stats`),
+            ]);
 
-        // Handle users count with graceful fallback
-        let totalUsers = 0;
-        let usersError = false;
-        if (usersResponse.status === 'fulfilled' && usersResponse.value && usersResponse.value && Array.isArray(usersResponse.value)) {
-            totalUsers = usersResponse?.value?.length;
-        } else {
-            console.log('Users service unavailable, returning 0');
-            usersError = true;
-        }
-
-        // Handle quizzes count with graceful fallback
-        let totalQuizzes = 0;
-        let quizzesError = false;
-        if (quizzesResponse.status === 'fulfilled' && quizzesResponse.value && quizzesResponse.value && Array.isArray(quizzesResponse.value)) {
-            totalQuizzes = quizzesResponse?.value?.length;
-        } else {
-            console.log('Quizzes service unavailable, returning 0');
-            quizzesError = true;
-        }
-
-        // Handle downloads count with graceful fallback
-        let totalDownloads = 0;
-        let downloadsError = false;
-        if (downloadsResponse.status === 'fulfilled' && downloadsResponse.value && downloadsResponse.value) {
-            totalDownloads = downloadsResponse.value;
-        } else {
-            console.log('Downloads service unavailable, returning 0\n');
-            downloadsError = true;
-        }
-
-        // Handle scores count with graceful fallback
-        let totalScores = 0;
-        let scoresError = false;
-        if (scoresResponse.status === 'fulfilled' && scoresResponse.value && scoresResponse.value) {
-            totalScores = scoresResponse.value;
-        } else {
-            console.log('Scores service unavailable, returning 0');
-            scoresError = true;
-        }
-
-        // Get service health status - Monitor all services
-        const services = [
-            { name: 'users-service', url: `${process.env.USERS_SERVICE_URL}` },
-            { name: 'quizzing-service', url: `${process.env.QUIZZING_SERVICE_URL}` },
-            { name: 'posts-service', url: `${process.env.POSTS_SERVICE_URL}` },
-            { name: 'schools-service', url: `${process.env.SCHOOLS_SERVICE_URL}` },
-            { name: 'courses-service', url: `${process.env.COURSES_SERVICE_URL}` },
-            { name: 'scores-service', url: `${process.env.SCORES_SERVICE_URL}` },
-            { name: 'downloads-service', url: `${process.env.DOWNLOADS_SERVICE_URL}` },
-            { name: 'contacts-service', url: `${process.env.CONTACTS_SERVICE_URL}` },
-            { name: 'feedbacks-service', url: `${process.env.FEEDBACKS_SERVICE_URL}` },
-            { name: 'comments-service', url: `${process.env.COMMENTS_SERVICE_URL}` },
-            { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
-        ];
-
-        const servicesHealthChecks = await Promise.allSettled(
-            services.map(service =>
-                getFromService(`${service.url}/health`, 200000)
-            )
-        );
-
-        const servicesHealth = servicesHealthChecks.map((result, index) => ({
-            service: services[index].name,
-            status: result.status === 'fulfilled' && result.value && result?.value?.status === 'healthy' ? 'healthy' : 'unhealthy',
-            database: result.status === 'fulfilled' && result.value && result?.value?.database,
-            dbStats: result.status === 'fulfilled' && result.value && result?.value?.dbStats,
-            system: result.status === 'fulfilled' && result.value && result?.value?.system,
-            process: result.status === 'fulfilled' && result.value && result?.value?.process,
-        }));
-
-        stats = {
-            totalUsers,
-            totalQuizzes,
-            totalDownloads,
-            totalScores,
-            servicesHealth,
-            lastUpdated: new Date().toISOString(),
-            errors: {
-                usersError,
-                quizzesError,
-                downloadsError,
-                scoresError,
+            // Handle users count with graceful fallback
+            let totalUsers = 0;
+            let usersError = false;
+            if (usersResponse.status === 'fulfilled' && usersResponse.value && usersResponse.value && Array.isArray(usersResponse.value)) {
+                totalUsers = usersResponse?.value?.length;
+            } else {
+                console.log('Users service unavailable, returning 0');
+                usersError = true;
             }
-        };
 
-        setCachedData(cacheKey, stats);
-        // }
+            // Handle quizzes count with graceful fallback
+            let totalQuizzes = 0;
+            let quizzesError = false;
+            if (quizzesResponse.status === 'fulfilled' && quizzesResponse.value && quizzesResponse.value && Array.isArray(quizzesResponse.value)) {
+                totalQuizzes = quizzesResponse?.value?.length;
+            } else {
+                console.log('Quizzes service unavailable, returning 0');
+                quizzesError = true;
+            }
+
+            // Handle downloads count with graceful fallback
+            let totalDownloads = 0;
+            let downloadsError = false;
+            if (downloadsResponse.status === 'fulfilled' && downloadsResponse.value && downloadsResponse.value) {
+                totalDownloads = downloadsResponse.value;
+            } else {
+                console.log('Downloads service unavailable, returning 0\n');
+                downloadsError = true;
+            }
+
+            // Handle scores count with graceful fallback
+            let totalScores = 0;
+            let scoresError = false;
+            if (scoresResponse.status === 'fulfilled' && scoresResponse.value && scoresResponse.value) {
+                totalScores = scoresResponse.value;
+            } else {
+                console.log('Scores service unavailable, returning 0');
+                scoresError = true;
+            }
+
+            // Get service health status - Monitor all services
+            const services = [
+                { name: 'users-service', url: `${process.env.USERS_SERVICE_URL}` },
+                { name: 'quizzing-service', url: `${process.env.QUIZZING_SERVICE_URL}` },
+                { name: 'posts-service', url: `${process.env.POSTS_SERVICE_URL}` },
+                { name: 'schools-service', url: `${process.env.SCHOOLS_SERVICE_URL}` },
+                { name: 'courses-service', url: `${process.env.COURSES_SERVICE_URL}` },
+                { name: 'scores-service', url: `${process.env.SCORES_SERVICE_URL}` },
+                { name: 'downloads-service', url: `${process.env.DOWNLOADS_SERVICE_URL}` },
+                { name: 'contacts-service', url: `${process.env.CONTACTS_SERVICE_URL}` },
+                { name: 'feedbacks-service', url: `${process.env.FEEDBACKS_SERVICE_URL}` },
+                { name: 'comments-service', url: `${process.env.COMMENTS_SERVICE_URL}` },
+                { name: 'statistics-service', url: `${process.env.STATISTICS_SERVICE_URL}` },
+            ];
+
+            const servicesHealthChecks = await Promise.allSettled(
+                services.map(service =>
+                    getFromService(`${service.url}/health`, 200000)
+                )
+            );
+
+            const servicesHealth = servicesHealthChecks.map((result, index) => ({
+                service: services[index].name,
+                status: result.status === 'fulfilled' && result.value && result?.value?.status === 'healthy' ? 'healthy' : 'unhealthy',
+                database: result.status === 'fulfilled' && result.value && result?.value?.database,
+                dbStats: result.status === 'fulfilled' && result.value && result?.value?.dbStats,
+                system: result.status === 'fulfilled' && result.value && result?.value?.system,
+                process: result.status === 'fulfilled' && result.value && result?.value?.process,
+            }));
+
+            stats = {
+                totalUsers,
+                totalQuizzes,
+                totalDownloads,
+                totalScores,
+                servicesHealth,
+                lastUpdated: new Date().toISOString(),
+                errors: {
+                    usersError,
+                    quizzesError,
+                    downloadsError,
+                    scoresError,
+                }
+            };
+
+            setCachedData(cacheKey, stats);
+        }
 
         res.status(200).json(stats);
     } catch (err) {
@@ -200,7 +199,6 @@ exports.getDashboardStats = async (req, res) => {
 exports.updateDashboardStats = async (req, res) => {
     try {
         // Clear dashboard cache to force refresh
-        // prefer helper delete function
         deleteCacheKey('dashboard_stats');
 
         // Build fresh stats and emit real-time update if socket.io is available
@@ -220,11 +218,10 @@ exports.updateDashboardStats = async (req, res) => {
 };
 
 exports.get50NewUsers = async (req, res) => {
-    const cacheKey = 'new_users_50';
 
     try {
+        const cacheKey = 'new_users_50';
         let users = getCachedData(cacheKey);
-
         if (!users || users.length === 0) {
             users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?limit=50`);
             setCachedData(cacheKey, users);
@@ -240,7 +237,13 @@ exports.get50NewUsers = async (req, res) => {
 
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users`);
+        const cacheKey = 'all_users';
+        let users = getCachedData(cacheKey);
+
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users`);
+            setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in getAllUsers:', err.message);
@@ -250,10 +253,13 @@ exports.getAllUsers = async (req, res) => {
 
 exports.getUsersWithImage = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=image`);
+        const cacheKey = `users_with_image`;
+        let users = getCachedData(cacheKey);
 
-        if (!users) throw { 'statusCode': 404, 'message': 'No users found with images' };
-
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=image`);
+            setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -262,10 +268,13 @@ exports.getUsersWithImage = async (req, res) => {
 
 exports.getUsersWithSchool = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=school`);
+        const cacheKey = `users_with_school`;//`users_with_school_${req.params?.school}`;
+        let users = getCachedData(cacheKey);
 
-        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that school' };
-
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=school`);
+            if (users) setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -274,10 +283,13 @@ exports.getUsersWithSchool = async (req, res) => {
 
 exports.getUsersWithLevel = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=level`);
+        const cacheKey = `users_with_level`;
+        let users = getCachedData(cacheKey);
 
-        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that level' };
-
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=level`);
+            if (users) setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -286,10 +298,13 @@ exports.getUsersWithLevel = async (req, res) => {
 
 exports.getUsersWithFaculty = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=faculty`);
+        const cacheKey = `users_with_faculty`;
+        let users = getCachedData(cacheKey);
 
-        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that faculty' };
-
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=faculty`);
+            if (users) setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -298,10 +313,13 @@ exports.getUsersWithFaculty = async (req, res) => {
 
 exports.getUsersWithYear = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=year`);
+        const cacheKey = `users_with_year`;
+        let users = getCachedData(cacheKey);
 
-        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that year' };
-
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=year`);
+            if (users) setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -310,10 +328,13 @@ exports.getUsersWithYear = async (req, res) => {
 
 exports.getUsersWithInterests = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=interests`);
+        const cacheKey = `users_with_interests`;
+        let users = getCachedData(cacheKey);
 
-        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that interest' };
-
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=interests`);
+            if (users) setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -322,10 +343,13 @@ exports.getUsersWithInterests = async (req, res) => {
 
 exports.getUsersWithAbout = async (req, res) => {
     try {
-        const users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=about`);
+        const cacheKey = `users_with_about`;
+        let users = getCachedData(cacheKey);
 
-        if (!users) throw { 'statusCode': 404, 'message': 'No users found with that about' };
-
+        if (!users || users.length === 0) {
+            users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=about`);
+            if (users) setCachedData(cacheKey, users);
+        }
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -334,19 +358,14 @@ exports.getUsersWithAbout = async (req, res) => {
 
 exports.getTop10QuizzingUsers = async (req, res) => {
 
-    const cacheKey = 'top_10_quizzing_users';
 
     try {
+        const cacheKey = 'top_10_quizzing_users';
         let quizStats = getCachedData(cacheKey);
 
         if (!quizStats || quizStats.length === 0) {
             quizStats = await getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores/top-10-quizzing-users`);
-
-            if (quizStats) {
-                setCachedData(cacheKey, quizStats);
-            }
-        } else {
-            console.log('📦 Returning cached quiz ranking statistics');
+            if (quizStats) setCachedData(cacheKey, quizStats);
         }
 
         res.status(200).json(quizStats);
@@ -357,15 +376,15 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 };
 
 exports.getTop10Quizzes = async (req, res) => {
-    const cacheKey = 'top_10_quizzes';
 
     try {
+        const cacheKey = 'top_10_quizzes';
         let quizStatistics = getCachedData(cacheKey);
 
         if (!quizStatistics || quizStatistics.length === 0) {
 
             quizStatistics = await getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores/top-10-quizzes`);
-            setCachedData(cacheKey, quizStatistics);
+            if (quizStatistics) setCachedData(cacheKey, quizStatistics);
         }
 
         res.status(200).json(quizStatistics);
@@ -398,7 +417,13 @@ exports.getTop10Downloaders = async (req, res) => {
 
 exports.getTop10Notes = async (req, res) => {
     try {
-        let top10 = await getFromService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/top-10-notes`, null, req?.header('x-auth-token'));
+        const cacheKey = 'top_10_notes';
+        let top10 = getCachedData(cacheKey);
+
+        if (!top10 || top10.length === 0) {
+            top10 = await getFromService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/top-10-notes`, null, req?.header('x-auth-token'));
+            if (top10) setCachedData(cacheKey, top10);
+        }
         res.status(200).json(top10);
     } catch (err) {
         handleError(res, err);
@@ -406,7 +431,6 @@ exports.getTop10Notes = async (req, res) => {
 };
 
 exports.getDailyUserRegistration = async (req, res) => {
-    // const cacheKey = 'daily_user_registration';
 
     try {
         const cacheKey = 'daily_user_registration';

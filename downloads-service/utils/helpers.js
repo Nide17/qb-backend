@@ -46,41 +46,8 @@ const populateDownload = async (download) => {
     }
 };
 
-
-// Cache for frequently accessed data
-const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Helper function to get cached data
-const getCachedData = (key) => {
-    const cached = cache.get(key);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return cached.data;
-    }
-    cache.delete(key);
-    return null;
-};
-
-// Helper function to set cached data
-const setCachedData = (key, data) => {
-    cache.set(key, { data, timestamp: Date.now() });
-};
-
-// Clear expired cache entries periodically
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of cache.entries()) {
-        if (now - value.timestamp >= CACHE_TTL) {
-            cache.delete(key);
-        }
-    }
-}, CACHE_TTL);
-
 module.exports = {
     populateDownload,
     getFromService,
     validateRequiredFields,
-    getCachedData,
-    setCachedData,
-    cache,
 };

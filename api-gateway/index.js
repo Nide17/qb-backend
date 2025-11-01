@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const process = require('process');
-const { routeToService, getFromService, setCachedData, getCachedData, redisCache, memoryCache } = require('./utils/helpers');
+const { routeToService, getFromService, setCachedData, getCachedData, redisCache } = require('./utils/helpers');
 const { handleError } = require('./utils/error');
 const HealthMonitor = require('./utils/health-monitor');
 const socketManager = require('./utils/enhanced-socket');
@@ -405,10 +405,6 @@ app.get('/api/health', async (req, res) => {
             connected: redisCache.isConnected,
             stats: await redisCache.getStats()
         },
-        memory: {
-            size: memoryCache.size,
-            keys: Array.from(memoryCache.keys())
-        }
     };
 
     res.status(200).json(healthReport);
@@ -487,7 +483,6 @@ async function startServer() {
         });
     } catch (err) {
         console.error('Failed to start server:\n', err);
-        process.exit(1);
     }
 }
 
@@ -495,10 +490,8 @@ startServer();
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
-    process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, _promise) => {
     console.error('Unhandled Rejection:', reason);
-    // Consider sending notification to monitoring system
 });

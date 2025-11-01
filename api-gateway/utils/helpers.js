@@ -1,17 +1,13 @@
 const axios = require('axios');
-// const http = require('http');
-const http = require('http');
 const util = require('util');
+const http = require('http');
+const https = require('https');
 const RedisCacheManager = require('./redis-cache');
 
 // Initialize Redis cache manager
 const redisCache = new RedisCacheManager();
 
-// In-memory cache as fallback
-const memoryCache = new Map();
-const MEMORY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Enhanced cache functions with Redis fallback
+// Enhanced cache functions with Redis
 const getCachedData = async (key) => {
     try {
         // Try Redis first
@@ -23,21 +19,9 @@ const getCachedData = async (key) => {
             }
         }
 
-        // Fallback to memory cache
-        const cached = memoryCache.get(key);
-        if (cached && Date.now() - cached.timestamp < MEMORY_CACHE_TTL) {
-            console.log(`💾 Memory cache hit: ${key}`);
-            return cached.data;
-        }
-
         return null;
     } catch (error) {
         console.error('Cache get error:\n', error);
-        // Fallback to memory cache on error
-        const cached = memoryCache.get(key);
-        if (cached && Date.now() - cached.timestamp < MEMORY_CACHE_TTL) {
-            return cached.data;
-        }
         return null;
     }
 };
@@ -49,13 +33,8 @@ const setCachedData = async (key, data, ttl = 300) => {
             await redisCache.set(key, data, ttl);
             console.log(`📦 Redis cache set: ${key} (TTL: ${ttl}s)`);
         }
-
-        // Also set in memory cache as backup
-        memoryCache.set(key, { data, timestamp: Date.now() });
     } catch (error) {
         console.error('Cache set error:\n', error);
-        // Fallback to memory cache only
-        memoryCache.set(key, { data, timestamp: Date.now() });
     }
 };
 
@@ -120,13 +99,18 @@ const makeRequest = async (req, serviceName, serviceUrl) => {
                 validateStatus: function (status) {
                     return status >= 200 && status < 600;
                 },
-                timeout: 30000, // 30-second timeout
+                timeout: 60000, // 60-second timeout
                 maxContentLength: Infinity,
                 maxBodyLength: Infinity,
-                httpAgent: new http.Agent({
-                    keepAlive: true,
-                    keepAliveMsecs: 1000
-                })
+                httpAgent: process.env.NODE_ENV === 'production' ?
+                    new https.Agent({
+                        keepAlive: true,
+                        keepAliveMsecs: 1000
+                    }) :
+                    new http.Agent({
+                        keepAlive: true,
+                        keepAliveMsecs: 1000
+                    })
             });
             return response;
         } catch (error) {
@@ -259,5 +243,4 @@ module.exports = {
     getCachedData,
     setCachedData,
     redisCache,
-    memoryCache,
 };
