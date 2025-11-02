@@ -1,7 +1,7 @@
 const os = require('os');
 const process = require('process');
 const { handleError } = require('../utils/error');
-const { getCachedData, setCachedData, getFromService, cache, deleteCacheKey } = require('../utils/helpers');
+const { getCachedData, setCachedData, getFromService, redisCache, deleteCacheKey } = require('../utils/helpers');
 
 // Enhanced system monitoring
 exports.getSystemMetrics = async (req, res) => {
@@ -77,7 +77,6 @@ exports.getSystemMetrics = async (req, res) => {
         }
         res.status(200).json(metrics);
     } catch (err) {
-        console.log('\n\nError retrieving system metrics:', err);
         handleError(res, err);
     }
 };
@@ -190,7 +189,6 @@ exports.getDashboardStats = async (req, res) => {
 
         res.status(200).json(stats);
     } catch (err) {
-        console.log('\n\nError retrieving dashboard stats:', err);
         handleError(res, err);
     }
 };
@@ -370,7 +368,6 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
         res.status(200).json(quizStats);
     } catch (err) {
-        console.error('💥 Error in getTop10QuizzingUsers:', err.message);
         handleError(res, err);
     }
 };
@@ -410,7 +407,6 @@ exports.getTop10Downloaders = async (req, res) => {
         }
         res.status(200).json(downloadStats);
     } catch (err) {
-        console.error('💥 Error in getTop10Downloaders:', err.message);
         handleError(res, err);
     }
 };
@@ -485,7 +481,6 @@ exports.getLiveAnalytics = async (req, res) => {
 
         res.status(200).json(analytics);
     } catch (err) {
-        // console.log('\n\nError retrieving live analytics:', err);
         handleError(res, err);
     }
 };
@@ -494,7 +489,7 @@ exports.getLiveAnalytics = async (req, res) => {
 exports.clearStatsCache = async (req, res) => {
     try {
         // use helper
-        cache.clear();
+        redisCache.clearCache();
         res.status(200).json({ message: 'Statistics cache cleared successfully' });
     } catch (err) {
         handleError(res, err);

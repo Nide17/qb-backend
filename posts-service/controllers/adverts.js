@@ -4,7 +4,7 @@ const { deleteImageFromS3, validateRequiredFields } = require('../utils/helpers'
 
 exports.getAdverts = async (req, res) => {
     try {
-        const adverts = await Advert.find().sort({ createdAt: -1 });
+        const adverts = await Advert.find().sort({ createdAt: -1 }).select('-__v -updatedAt');
         if (!adverts) throw { 'message': 'No adverts found!', 'status': 204 };
         res.status(200).json(adverts);
     } catch (err) {

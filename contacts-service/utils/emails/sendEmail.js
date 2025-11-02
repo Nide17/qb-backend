@@ -47,7 +47,6 @@ const sendEmail = async (email, subject, payload, template, retries = 3) => {
     };
     return await sendActualMail(transporter, mailOptions, retries);
   } catch (error) {
-    console.error('Failed to send email:', error);
     return error.message;
   }
 };
@@ -63,7 +62,6 @@ const sendHtmlEmail = async (email, subject, html, retries = 3) => {
     };
     return await sendActualMail(transporter, mailOptions, retries);
   } catch (error) {
-    console.error('Failed to send HTML email:', error);
     return error.message;
   }
 };

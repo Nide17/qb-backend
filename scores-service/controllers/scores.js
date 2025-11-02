@@ -99,7 +99,6 @@ exports.getScoresForQuizCreator = async (req, res) => {
         if (err.message && err.message.includes('JavaScript heap out of memory')) {
             throw { 'status': 500, 'message': 'Memory exhaustion error' };
         }
-        console.log('\n\nError retrieving scores for quiz creator: ', err);
         handleError(res, err);
     }
 };
@@ -205,7 +204,6 @@ exports.getPopularQuizzes = async (req, res) => {
 
         res.status(200).json(popularQuizzes);
     } catch (err) {
-        console.log('\n\nError retrieving popular quizzes: ', err);
         handleError(res, err);
     }
 };
@@ -243,7 +241,6 @@ exports.getMonthlyUser = async (req, res) => {
                         count: monthlyUser[0].count
                     };
                 } catch (usererr) {
-                    console.log('Error fetching user data:', usererr);
                     monthlyUserData = null;
                 }
             } else {
@@ -255,7 +252,6 @@ exports.getMonthlyUser = async (req, res) => {
 
         res.status(200).json(monthlyUserData);
     } catch (err) {
-        console.log('\n\nError retrieving monthly user: ', err);
         handleError(res, err);
     }
 };
@@ -350,7 +346,6 @@ exports.createScore = async (req, res) => {
             });
         }
     } catch (err) {
-        console.log('Error creating score: ', err);
         handleError(res, err);
     }
 };
@@ -371,7 +366,6 @@ exports.deleteScore = async (req, res) => {
     }
 
     catch (err) {
-        console.log('Error deleting score: ', err);
         handleError(res, err);
     }
 };
@@ -414,7 +408,6 @@ exports.getTop10QuizzingUsers = async (req, res) => {
         }
         res.status(200).json(topUsers);
     } catch (err) {
-        console.log('\n\nError retrieving top users by quizzes:', err);
         handleError(res, err);
     }
 };
@@ -455,7 +448,6 @@ exports.getTop10Quizzes = async (req, res) => {
         }
         res.status(200).json(topQuizzes);
     } catch (err) {
-        console.log('\n\nError retrieving top quizzes:', err);
         handleError(res, err);
     }
 };

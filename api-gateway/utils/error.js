@@ -70,14 +70,8 @@ const handleError = (res, err, status) => {
 
     // Handle Axios Errors
     else if (err.isAxiosError) {
-        if (err.response) {
-            return res.status(err.response.status).json({
-                success: false,
-                message: err.response.data?.message || err.response.data?.msg || err.message,
-                code: `HTTP_${err.response.status}`,
-                timestamp: new Date().toISOString()
-            });
-        } else if (err.request) {
+        console.error('Axios error occurred:', err.code, err.name);
+        if (err.code === 'ECONNREFUSED') {
             return res.status(503).json({
                 success: false,
                 message: 'Service Unavailable',
@@ -85,13 +79,35 @@ const handleError = (res, err, status) => {
                 timestamp: new Date().toISOString()
             });
         }
+        // Aggregate errors
+        else if (err.response?.data?.errors) {
+            let numberOfErrors = err.response.data.errors.length;
+            let message = `${numberOfErrors} errors occurred: `;
+            console.error(`${numberOfErrors} errors occurred.`);
+            err.response.data.errors.forEach(e => message += `${e.message}, `);
+            return res.status(err.response.status).json({
+                success: false,
+                numberOfErrors,
+                message,
+                code: `HTTP_${err.response.status}`,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        else if (err.response) {
+            return res.status(err.response.status).json({
+                success: false,
+                message: err.response.data?.message || err.response.data?.msg || err.message,
+                code: `HTTP_${err.response.status}`,
+                timestamp: new Date().toISOString()
+            });
+        }
     }
 
     // Handle 404 errors
-    else if (err.code === 'ENOTFOUND') {
+    else if (err.code === 'ENOTFOUND' || status === 404 || err.status === 404) {
         return res.status(404).json({
             success: false,
-            message: 'Route does not exist',
+            message: err.message || 'Resource not found',
             code: 'NOT_FOUND',
             timestamp: new Date().toISOString()
         });

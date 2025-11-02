@@ -57,17 +57,12 @@ exports.createContact = async (req, res) => {
         }
 
         // Sending e-mail to contacted user
-        try {
-            sendEmail(
-                newContact.email,
-                'Thank you for contacting Quiz-Blog!',
-                { name: newContact.contact_name },
-                './template/contact.handlebars'
-            );
-        } catch (err) {
-            console.error('Error sending email to contacted user:', err);
-        }
-
+        sendEmail(
+            newContact.email,
+            'Thank you for contacting Quiz-Blog!',
+            { name: newContact.contact_name },
+            './template/contact.handlebars'
+        );
         // Notify admins
         await notifyAdmins(newContact);
 

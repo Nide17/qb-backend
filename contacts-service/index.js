@@ -80,8 +80,6 @@ app.get('/health', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error in /health route:', error);
-
         res.status(503).json({
             service: 'contacts-service',
             status: 'unhealthy',

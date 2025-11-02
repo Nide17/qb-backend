@@ -54,8 +54,6 @@ const sendEmail = async (email, subject, payload, template, retries = 3) => {
     };
     return await sendActualMail(transporter, mailOptions, retries);
   } catch (error) {
-    console.error(`Failed to send email to ${email}: ${error.message}`);
-    // Rethrow the error or handle it in another way
     throw { 'message': `Failed to send email to ${email}.`, 'status': 500 };
   }
 };
@@ -70,8 +68,7 @@ const sendHtmlEmail = async (email, subject, html, retries = 3) => {
       html: html,
     };
     return await sendActualMail(transporter, mailOptions, retries);
-  } catch (error) {
-    console.error(`Failed to send email to ${email}: ${error.message}`);
+  } catch (err) {
     throw { 'message': `Failed to send email to ${email}.`, 'status': 500 };
   }
 };

@@ -89,10 +89,10 @@ const handleError = (res, err, status) => {
     }
 
     // Handle 404 errors
-    else if (err.code === 'ENOTFOUND') {
+    else if (err.code === 'ENOTFOUND' || status === 404 || err.status === 404) {
         return res.status(404).json({
             success: false,
-            message: 'Route does not exist',
+            message: err.message || 'Resource not found',
             code: 'NOT_FOUND',
             timestamp: new Date().toISOString()
         });

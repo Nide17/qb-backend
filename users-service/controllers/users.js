@@ -82,7 +82,6 @@ exports.getAdminsEmails = async (req, res) => {
         const adminEmails = admins.map(admin => admin.email);
         return res.status(200).json(adminEmails);
     } catch (err) {
-        console.error(err);
         handleError(res, err);
     }
 };
@@ -307,7 +306,6 @@ exports.sendResetLink = async (req, res) => {
         ).then(async () => {
             res.status(200).json({ message: 'Reset email sent successfully', status: 200 });
         }).catch((err) => {
-            console.error(err);
             handleError(res, { status: 500, message: 'Failed to send reset link to your email!' }, 500);
         });
     } catch (err) {

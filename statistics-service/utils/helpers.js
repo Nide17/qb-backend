@@ -18,7 +18,7 @@ const getCachedData = async (key) => {
 
         return null;
     } catch (error) {
-        console.error('Cache get error:\n', error);
+        console.error('Cache get error:\n', error.message);
         return null;
     }
 };
@@ -31,9 +31,10 @@ const setCachedData = async (key, data, ttl = 300) => {
             console.log(`📦 Redis cache set: ${key} (TTL: ${ttl}s)`);
         }
     } catch (error) {
-        console.error('Cache set error:\n', error);
+        console.error('Cache set error:\n', error.message);
     }
 };
+
 // Helper function to call other services
 const getFromService = async (url, timeout = 40000, token) => {
 
@@ -54,25 +55,11 @@ const getFromService = async (url, timeout = 40000, token) => {
     }
 };
 
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes for statistics
-
-// Clear expired cache entries periodically
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of redisCache.entries()) {
-        if (now - value.timestamp >= CACHE_TTL) {
-            redisCache.delete(key);
-        }
-    }
-}, CACHE_TTL);
-
 module.exports = {
     getFromService,
     getCachedData,
     setCachedData,
+    redisCache,
+    deleteCacheKey: (key) => redisCache.del(key),
+    clearCache: () => redisCache.flush()
 };
-
-// expose cache utilities for controllers that need to clear or delete specific keys
-module.exports.cache = redisCache;
-module.exports.clearCache = () => redisCache.flush();
-module.exports.deleteCacheKey = (key) => redisCache.del(key);

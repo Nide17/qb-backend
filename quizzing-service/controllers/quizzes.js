@@ -390,7 +390,6 @@ exports.getDatabaseStats = async (req, res) => {
 
         res.status(200).json(dbStats);
     } catch (err) {
-        console.log('Error getting database stats:', err);
         handleError(res, err);
     }
 };

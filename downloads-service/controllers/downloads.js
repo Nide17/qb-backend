@@ -224,7 +224,6 @@ exports.getTop10Notes = async (req, res) => {
         }
         res.status(200).json(topNotes);
     } catch (err) {
-        console.log('\n\nError retrieving top notes:', err);
         handleError(res, err);
     }
 };

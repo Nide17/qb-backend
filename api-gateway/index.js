@@ -128,7 +128,6 @@ app.get('/api/aggregated/quiz/:id', async (req, res) => {
         await setCachedData(cacheKey, aggregatedData);
         res.status(200).json(aggregatedData);
     } catch (err) {
-        console.error('Error aggregating quiz data:\n', err);
         handleError(res, err);
     }
 });
@@ -187,7 +186,6 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
         await setCachedData(cacheKey, aggregatedData);
         res.status(200).json(aggregatedData);
     } catch (err) {
-        console.error('Error aggregating quizzes data:\n', err);
         handleError(res, err);
     }
 });
@@ -225,7 +223,6 @@ app.get('/api/aggregated/dashboard', async (req, res) => {
         await setCachedData(cacheKey, dashboardData);
         res.status(200).json(dashboardData);
     } catch (err) {
-        console.error('Error aggregating dashboard data:\n', err);
         handleError(res, err);
     }
 });
@@ -272,7 +269,6 @@ app.get('/api/aggregated/user/:id', async (req, res) => {
         await setCachedData(cacheKey, aggregatedData);
         res.status(200).json(aggregatedData);
     } catch (err) {
-        console.error('Error aggregating user data:\n', err);
         handleError(res, err);
     }
 });
@@ -318,7 +314,6 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
         await setCachedData(cacheKey, aggregatedData);
         res.status(200).json(aggregatedData);
     } catch (err) {
-        console.error('Error aggregating category data:\n', err);
         handleError(res, err);
     }
 });
@@ -374,7 +369,6 @@ app.get('/api/aggregated/search', async (req, res) => {
         await setCachedData(cacheKey, aggregatedData);
         res.status(200).json(aggregatedData);
     } catch (err) {
-        console.error('Error performing search:\n', err);
         handleError(res, err);
     }
 });
@@ -432,22 +426,6 @@ app.use((req, res, _next) => {
     }
 });
 
-// Error Handling Middleware
-app.use((err, req, res, _next) => {
-    console.error('Global error handler:', err.stack);
-    console.error('Error details:', err);
-
-    // Only send response if headers haven't been sent yet
-    if (!res.headersSent) {
-        res.status(err.status || 500).json({
-            success: false,
-            error: err.message || 'Internal Server Error',
-            code: 'INTERNAL_SERVER_ERROR',
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-
 // Socket.io connection handling is now managed by the enhanced socket manager
 // All socket events, rooms, and features are handled automatically
 // The socket manager provides improved real-time features including:
@@ -488,10 +466,5 @@ async function startServer() {
 
 startServer();
 
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, _promise) => {
-    console.error('Unhandled Rejection:', reason);
-});
+// Handle errors: takes res, err, status
+app.use((err, req, res, _next) => handleError(res, err));
