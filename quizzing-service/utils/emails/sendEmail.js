@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const createTransporter = () => {
-  
+
   return nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
@@ -56,7 +56,7 @@ const sendEmail = async (email, subject, payload, template, retries = 3) => {
   } catch (error) {
     console.error(`Failed to send email to ${email}: ${error.message}`);
     // Rethrow the error or handle it in another way
-    throw { 'message': `Failed to send email to ${email}.`, 'statusCode': 500 } ;
+    throw { 'message': `Failed to send email to ${email}.`, 'status': 500 };
   }
 };
 
@@ -72,7 +72,7 @@ const sendHtmlEmail = async (email, subject, html, retries = 3) => {
     return await sendActualMail(transporter, mailOptions, retries);
   } catch (error) {
     console.error(`Failed to send email to ${email}: ${error.message}`);
-    throw { 'message': `Failed to send email to ${email}.`, 'statusCode': 500 };
+    throw { 'message': `Failed to send email to ${email}.`, 'status': 500 };
   }
 };
 

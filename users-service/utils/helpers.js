@@ -51,9 +51,9 @@ const sendOtpEmail = async (user, otp) => {
 
 const hashPassword = async (password) => {
     const salt = await bcrypt.genSalt(10);
-    if (!salt) throw { 'message': 'Something went wrong with bcrypt', 'statusCode': 500 };
+    if (!salt) throw { 'message': 'Something went wrong with bcrypt', 'status': 500 };
     const hash = await bcrypt.hash(password, salt);
-    if (!hash) throw { 'message': 'Something went wrong hashing the password', 'statusCode': 500 };
+    if (!hash) throw { 'message': 'Something went wrong hashing the password', 'status': 500 };
     return hash;
 };
 
@@ -83,7 +83,7 @@ const populateSchoolDetails = async (user) => {
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw { 'message': `Missing required field: ${field.name}`, 'statusCode': 400 };
+            throw { 'message': `Missing required field: ${field.name}`, 'status': 400 };
         }
     }
 };
@@ -119,7 +119,7 @@ const deleteImageFromS3 = async (imagePath) => {
             }
         });
     } catch (err) {
-        throw { 'message': `Error deleting image: ${err.message}`, 'statusCode': 500 };
+        throw { 'message': `Error deleting image: ${err.message}`, 'status': 500 };
     }
 };
 

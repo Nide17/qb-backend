@@ -305,7 +305,7 @@ class HealthMonitor {
             const originalEnd = res.end;
             res.end = (...args) => {
                 const responseTime = Date.now() - startTime;
-                const isError = res.statusCode >= 400;
+                const isError = res.status >= 400;
                 this.recordRequest(responseTime, isError);
                 originalEnd.apply(res, args);
             };

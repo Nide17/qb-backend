@@ -7,7 +7,7 @@ const { populateUser, validateRequiredFields } = require('../utils/helpers');
 exports.getCourses = async (req, res) => {
     try {
         const courses = await Course.find().populate('courseCategory', 'title').sort({ createdAt: -1 }).select('title description courseCategory created_by');
-        if (!courses) throw {'message':'No courses found!','statusCode':204};
+        if (!courses) throw { 'message': 'No courses found!', 'status': 204 };
 
         // Populate created_by field
         const populatedCourses = await Promise.all(courses.map(async (course) => {
@@ -23,7 +23,7 @@ exports.getCourses = async (req, res) => {
 exports.getCoursesByCategory = async (req, res) => {
     try {
         let courses = await Course.find({ courseCategory: req.params.id }).populate('courseCategory', 'title').select('title description courseCategory created_by');
-        if (!courses) throw {'message':'No courses found!','statusCode':404};
+        if (!courses) throw { 'message': 'No courses found!', 'status': 404 };
 
         // Populate created_by field
         const populatedCourses = await Promise.all(courses.map(async (course) => {
@@ -66,7 +66,7 @@ exports.createCourse = async (req, res) => {
         ]);
 
         const course = await Course.findOne({ title });
-        if (course) throw {'message':'Course with this title already exists!','statusCode':409};
+        if (course) throw { 'message': 'Course with this title already exists!', 'status': 409 };
 
         const newCourse = new Course({
             title,
@@ -76,7 +76,7 @@ exports.createCourse = async (req, res) => {
         });
 
         const savedCourse = await newCourse.save();
-        if (!savedCourse) throw {'message':'Could not save course, try again!','statusCode':500};
+        if (!savedCourse) throw { 'message': 'Could not save course, try again!', 'status': 500 };
 
         res.status(200).json({
             _id: savedCourse._id,
@@ -94,7 +94,7 @@ exports.createCourse = async (req, res) => {
 exports.updateCourse = async (req, res) => {
     try {
         let course = await Course.findById(req.params.id);
-        if (!course) throw {'message':'Course not found!','statusCode':404};
+        if (!course) throw { 'message': 'Course not found!', 'status': 404 };
 
         const updatedCourse = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedCourse);
@@ -107,7 +107,7 @@ exports.deleteCourse = async (req, res) => {
     try {
 
         let course = await Course.findById(req.params.id);
-        if (!course) throw {'message':'Course not found!','statusCode':404};
+        if (!course) throw { 'message': 'Course not found!', 'status': 404 };
 
         // Delete chapters and notes belonging to this course
         await Chapter.deleteMany({ course: course._id });

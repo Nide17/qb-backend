@@ -15,7 +15,7 @@ exports.getUsers = async (req, res) => {
         const limit = req.query.limit ? parseInt(req.query.limit) : 0;
         const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
         let users = await User.find(filter ? { [filter]: { $exists: true } } : {}).limit(limit).sort({ register_date: -1 }).select('name email role register_date' + (filter ? ` ${filter}` : ''));
-        if (!users.length) throw { 'message': 'No users found!', 'statusCode': 204 };
+        if (!users.length) throw { 'message': 'No users found!', 'status': 204 };
 
         res.status(200).json(users);
     } catch (err) {
@@ -27,7 +27,7 @@ exports.getUsers = async (req, res) => {
 exports.getLatestUsers = async (req, res) => {
     try {
         let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
-        if (!users.length) throw { 'message': 'No users found!', 'statusCode': 404 };
+        if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -38,7 +38,7 @@ exports.getLatestUsers = async (req, res) => {
 exports.getAdminsCreators = async (req, res) => {
     try {
         let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
-        if (!adminsCreators.length) throw { 'message': 'No users found!', 'statusCode': 404 };
+        if (!adminsCreators.length) throw { 'message': 'No users found!', 'status': 404 };
         res.status(200).json(adminsCreators);
     } catch (err) {
         handleError(res, err);
@@ -50,7 +50,7 @@ exports.getOneUser = async (req, res) => {
 
     try {
         let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
-        if (!user) throw { 'message': 'User not found!', 'statusCode': 404 };
+        if (!user) throw { 'message': 'User not found!', 'status': 404 };
 
         // Populate user school details
         user = await populateSchoolDetails(user);
@@ -66,7 +66,7 @@ exports.loadUser = async (req, res) => {
     try {
         let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
 
-        if (!user) throw { 'message': 'No active session!', 'statusCode': 204 };
+        if (!user) throw { 'message': 'No active session!', 'status': 204 };
         user = await populateSchoolDetails(user);
         return res.status(200).json(user);
     } catch (err) {
@@ -78,7 +78,7 @@ exports.loadUser = async (req, res) => {
 exports.getAdminsEmails = async (req, res) => {
     try {
         const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
-        if (!admins) throw { 'message': 'No admins found!', 'statusCode': 404 };
+        if (!admins) throw { 'message': 'No admins found!', 'status': 404 };
         const adminEmails = admins.map(admin => admin.email);
         return res.status(200).json(adminEmails);
     } catch (err) {
@@ -91,7 +91,7 @@ exports.getAdminsEmails = async (req, res) => {
 exports.getBatchedUsers = async (req, res) => {
     try {
         const users = await User.find({ _id: { $in: req.body?.userIds } }).select('name email');
-        if (!users.length) throw { 'message': 'No users found!', 'statusCode': 404 };
+        if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -141,26 +141,26 @@ exports.login = async (req, res) => {
 
     try {
         const { email, password, confirmLogin } = req.body;
-        if (!email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
+        if (!email || !password) throw { 'status': 400, 'message': 'Please fill all fields' };
 
         const user = await User.findOne({ email });
-        if (!user) throw { 'statusCode': 404, 'message': 'User not found' };
+        if (!user) throw { 'status': 404, 'message': 'User not found' };
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) throw { 'statusCode': 400, 'message': 'Incorrect E-mail or Password!' };
+        if (!isMatch) throw { 'status': 400, 'message': 'Incorrect E-mail or Password!' };
 
         if (!user.verified && new Date(user.register_date) > new Date('2024-12-09')) {
             const otp = Math.floor(100000 + Math.random() * 900000).toString();
             await User.findOneAndUpdate({ email }, { otp });
             await sendEmail(email, otp);
-            throw { 'statusCode': 400, 'message': 'Account not verified yet, check your email for OTP!' };
+            throw { 'status': 400, 'message': 'Account not verified yet, check your email for OTP!' };
         }
 
         jwt.verify(user.current_token, process.env.JWT_SECRET, async (err) => {
             if (!user.current_token || err) {
 
                 const updatedUser = await updateUserToken(user);
-                if (!updatedUser) throw { 'statusCode': 500, 'message': 'Could not log you in, try again later!' };
+                if (!updatedUser) throw { 'status': 500, 'message': 'Could not log you in, try again later!' };
 
                 res.status(200).json({
                     current_token: updatedUser.current_token,
@@ -168,10 +168,10 @@ exports.login = async (req, res) => {
                 });
             } else {
                 if (!confirmLogin) {
-                    throw { 'statusCode': 401, 'message': 'Already logged in, Log out & use here', 'code': 'CONFIRM_ERR' };
+                    throw { 'status': 401, 'message': 'Already logged in, Log out & use here', 'code': 'CONFIRM_ERR' };
                 } else {
                     const confirmedUser = await updateUserToken(user);
-                    if (!confirmedUser) throw { 'statusCode': 500, 'message': 'Could not log you in, try again later!' };
+                    if (!confirmedUser) throw { 'status': 500, 'message': 'Could not log you in, try again later!' };
 
                     res.status(200).json({
                         current_token: confirmedUser.current_token,
@@ -193,7 +193,7 @@ exports.logout = async (req, res) => {
             { $set: { current_token: null } },
             { new: true }
         );
-        if (!loggedOutUser) throw { 'statusCode': 404, 'message': 'User not found!' };
+        if (!loggedOutUser) throw { 'status': 404, 'message': 'User not found!' };
         res.status(200).json({ message: 'Good Bye!', status: 200 });
     } catch (err) {
         handleError(res, err);
@@ -209,14 +209,14 @@ exports.register = async (req, res) => {
         const emailTest = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-        if (!name || !email || !password) throw { 'statusCode': 400, 'message': 'Please fill all fields' };
-        if (!emailTest.test(email)) throw { 'statusCode': 400, 'message': 'Please provide a valid email!' };
+        if (!name || !email || !password) throw { 'status': 400, 'message': 'Please fill all fields' };
+        if (!emailTest.test(email)) throw { 'status': 400, 'message': 'Please provide a valid email!' };
 
         const user = await User.findOne({ email });
         const hash = await hashPassword(password);
 
         if (user && (user.verified === true)) {
-            throw { 'statusCode': 400, 'message': 'User already exists, login instead!' };
+            throw { 'status': 400, 'message': 'User already exists, login instead!' };
         }
 
         // If user already and not verified, update user
@@ -230,7 +230,7 @@ exports.register = async (req, res) => {
             const newUser = new User({ name, email, password: hash, otp, verified: false });
             const savedUser = await newUser.save();
 
-            if (!savedUser) throw { statusCode: 500, message: 'Could not save user, try again!' };
+            if (!savedUser) throw { status: 500, message: 'Could not save user, try again!' };
 
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
             console.log('new user\'s otp: ', otp);
@@ -248,18 +248,18 @@ exports.verifyOTP = async (req, res) => {
     try {
 
         const { email, otp } = req.body;
-        if (!email || !otp) throw { 'statusCode': 400, 'message': 'Email and OTP are required!' };
+        if (!email || !otp) throw { 'status': 400, 'message': 'Email and OTP are required!' };
 
         const usr = await User.findOne({ email }).select('-password');
 
-        if (!usr) throw { 'statusCode': 400, 'message': 'User does not exist' };
-        if (otp !== usr.otp) throw { 'statusCode': 400, 'message': 'Invalid OTP provided.' };
+        if (!usr) throw { 'status': 400, 'message': 'User does not exist' };
+        if (otp !== usr.otp) throw { 'status': 400, 'message': 'Invalid OTP provided.' };
 
         await User.findOneAndUpdate({ email }, { verified: true });
 
         const updatedUser = await updateUserToken(usr);
 
-        if (!updatedUser) throw { statusCode: 500, message: 'Could not verify user, try again!' };
+        if (!updatedUser) throw { status: 500, message: 'Could not verify user, try again!' };
 
         res.status(200).json({
             current_token: updatedUser.current_token,
@@ -282,7 +282,7 @@ exports.sendResetLink = async (req, res) => {
         const email = req.body.email;
         const userToReset = await User.findOne({ email });
         if (!userToReset) {
-            throw { 'statusCode': 404, 'message': 'User with that email does not exist!' };
+            throw { 'status': 404, 'message': 'User with that email does not exist!' };
         }
 
         let token = await PswdResetToken.findOne({ userId: userToReset._id });
@@ -308,7 +308,7 @@ exports.sendResetLink = async (req, res) => {
             res.status(200).json({ message: 'Reset email sent successfully', status: 200 });
         }).catch((err) => {
             console.error(err);
-            handleError(res, { statusCode: 500, message: 'Failed to send reset link to your email!' }, 500);
+            handleError(res, { status: 500, message: 'Failed to send reset link to your email!' }, 500);
         });
     } catch (err) {
         handleError(res, err);
@@ -321,12 +321,12 @@ exports.sendNewPassword = async (req, res) => {
         const { userId, token, password } = req.body;
         let passwordResetToken = await PswdResetToken.findOne({ userId });
         if (!passwordResetToken) {
-            throw { 'statusCode': 400, 'message': 'Invalid or expired link, try resetting again!' };
+            throw { 'status': 400, 'message': 'Invalid or expired link, try resetting again!' };
         }
 
         const isValid = await bcrypt.compare(token, passwordResetToken.token);
         if (!isValid) {
-            throw { 'statusCode': 400, 'message': 'Invalid link, try resetting again!' };
+            throw { 'status': 400, 'message': 'Invalid link, try resetting again!' };
         }
 
         const hash = await hashPassword(password);
@@ -350,11 +350,11 @@ exports.sendNewPassword = async (req, res) => {
 // Update profile image
 exports.updateProfileImage = async (req, res) => {
     try {
-        if (!req.file) throw { 'statusCode': 400, 'message': 'Profile image is required!' };
+        if (!req.file) throw { 'status': 400, 'message': 'Profile image is required!' };
 
         const img_file = req.file;
         const user = await User.findOne({ _id: req.params.id });
-        if (!user) throw { 'statusCode': 404, 'message': 'Failed! user not exists!' };
+        if (!user) throw { 'status': 404, 'message': 'Failed! user not exists!' };
         user.image && await deleteImageFromS3(user.image);
 
         let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true });
@@ -382,7 +382,7 @@ exports.updateUser = async (req, res) => {
     try {
         let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true });
 
-        if (!user) throw { 'statusCode': 404, 'message': 'User not found!' };
+        if (!user) throw { 'status': 404, 'message': 'User not found!' };
 
         res.status(200).json(user);
     } catch (err) {
@@ -394,10 +394,10 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
-        if (!user) throw { 'statusCode': 404, 'message': 'User not found!' };
+        if (!user) throw { 'status': 404, 'message': 'User not found!' };
 
         const removedUser = await User.deleteOne({ _id: req.params.id });
-        if (removedUser.deletedCount === 0) throw { 'statusCode': 500, 'message': 'Failed to delete user!' };
+        if (removedUser.deletedCount === 0) throw { 'status': 500, 'message': 'Failed to delete user!' };
 
         res.status(200).json(user);
     } catch (err) {

@@ -16,7 +16,7 @@ exports.getFeedbacks = async (req, res) => {
         let feedbacks = await Feedback.find({}, {}, query).sort({ createdAt: -1 }).lean();
 
         if (!feedbacks || feedbacks.length === 0) {
-            throw { 'message': 'No feedbacks found!', 'statusCode': 204 };
+            throw { 'message': 'No feedbacks found!', 'status': 204 };
         }
 
         // Populate feedback details
@@ -34,7 +34,7 @@ exports.getFeedbacks = async (req, res) => {
 exports.getOneFeedback = async (req, res) => {
     try {
         let feedback = await Feedback.findById(req.params.id).select('quiz score user comment rating');
-        if (!feedback) throw { 'message': 'Feedback not found!', 'statusCode': 404 };
+        if (!feedback) throw { 'message': 'Feedback not found!', 'status': 404 };
 
         feedback = await populateFeedbackDetails(feedback);
         res.status(200).json(feedback);
@@ -57,7 +57,7 @@ exports.updateFeedback = async (req, res) => {
     try {
         const updatedFeedback = await Feedback.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedFeedback) {
-            throw { 'message': 'Feedback not found!', 'statusCode': 404 };
+            throw { 'message': 'Feedback not found!', 'status': 404 };
         }
         res.status(200).json(updatedFeedback);
     } catch (err) {
@@ -70,13 +70,13 @@ exports.deleteFeedback = async (req, res) => {
         const feedback = await Feedback.findById(req.params.id);
 
         if (!feedback) {
-            throw { 'message': 'Feedback not found!', 'statusCode': 404 };
+            throw { 'message': 'Feedback not found!', 'status': 404 };
         }
 
         const removedFeedback = await feedback.deleteOne();
 
         if (removedFeedback.deletedCount === 0) {
-            throw { 'message': 'Something went wrong while deleting!', 'statusCode': 503 };
+            throw { 'message': 'Something went wrong while deleting!', 'status': 503 };
         }
         res.status(200).json(feedback);
     } catch (err) {

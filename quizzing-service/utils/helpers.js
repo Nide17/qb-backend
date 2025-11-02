@@ -74,7 +74,7 @@ const populateCategory = async (category) => {
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw { 'message': `Missing required field: ${field.name}`, 'statusCode': 400 };
+            throw { 'message': `Missing required field: ${field.name}`, 'status': 400 };
         }
     }
 };
@@ -84,7 +84,7 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
     try {
         const quiz = await Quiz.findById(quizId);
 
-        if (!quiz) throw { 'message': 'Quiz not found while updating questions!', 'statusCode': 404 };
+        if (!quiz) throw { 'message': 'Quiz not found while updating questions!', 'status': 404 };
 
         if (action === 'add') {
             quiz.questions.push(questionId);
@@ -95,7 +95,7 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
         return true;
     } catch (err) {
         console.error(err.message);
-        throw { 'message': 'Error updating quiz questions!', 'statusCode': 500 };
+        throw { 'message': 'Error updating quiz questions!', 'status': 500 };
     }
 };
 
@@ -114,7 +114,7 @@ const deleteImageFromS3 = async (imagePath) => {
             }
         });
     } catch (err) {
-        throw { 'message': `Error deleting image: ${err.message}`, 'statusCode': 500 };
+        throw { 'message': `Error deleting image: ${err.message}`, 'status': 500 };
     }
 };
 

@@ -76,17 +76,17 @@ const notifyAdmins = async (newContact) => {
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw { message: `Missing required field: ${field.name}`, statusCode: 400 };
+            throw { message: `Missing required field: ${field.name}`, status: 400 };
         }
     }
 };
 
 // Lightweight validator for room message payloads used by room-messages controller
 const validateRoomMessageData = (data) => {
-    if (!data) throw { message: 'No data provided', statusCode: 400 };
+    if (!data) throw { message: 'No data provided', status: 400 };
     const required = ['senderID', 'receiverID', 'content', 'roomID'];
     required.forEach((key) => {
-        if (!data[key]) throw { message: `Missing required field: ${key}`, statusCode: 400 };
+        if (!data[key]) throw { message: `Missing required field: ${key}`, status: 400 };
     });
     return true;
 };

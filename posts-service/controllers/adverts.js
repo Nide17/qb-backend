@@ -5,7 +5,7 @@ const { deleteImageFromS3, validateRequiredFields } = require('../utils/helpers'
 exports.getAdverts = async (req, res) => {
     try {
         const adverts = await Advert.find().sort({ createdAt: -1 });
-        if (!adverts) throw { 'message': 'No adverts found!', 'statusCode': 204 };
+        if (!adverts) throw { 'message': 'No adverts found!', 'status': 204 };
         res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
@@ -16,7 +16,7 @@ exports.getOneAdvert = async (req, res) => {
     try {
         const advert = await Advert.findById(req.params.id);
 
-        if (!advert) throw { 'message': 'Advert not found!', 'statusCode': 404 };
+        if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
         res.status(200).json(advert);
     } catch (err) {
         handleError(res, err);
@@ -26,7 +26,7 @@ exports.getOneAdvert = async (req, res) => {
 exports.getActiveAdverts = async (req, res) => {
     try {
         const adverts = await Advert.find({ status: 'Active' }).sort({ createdAt: -1 });
-        if (!adverts) throw { 'message': 'No active adverts found!', 'statusCode': 404 };
+        if (!adverts) throw { 'message': 'No active adverts found!', 'status': 404 };
         res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
@@ -36,7 +36,7 @@ exports.getActiveAdverts = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
         const adverts = await Advert.find({ owner: req.params.id }).sort({ createdAt: -1 });
-        if (!adverts) throw { 'message': 'No adverts found!', 'statusCode': 404 };
+        if (!adverts) throw { 'message': 'No adverts found!', 'status': 404 };
         res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
@@ -56,7 +56,7 @@ exports.createAdvert = async (req, res) => {
             { name: 'email', value: email }
         ]);
 
-        if (!req.file) throw { message: 'Advert image file is required!', statusCode: 400 };
+        if (!req.file) throw { message: 'Advert image file is required!', status: 400 };
 
         const newAdvert = new Advert({
             caption,
@@ -70,7 +70,7 @@ exports.createAdvert = async (req, res) => {
         console.log('File exist.');
 
         const savedAdvert = await newAdvert.save();
-        if (!savedAdvert) throw { message: 'Something went wrong during creation!', statusCode: 500 };
+        if (!savedAdvert) throw { message: 'Something went wrong during creation!', status: 500 };
 
         res.status(200).json({
             _id: savedAdvert._id,
@@ -90,7 +90,7 @@ exports.createAdvert = async (req, res) => {
 exports.updateAdvert = async (req, res) => {
     try {
         const advert = await Advert.findById(req.params.id);
-        if (!advert) throw { 'message': 'Advert not found!', 'statusCode': 404 };
+        if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedAdvert);
@@ -102,7 +102,7 @@ exports.updateAdvert = async (req, res) => {
 exports.updateAdvertStatus = async (req, res) => {
     try {
         const advert = await Advert.findById(req.params.id);
-        if (!advert) throw { 'message': 'Advert not found!', 'statusCode': 404 };
+        if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
         res.status(200).json(updatedAdvert);
@@ -114,11 +114,11 @@ exports.updateAdvertStatus = async (req, res) => {
 exports.deleteAdvert = async (req, res) => {
     try {
         const advert = await Advert.findById(req.params.id);
-        if (!advert) throw { message: 'Advert not found!', statusCode: 404 };
+        if (!advert) throw { message: 'Advert not found!', status: 404 };
 
         advert.advert_image && await deleteImageFromS3(advert.advert_image);
         const removedAdvert = await advert.deleteOne();
-        if (removedAdvert.deletedCount === 0) throw { message: 'Something went wrong during deletion!', statusCode: 500 };
+        if (removedAdvert.deletedCount === 0) throw { message: 'Something went wrong during deletion!', status: 500 };
 
         res.status(200).json(advert);
     } catch (err) {
@@ -129,7 +129,7 @@ exports.deleteAdvert = async (req, res) => {
 exports.deleteAdvertImage = async (req, res) => {
     try {
         const advert = await Advert.findById(req.params.id);
-        if (!advert) throw { 'message': 'Advert not found!', 'statusCode': 404 };
+        if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { new: true });
         res.status(200).json(updatedAdvert);

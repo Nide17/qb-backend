@@ -8,7 +8,7 @@ exports.getQuestions = async (req, res) => {
 
     try {
         const questions = await Question.find().sort({ creation_date: -1 }).populate('category quiz');
-        if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'statusCode': 204 };
+        if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 204 };
         res.status(200).json(questions);
     } catch (err) {
         handleError(res, err);
@@ -18,7 +18,7 @@ exports.getQuestions = async (req, res) => {
 exports.getOneQuestion = async (req, res) => {
     try {
         const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
-        if (!question) throw { 'message': 'Question not found!', 'statusCode': 404 };
+        if (!question) throw { 'message': 'Question not found!', 'status': 404 };
         res.status(200).json(question);
     } catch (err) {
         handleError(res, err);
@@ -47,7 +47,7 @@ exports.createQuestion = async (req, res) => {
         let existingQtn = await Question.findOne({ questionText });
 
         if (existingQtn) {
-            throw { 'message': 'A question with same name already exists!', 'statusCode': 400 };
+            throw { 'message': 'A question with same name already exists!', 'status': 400 };
         }
 
         const newQuestion = new Question({
@@ -62,7 +62,7 @@ exports.createQuestion = async (req, res) => {
 
         const savedQuestion = await newQuestion.save();
         if (!savedQuestion) {
-            throw { 'message': 'Something went wrong during creation!', 'statusCode': 500 };
+            throw { 'message': 'Something went wrong during creation!', 'status': 500 };
         }
 
         // Update the Quiz on Question creation
@@ -70,7 +70,7 @@ exports.createQuestion = async (req, res) => {
 
         if (isQuizUpdated.deletedCount === 0) {
             Question.deleteOne(savedQuestion._id);
-            throw { 'message': 'Cannot update corresponding quiz!', 'statusCode': 500 };
+            throw { 'message': 'Cannot update corresponding quiz!', 'status': 500 };
         }
 
         res.status(200).json(savedQuestion);
@@ -87,7 +87,7 @@ exports.updateQuestion = async (req, res) => {
 
         // Find the Question by id
         const qtn = await Question.findOne({ _id: req.params.id });
-        if (!qtn) throw { 'message': 'Question not found', 'statusCode': 404 };
+        if (!qtn) throw { 'message': 'Question not found', 'status': 404 };
 
         // Changing question's quiz
         if (newQuiz && oldQuizID) {
@@ -131,7 +131,7 @@ exports.deleteQuestion = async (req, res) => {
     try {
         // Find the Question to delete by id first
         const question = await Question.findById(req.params.id);
-        if (!question) throw { 'message': 'Question not found', 'statusCode': 404 };
+        if (!question) throw { 'message': 'Question not found', 'status': 404 };
 
         // Delete existing image
         question.question_image && await deleteImageFromS3(question.question_image);
@@ -142,7 +142,7 @@ exports.deleteQuestion = async (req, res) => {
         // Delete the question
         const removedQuestion = await question.deleteOne();
 
-        if (removedQuestion.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'statusCode': 500 };
+        if (removedQuestion.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
 
         res.status(200).json(question);
     } catch (err) {

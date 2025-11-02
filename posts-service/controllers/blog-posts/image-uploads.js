@@ -5,7 +5,7 @@ const { populateUser, validateRequiredFields, deleteImageFromS3 } = require('../
 exports.getImageUploads = async (req, res) => {
     try {
         let imageUploads = await ImageUpload.find().sort({ createdAt: -1 });
-        if (!imageUploads) throw { 'message': 'No image uploads found!', 'statusCode': 204 };
+        if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 204 };
         imageUploads = await Promise.all(imageUploads.map(async (imgUp) => {
             imgUp = imgUp.toObject ? imgUp.toObject() : imgUp;
             imgUp.owner = await populateUser(imgUp.owner);
@@ -20,7 +20,7 @@ exports.getImageUploads = async (req, res) => {
 exports.getOneImageUpload = async (req, res) => {
     try {
         let imageUpload = await ImageUpload.findById(req.params.id);
-        if (!imageUpload) throw { statusCode: 404, message: 'Image upload not found!' };
+        if (!imageUpload) throw { status: 404, message: 'Image upload not found!' };
 
         // Populate user
         imageUpload = imageUpload.toObject ? imageUpload.toObject() : imageUpload;
@@ -34,7 +34,7 @@ exports.getOneImageUpload = async (req, res) => {
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
         let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 });
-        if (!imageUploads) throw { 'message': 'No image uploads found!', 'statusCode': 404 };
+        if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
         imageUploads = await Promise.all(imageUploads.map(async (imgUp) => {
             imgUp = imgUp.toObject ? imgUp.toObject() : imgUp;
@@ -53,7 +53,7 @@ exports.createImageUpload = async (req, res) => {
     try {
         const { imageTitle, owner } = req.body;
 
-        if (!req.file) throw { message: 'Image file is required!', statusCode: 400 };
+        if (!req.file) throw { message: 'Image file is required!', status: 400 };
 
         const imgUp_file = req.file;
 
@@ -65,7 +65,7 @@ exports.createImageUpload = async (req, res) => {
         ]);
         // Check for duplicate imageTitle
         const imgUp = await ImageUpload.findOne({ imageTitle });
-        if (imgUp) throw { 'message': 'Failed! Image with that name already exists!', 'statusCode': 400 };
+        if (imgUp) throw { 'message': 'Failed! Image with that name already exists!', 'status': 400 };
 
         const newImgUp = new ImageUpload({
             imageTitle,
@@ -74,7 +74,7 @@ exports.createImageUpload = async (req, res) => {
         });
 
         const savedImgUp = await newImgUp.save();
-        if (!savedImgUp) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'statusCode': 500 };
+        if (!savedImgUp) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
 
         res.status(200).json({
             _id: savedImgUp._id,
@@ -92,7 +92,7 @@ exports.createImageUpload = async (req, res) => {
 exports.updateImageUpload = async (req, res) => {
     try {
         const imageUpload = await ImageUpload.findById(req.params.id);
-        if (!imageUpload) throw { 'message': 'Image upload not found!', 'statusCode': 404 };
+        if (!imageUpload) throw { 'message': 'Image upload not found!', 'status': 404 };
 
         const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedImageUpload);
@@ -105,13 +105,13 @@ exports.deleteImageUpload = async (req, res) => {
 
     try {
         const imageUpload = await ImageUpload.findById(req.params.id);
-        if (!imageUpload) throw { 'message': 'Image upload is not found!', 'statusCode': 404 };
+        if (!imageUpload) throw { 'message': 'Image upload is not found!', 'status': 404 };
 
         imageUpload.uploadImage && await deleteImageFromS3(imageUpload.uploadImage);
         const removedImageUpload = await imageUpload.deleteOne();
 
         if (removedImageUpload.deletedCount === 0)
-            throw { 'message': 'Something went wrong while deleting!', 'statusCode': 503 };
+            throw { 'message': 'Something went wrong while deleting!', 'status': 503 };
 
         res.status(200).json(imageUpload);
     } catch (err) {

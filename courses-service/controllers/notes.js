@@ -28,8 +28,8 @@ const findNotes = async (query, limit = 0) => {
 exports.getNotes = async (req, res) => {
 
     try {
-    const notes = await findNotes({}, 0);
-    res.status(200).json(notes);
+        const notes = await findNotes({}, 0);
+        res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
     }
@@ -39,8 +39,8 @@ exports.getLimitedNotes = async (req, res) => {
 
     try {
         const limit = parseInt(req.query.limit) || 5;
-    const notes = await findNotes({}, limit);
-    res.status(200).json(notes);
+        const notes = await findNotes({}, limit);
+        res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
     }
@@ -48,8 +48,8 @@ exports.getLimitedNotes = async (req, res) => {
 
 exports.getNotesByCategory = async (req, res) => {
     try {
-    const notes = await findNotes({ courseCategory: req.params.id });
-    res.status(200).json(notes);
+        const notes = await findNotes({ courseCategory: req.params.id });
+        res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
     }
@@ -57,8 +57,8 @@ exports.getNotesByCategory = async (req, res) => {
 
 exports.getNotesByChapter = async (req, res) => {
     try {
-    const notes = await findNotes({ chapter: req.params.id });
-    res.status(200).json(notes);
+        const notes = await findNotes({ chapter: req.params.id });
+        res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
     }
@@ -69,7 +69,7 @@ exports.getOneNotes = async (req, res) => {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
         const notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title');
-        if (!notes) throw {'message':'Notes not found!','statusCode':404};
+        if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
 
         let notesObj = notes.toObject ? notes.toObject() : notes;
         if (notes.uploaded_by) {
@@ -87,7 +87,7 @@ exports.createNotes = async (req, res) => {
     try {
         const not_file = req.file;
 
-        if (!not_file) throw { message: 'Notes file is required!', statusCode: 400 };
+        if (!not_file) throw { message: 'Notes file is required!', status: 400 };
 
         const { title, description, chapter, course, courseCategory, uploaded_by } = req.body;
         validateRequiredFields([
@@ -100,7 +100,7 @@ exports.createNotes = async (req, res) => {
         ]);
 
         const notes = await Notes.findOne({ title });
-        if (notes) throw { message: 'Notes with that title arleady exists!', statusCode: 400 };
+        if (notes) throw { message: 'Notes with that title arleady exists!', status: 400 };
 
         const newNotes = new Notes({
             title,
@@ -112,7 +112,7 @@ exports.createNotes = async (req, res) => {
         });
 
         const savedNotes = await newNotes.save();
-        if (!savedNotes) throw { message: 'Could not save notes, try again!', statusCode: 500 };
+        if (!savedNotes) throw { message: 'Could not save notes, try again!', status: 500 };
 
         res.status(200).json(savedNotes);
 
@@ -127,7 +127,7 @@ exports.updateNotes = async (req, res) => {
 
         const notes = await Notes.findById(req.params.id);
 
-        if (!notes) throw {'message':'Notes not found!','statusCode':404};
+        if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
 
         let updates = { ...req.body };
         if (not_file) updates.notes_file = not_file.location;
@@ -155,7 +155,7 @@ exports.updateNotesQuizzes = async (req, res) => {
 exports.removeQuizFromNotes = async (req, res) => {
     try {
         const note = await Notes.findOne({ _id: req.params.id });
-        if (!note) throw {'message':'Notes not found!','statusCode':404};
+        if (!note) throw { 'message': 'Notes not found!', 'status': 404 };
 
         await Notes.updateOne(
             { _id: note._id },
@@ -171,7 +171,7 @@ exports.removeQuizFromNotes = async (req, res) => {
 exports.deleteNotes = async (req, res) => {
     try {
         const notes = await Notes.findById(req.params.id);
-        if (!notes) throw {'message':'Notes not found!','statusCode':404};
+        if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
 
         // Delete this notes entry
         await notes.deleteOne();
@@ -185,12 +185,12 @@ exports.getBatchedNotes = async (req, res) => {
     try {
         const ids = req.body.noteIds;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            throw {'message':'Invalid or missing note IDs!','statusCode':400};
+            throw { 'message': 'Invalid or missing note IDs!', 'status': 400 };
         }
 
         const notes = await Notes.find({ _id: { $in: ids } }).populate('chapter course courseCategory', 'title');
         if (!notes.length) {
-            throw {'message':'No notes found!','statusCode':204};
+            throw { 'message': 'No notes found!', 'status': 204 };
         }
 
         res.status(200).json(notes);

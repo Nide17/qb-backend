@@ -9,10 +9,10 @@ exports.initialize = (httpServer) => {
     io = socketManager.initialize(httpServer);
 
     console.log('✨ Contacts Service: Enhanced Socket.IO initialized');
-    
+
     // Set up contacts-specific event handlers
     setupContactsEvents();
-    
+
     return io;
 };
 
@@ -56,7 +56,7 @@ function setupContactsEvents() {
 // Export functions for compatibility with existing code
 exports.getIO = () => {
     if (!io) {
-        throw { message: 'Socket.io not initialized!', statusCode: 500 };
+        throw { message: 'Socket.io not initialized!', status: 500 };
     }
     return io;
 };

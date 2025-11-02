@@ -231,7 +231,7 @@ exports.get50NewUsers = async (req, res) => {
         res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in get50NewUsers:', err.message);
-        throw { 'statusCode': 503, 'message': 'Users temporarily unavailable' };
+        throw { 'status': 503, 'message': 'Users temporarily unavailable' };
     }
 };
 
@@ -247,7 +247,7 @@ exports.getAllUsers = async (req, res) => {
         res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in getAllUsers:', err.message);
-        throw { 'statusCode': 503, 'message': 'Users temporarily unavailable' };
+        throw { 'status': 503, 'message': 'Users temporarily unavailable' };
     }
 };
 

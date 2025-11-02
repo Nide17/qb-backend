@@ -8,7 +8,7 @@ const options = {
 };
 
 const req = http.request(options, (res) => {
-  if (res.statusCode === 200) {
+  if (res.status === 200) {
     process.exit(0);
   } else {
     process.exit(1);

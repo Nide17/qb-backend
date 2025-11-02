@@ -100,8 +100,7 @@ const handleError = (res, err, status) => {
     }
 
     // Default error response
-    const statusCode = status || err.statusCode || 500;
-    res.status(statusCode).json({
+    res.status(status ? status : err.status || 500).json({
         success: false,
         message: err?.message || 'Internal server error',
         code: err.code || 'INTERNAL_ERROR',

@@ -9,7 +9,7 @@ exports.getCourseCategories = async (req, res) => {
 
     try {
         const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
-        if (!courseCategories) throw {'message':'No course categories found!','statusCode':204};
+        if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 204 };
         res.status(200).json(courseCategories);
     } catch (err) {
         handleError(res, err);
@@ -20,7 +20,7 @@ exports.getOneCategory = async (req, res) => {
     try {
         const category = await CourseCategory.findById(req.params.id).select('title');
 
-        if (!category) throw {'message':'Category not found','statusCode':404};
+        if (!category) throw { 'message': 'Category not found', 'status': 404 };
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);
@@ -39,11 +39,11 @@ exports.createCategory = async (req, res) => {
         ]);
 
         const category = await CourseCategory.findOne({ title });
-        if (category) throw {'message':'Category with this title already exists!','statusCode':409};
+        if (category) throw { 'message': 'Category with this title already exists!', 'status': 409 };
 
         const newCategory = new CourseCategory({ title, description, created_by });
         const savedCategory = await newCategory.save();
-        if (!savedCategory) throw {'message':'Something went wrong during creation!','statusCode':503};
+        if (!savedCategory) throw { 'message': 'Something went wrong during creation!', 'status': 503 };
 
         res.status(200).json(savedCategory);
     } catch (err) {
@@ -54,7 +54,7 @@ exports.createCategory = async (req, res) => {
 exports.updateCategory = async (req, res) => {
     try {
         const category = await CourseCategory.findById(req.params.id);
-        if (!category) throw {'message':'Category not found!','statusCode':404};
+        if (!category) throw { 'message': 'Category not found!', 'status': 404 };
 
         const updatedCategory = await CourseCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedCategory);
@@ -66,7 +66,7 @@ exports.updateCategory = async (req, res) => {
 exports.deleteCategory = async (req, res) => {
     try {
         const category = await CourseCategory.findById(req.params.id);
-        if (!category) throw {'message':'Category not found!','statusCode':404};
+        if (!category) throw { 'message': 'Category not found!', 'status': 404 };
 
         // Delete related data
         await Promise.all([
@@ -76,7 +76,7 @@ exports.deleteCategory = async (req, res) => {
         ]);
 
         const removedCategory = await CourseCategory.deleteOne({ _id: req.params.id });
-        if (removedCategory.deletedCount === 0) throw {'message':'Something went wrong while deleting!','statusCode':503};
+        if (removedCategory.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 503 };
 
         res.status(200).json(category);
     } catch (err) {

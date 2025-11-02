@@ -44,7 +44,7 @@ const populateUser = async (userId) => {
 const validateRequiredFields = (fields) => {
     for (const field of fields) {
         if (!field.value) {
-            throw { 'message': `Missing required field: ${field.name}`, 'statusCode': 400 };
+            throw { 'message': `Missing required field: ${field.name}`, 'status': 400 };
         }
     }
 };
@@ -64,7 +64,7 @@ const deleteImageFromS3 = async (imagePath) => {
             }
         });
     } catch (err) {
-        throw { 'message': `Error deleting image: ${err.message}`, 'statusCode': 500 };
+        throw { 'message': `Error deleting image: ${err.message}`, 'status': 500 };
     }
 };
 

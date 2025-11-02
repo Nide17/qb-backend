@@ -59,7 +59,7 @@ exports.getCommentsByQuestion = async (req, res) => {
 exports.getOneQuestionComment = async (req, res) => {
     try {
         let questionComment = await QuestionComment.findById(req.params.id).select('comment sender question quiz status createdAt updatedAt');
-        if (!questionComment) throw { 'message': 'QuestionComment not found!', 'statusCode': 404 };
+        if (!questionComment) throw { 'message': 'QuestionComment not found!', 'status': 404 };
         questionComment = await populateComment(questionComment) || questionComment;
         res.status(200).json(questionComment);
     } catch (err) {
@@ -82,7 +82,7 @@ exports.createQuestionComment = async (req, res) => {
 
     // Simple validation
     if (!comment || !sender || !quiz || !question) {
-        throw { 'message': 'There are empty fields', 'statusCode': 400 };
+        throw { 'message': 'There are empty fields', 'status': 400 };
     }
 
     try {
@@ -94,7 +94,7 @@ exports.createQuestionComment = async (req, res) => {
         });
 
         const savedQuestionComment = await newQuestionComment.save();
-        if (!savedQuestionComment) throw { 'message': 'Something went wrong during creation!', 'statusCode': 500 };
+        if (!savedQuestionComment) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
 
         res.status(200).json({
             _id: savedQuestionComment._id,

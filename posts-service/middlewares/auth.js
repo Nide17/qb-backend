@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const { handleError } = require('../utils/error');
 
 const verifyToken = (req) => {
   const token = req.header('x-auth-token');
@@ -11,7 +10,7 @@ const verifyToken = (req) => {
     req.user = decoded;
     return decoded;
   } catch {
-    throw { status: 401, message: 'Token is not valid or expired' };
+    throw { status: 401, message: 'Token is not valid or expired', code: "TOKEN_EXPIRED" };
   }
 };
 
@@ -20,7 +19,7 @@ const auth = (req, res, next) => {
     verifyToken(req);
     return next();
   } catch (_err) {
-    return handleError(res, _err);
+    throw _err;
   }
 };
 
@@ -31,7 +30,7 @@ const authRole = (roles) => (req, res, next) => {
     if (Array.isArray(roles) && roles.includes(req.user.role)) return next();
     throw { status: 403, message: 'Unauthorized' };
   } catch (_err) {
-    return handleError(res, _err);
+    throw _err;
   }
 };
 

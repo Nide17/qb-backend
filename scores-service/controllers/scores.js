@@ -20,7 +20,7 @@ exports.getScores = async (req, res) => {
         let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
 
         if (!scores || scores.length === 0) {
-            throw { 'statusCode': 204, 'message': 'No scores found' };
+            throw { 'status': 204, 'message': 'No scores found' };
         }
 
         if (req.query?.filter === 'stats') {
@@ -41,7 +41,7 @@ exports.getScores = async (req, res) => {
     } catch (err) {
         // Check if this is a memory exhaustion error
         if (err.message && err.message.includes('JavaScript heap out of memory')) {
-            throw { 'statusCode': 500, 'message': 'Memory exhaustion error' };
+            throw { 'status': 500, 'message': 'Memory exhaustion error' };
         }
         handleError(res, err);
     }
@@ -57,7 +57,7 @@ exports.getScoresByTaker = async (req, res) => {
 
         if (!scores || scores.length === 0) {
             scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).exec();
-            if (!scores || scores.length === 0) throw { 'statusCode': 404, 'message': 'You have no scores. Take some quizzes!' };
+            if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
 
             // Populate scores
             scores = await Promise.all(scores.map(score => populateScore(score)));
@@ -81,7 +81,7 @@ exports.getScoresForQuizCreator = async (req, res) => {
         let scores = await Score.find().skip(skip).limit(PAGE_SIZE).sort({ test_date: -1 }).exec();
 
         if (!scores || scores.length === 0) {
-            throw { statusCode: 404, message: '404' };
+            throw { status: 404, message: '404' };
         }
 
         // Populate scores
@@ -97,7 +97,7 @@ exports.getScoresForQuizCreator = async (req, res) => {
     } catch (err) {
         // Check if this is a memory exhaustion error
         if (err.message && err.message.includes('JavaScript heap out of memory')) {
-            throw { 'statusCode': 500, 'message': 'Memory exhaustion error' };
+            throw { 'status': 500, 'message': 'Memory exhaustion error' };
         }
         console.log('\n\nError retrieving scores for quiz creator: ', err);
         handleError(res, err);
@@ -124,7 +124,7 @@ exports.getOneScore = async (req, res) => {
         if (!scoreObj) {
             // Throw an object that the controllers can pass to handleError
             console.log('Score not found!');
-            throw { statusCode: 404, message: 'Score not found!' };
+            throw { status: 404, message: 'Score not found!' };
         }
 
         // Send the populated score as an HTTP response
@@ -147,7 +147,7 @@ exports.getQuizRanking = async (req, res) => {
             scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).exec();
             if (!scores || scores.length === 0) {
                 console.warn(`No scores found for the ${req.params.id} quiz`);
-                throw { 'statusCode': 404, 'message': 'No scores to display' };
+                throw { 'status': 404, 'message': 'No scores to display' };
             }
 
             // Populate scores
@@ -269,7 +269,7 @@ exports.createScore = async (req, res) => {
 
         // Simple validation
         if (!id || !out_of || !review || !taken_by) {
-            throw { statusCode: 400, message: '400' };
+            throw { status: 400, message: '400' };
         }
 
         else {
@@ -280,7 +280,7 @@ exports.createScore = async (req, res) => {
             ]);
 
             if (existingScore.length > 0) {
-                throw { 'statusCode': 400, 'message': 'Score duplicate! You have already saved this score!' };
+                throw { 'status': 400, 'message': 'Score duplicate! You have already saved this score!' };
             }
 
             if (recentScoreExist.length > 0) {
@@ -289,7 +289,7 @@ exports.createScore = async (req, res) => {
                 let seconds = Math.round((now - testDate) / 1000);
 
                 if (seconds < 60) {
-                    throw { 'statusCode': 400, 'message': 'Score duplicate! You took this quiz in less than a minute ago!' };
+                    throw { 'status': 400, 'message': 'Score duplicate! You took this quiz in less than a minute ago!' };
                 }
             }
 
@@ -306,7 +306,7 @@ exports.createScore = async (req, res) => {
 
             const savedScore = await newScore.save();
 
-            if (!savedScore) throw { 'message': 'Something went wrong during creation!', 'statusCode': 500 };
+            if (!savedScore) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
 
             // Clear relevant cache entries
             const cacheKeysToDelete = [`scores_user_${taken_by}`, `ranking_${quiz}`, 'popular_quizzes', 'monthly_user'];
@@ -360,12 +360,12 @@ exports.deleteScore = async (req, res) => {
         //Find the Score to delete by id first
         const score = await Score.findOne({ _id: req.params.id });
 
-        if (!score) throw { 'statusCode': 404, 'message': 'No scores found' };
+        if (!score) throw { 'status': 404, 'message': 'No scores found' };
 
         // Delete the Score
         const removedScore = await Score.deleteOne({ _id: req.params.id });
 
-        if (removedScore.deletedCount === 0) throw { 'statusCode': 500, 'message': 'Something went wrong while deleting!' };
+        if (removedScore.deletedCount === 0) throw { 'status': 500, 'message': 'Something went wrong while deleting!' };
 
         res.status(200).json(score);
     }

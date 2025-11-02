@@ -53,7 +53,7 @@ exports.createContact = async (req, res) => {
     try {
         const newContact = await Contact.create(req.body);
         if (!newContact) {
-            throw { 'statusCode': 500, 'message': 'Something went wrong!' };
+            throw { 'status': 500, 'message': 'Something went wrong!' };
         }
 
         // Sending e-mail to contacted user
@@ -92,7 +92,7 @@ exports.updateContact = async (req, res) => {
         );
 
         if (!newMessage) {
-            throw { 'statusCode': 500, 'message': 'Something went wrong while trying to update the contact' };
+            throw { 'status': 500, 'message': 'Something went wrong while trying to update the contact' };
         }
 
         // Send Reply email

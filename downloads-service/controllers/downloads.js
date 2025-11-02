@@ -18,10 +18,10 @@ exports.getDownloads = async (req, res) => {
         let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();
 
         if (!downloads || downloads.length === 0) {
-            throw {'message':'No downloads found!','statusCode':204};
+            throw { 'message': 'No downloads found!', 'status': 204 };
         }
 
-    if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads);
+        if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads);
 
         // Populate downloads
         for (let i = 0; i < downloads.length; i++) {
@@ -45,7 +45,7 @@ exports.getOneDownload = async (req, res) => {
     try {
         let download = await Download.findById(req.params.id).lean();
         if (!download) {
-            throw {'message':'Download not found!','statusCode':404};
+            throw { 'message': 'Download not found!', 'status': 404 };
         }
         res.status(200).json(download);
     } catch (err) {
@@ -59,7 +59,7 @@ exports.getNotesDownloader = async (req, res) => {
         let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
 
         if (!downloads || downloads.length === 0) {
-            throw {'message':'No downloads found for this user','statusCode':404};
+            throw { 'message': 'No downloads found for this user', 'status': 404 };
         }
 
         // Populate downloads
@@ -77,7 +77,7 @@ exports.getCreatorDownloads = async (req, res) => {
     try {
         let downloads = await Download.find().lean();
         if (!downloads || downloads.length === 0) {
-            throw {'message':'No downloads found for this course','statusCode':404};
+            throw { 'message': 'No downloads found for this course', 'status': 404 };
         }
 
         // Populate downloads
@@ -115,7 +115,7 @@ exports.createDownload = async (req, res) => {
             let seconds = Math.round((now - downDate) / 1000);
 
             if (seconds < 5) {
-                throw {'message':'Download with same time saved already!','statusCode':400};
+                throw { 'message': 'Download with same time saved already!', 'status': 400 };
             }
         }
 
@@ -129,7 +129,7 @@ exports.createDownload = async (req, res) => {
 
         const savedDownload = await newDownload.save();
         if (!savedDownload) {
-            throw {'message':'Something went wrong during creation!','statusCode':400};
+            throw { 'message': 'Something went wrong during creation!', 'status': 400 };
         }
 
         res.status(200).json({
@@ -148,10 +148,10 @@ exports.createDownload = async (req, res) => {
 exports.deleteDownload = async (req, res) => {
     try {
         const download = await Download.findById(req.params.id);
-        if (!download) throw { message: 'Download not found!', statusCode: 404 };
+        if (!download) throw { message: 'Download not found!', status: 404 };
 
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
-        if (removedDownload.deletedCount === 0) throw { message: 'Something went wrong while deleting!', statusCode: 500 };
+        if (removedDownload.deletedCount === 0) throw { message: 'Something went wrong while deleting!', status: 500 };
         res.status(200).json(download);
     } catch (err) {
         handleError(res, err);
@@ -168,7 +168,7 @@ exports.getTop10Downloaders = async (req, res) => {
             { $limit: 10 }
         ]);
 
-    if (topDownloaders.length > 0) {
+        if (topDownloaders.length > 0) {
 
             const userIds = topDownloaders.map(u => u?._id?.toString());
             const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, 200000);
@@ -197,7 +197,7 @@ exports.getTop10Notes = async (req, res) => {
         let topNotes = getCachedData(cacheKey);
 
         if (!topNotes || topNotes.length === 0) {
-            
+
             const topNotesData = await Download.aggregate([
                 { $group: { _id: '$notes', totalDownloaded: { $sum: 1 } } },
                 { $sort: { totalDownloaded: -1 } },
@@ -307,6 +307,6 @@ exports.getDatabaseStats = async (req, res) => {
         res.status(200).json(dbStats);
     } catch (err) {
         console.log('Error getting database stats:', err.message);
-        throw {'message':'Failed to get database statistics','statusCode':500};
+        throw { 'message': 'Failed to get database statistics', 'status': 500 };
     }
 };
