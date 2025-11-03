@@ -194,34 +194,37 @@ exports.getTop10Notes = async (req, res) => {
     const cacheKey = 'top_10_notes';
     try {
         // Check cache first
-        let topNotes = getCachedData(cacheKey);
-
-        if (!topNotes || topNotes.length === 0) {
-
-            const topNotesData = await Download.aggregate([
-                { $group: { _id: '$notes', totalDownloaded: { $sum: 1 } } },
-                { $sort: { totalDownloaded: -1 } },
-                { $limit: 10 }
-            ]).exec();
-
-            if (topNotesData.length > 0) {
-
-                const noteIds = topNotesData.map(note => note?._id?.toString());
-                const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { noteIds }, 200000);
-
-                topNotes = topNotesData.map(nt => {
-                    const note = notes?.data?.find(data => String(data._id) === String(nt._id)) || {};
-                    return {
-                        _id: nt._id,
-                        title: note.title || 'Unknown Note',
-                        courseCategory: note.courseCategory || 'Uncategorized',
-                        slug: note.slug || '',
-                        totalDownloaded: nt.totalDownloaded
-                    };
-                });
-                setCachedData(cacheKey, topNotes);
-            }
+        const cached = await getCachedData(cacheKey);
+        
+        if (cached) {
+            return res.status(200).json(cached);
         }
+
+        // Get top notes aggregation
+        const topNotesData = await Download.aggregate([
+            { $group: { _id: '$notes', totalDownloaded: { $sum: 1 } } },
+            { $sort: { totalDownloaded: -1 } },
+            { $limit: 10 }
+        ]).exec();
+
+        if (topNotesData.length > 0) {
+
+            const noteIds = topNotesData.map(note => note?._id?.toString());
+            const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { noteIds }, 200000);
+
+            let topNotes = topNotesData.map(nt => {
+                const note = notes?.data?.find(data => String(data._id) === String(nt._id)) || {};
+                return {
+                    _id: nt._id,
+                    title: note.title || 'Unknown Note',
+                    courseCategory: note.courseCategory || 'Uncategorized',
+                    slug: note.slug || '',
+                    totalDownloaded: nt.totalDownloaded
+                };
+            });
+            setCachedData(cacheKey, topNotes);
+        }
+
         res.status(200).json(topNotes);
     } catch (err) {
         handleError(res, err);

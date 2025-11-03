@@ -5,6 +5,7 @@ const os = require('os');
 const process = require('process');
 const dotenv = require('dotenv');
 const { handleError } = require('./utils/error');
+const { redisCache } = require('./utils/helpers');
 
 // Config
 dotenv.config();
@@ -87,9 +88,16 @@ app.use((err, req, res, _next) => handleError(res, err));
 mongoose
     .connect(process.env.MONGODB_URI)
     .then(async (conn) => {
+
         app.listen(process.env.PORT || 5007, async () => {
             const db = conn.connection.db;
-            console.log(`Downloads service is running on port ${process.env.PORT || 5007}, and MongoDB ${db.databaseName} is connected`);
+            console.log(`🔥 Downloads service is running on port ${process.env.PORT || 5007}, and MongoDB ${db.databaseName} is connected`);
         });
+
+        try {
+            await redisCache.connect()
+        } catch (error) {
+            console.log(error)
+        }
     })
     .catch((err) => console.log(err));

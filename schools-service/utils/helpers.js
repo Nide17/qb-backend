@@ -15,8 +15,7 @@ const getFromService = async (url, timeout = 20000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
-        return null;
+        throw err;
     }
 };
 

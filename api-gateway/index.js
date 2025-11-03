@@ -92,41 +92,44 @@ app.get('/', (req, res) => {
 app.get('/api/aggregated/quiz/:id', async (req, res) => {
     try {
         const cacheKey = `quiz_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) {
-            return res.status(200).json(cached);
+        const cached = await getCachedData(cacheKey)
+
+        if (!cached || cached.length === 0 || Object.keys(cached).length === 0) {
+
+            // Fetch quiz with all related data
+            const [quizRes, categoryRes, questionsRes, commentsRes, scoresRes] = await Promise.allSettled([
+                getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${req.params.id}`),
+                getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
+                getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`),
+                getFromService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?quiz=${req.params.id}`),
+                getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores?quiz=${req.params.id}`)
+            ]);
+
+            const quiz = quizRes.status === 'fulfilled' ? quizRes.value.data : null;
+            if (!quiz) {
+                handleError(res, { status: 404, message: 'Quiz not found' });
+                return;
+            }
+
+            // Aggregate data
+            const aggregatedData = {
+                ...quiz,
+                category: categoryRes.status === 'fulfilled' ?
+                    categoryRes.value.data.find(cat => cat._id === quiz.category) : null,
+                questions: questionsRes.status === 'fulfilled' ?
+                    questionsRes.value.data.filter(q => quiz.questions.includes(q._id)) : [],
+                comments: commentsRes.status === 'fulfilled' ? commentsRes.value.data : [],
+                scores: scoresRes.status === 'fulfilled' ? scoresRes.value.data : [],
+                _aggregated: true,
+                _cached: false
+            };
+
+            // Cache and return aggregated data
+            await setCachedData(cacheKey, aggregatedData);
+            res.status(200).json(aggregatedData);
+        } else {
+            res.status(200).json(cached);
         }
-
-        // Fetch quiz with all related data
-        const [quizRes, categoryRes, questionsRes, commentsRes, scoresRes] = await Promise.allSettled([
-            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${req.params.id}`),
-            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/categories`),
-            getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/questions`),
-            getFromService(`${process.env.COMMENTS_SERVICE_URL}/api/quizzes-comments?quiz=${req.params.id}`),
-            getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores?quiz=${req.params.id}`)
-        ]);
-
-        const quiz = quizRes.status === 'fulfilled' ? quizRes.value.data : null;
-        if (!quiz) {
-            handleError(res, { status: 404, message: 'Quiz not found' });
-            return;
-        }
-
-        // Aggregate data
-        const aggregatedData = {
-            ...quiz,
-            category: categoryRes.status === 'fulfilled' ?
-                categoryRes.value.data.find(cat => cat._id === quiz.category) : null,
-            questions: questionsRes.status === 'fulfilled' ?
-                questionsRes.value.data.filter(q => quiz.questions.includes(q._id)) : [],
-            comments: commentsRes.status === 'fulfilled' ? commentsRes.value.data : [],
-            scores: scoresRes.status === 'fulfilled' ? scoresRes.value.data : [],
-            _aggregated: true,
-            _cached: false
-        };
-
-        await setCachedData(cacheKey, aggregatedData);
-        res.status(200).json(aggregatedData);
     } catch (err) {
         handleError(res, err);
     }
@@ -136,7 +139,9 @@ app.get('/api/aggregated/quizzes', async (req, res) => {
     try {
         const { page = 1, limit = 12, category, search, difficulty, created_by } = req.query;
         const cacheKey = `quizzes_${page}_${limit}_${category}_${search}_${difficulty}_${created_by}`;
+
         const cached = await getCachedData(cacheKey);
+
         if (cached) {
             return res.status(200).json(cached);
         }
@@ -277,6 +282,7 @@ app.get('/api/aggregated/category/:id', async (req, res) => {
     try {
         const cacheKey = `category_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
+
         if (cached) {
             return res.status(200).json(cached);
         }
@@ -451,14 +457,17 @@ const PORT = process.env.PORT || 5000;
 // Initialize Redis connection and start server
 async function startServer() {
     try {
-        // Connect to Redis
-        await redisCache.connect();
 
         server.listen(PORT, () => {
             console.log(`🚀 API Gateway with Socket.io running on port ${PORT}`);
             console.log('📡 Ready to route requests to microservices');
-            console.log(`📦 Redis cache: ${redisCache.isConnected ? 'Connected' : 'Disconnected'}`);
         });
+
+        try {
+            await redisCache.connect()
+        } catch (error) {
+            console.log(error)
+        }
     } catch (err) {
         console.error('Failed to start server:\n', err);
     }

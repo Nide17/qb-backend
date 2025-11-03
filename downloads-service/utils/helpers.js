@@ -50,8 +50,7 @@ const getFromService = async (url, timeout = 60000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
-        return null;
+        throw err;
     }
 };
 
@@ -76,8 +75,7 @@ const populateDownload = async (download) => {
 
         return { ...downloadObj, notes, chapter: notes ? notes.chapter : null, course: notes ? notes.course : null, courseCategory: notes ? notes.courseCategory : null, downloaded_by };
     } catch (err) {
-        console.error('Error populating download details:', err.message);
-        return download; // Return original download if population fails
+        return downloadObj; // Return original download if population fails
     }
 };
 

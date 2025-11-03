@@ -15,8 +15,7 @@ const getFromService = async (url, timeout = 20000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`Service call failed for URL: ${url} -`, err?.message || err);
-        return null;
+        throw err;
     }
 };
 
@@ -120,7 +119,6 @@ const populateUsersInChatRooms = async (chatRooms) => {
 
         return chatRooms;
     } catch (error) {
-        console.log('Error populating users in chat rooms:', error.message);
         return chatRooms;
     }
 };

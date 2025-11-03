@@ -14,8 +14,7 @@ const getFromService = async (url, timeout = 60000) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
-        return null;
+        throw err;
     }
 };
 
@@ -29,13 +28,19 @@ const validateRequiredFields = (fields) => {
 };
 
 const populateUser = async (userId) => {
-    if (!userId) return null;
-    const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
-    return data ? {
-        _id: data._id,
-        name: data.name
-    } : { _id: userId, name: 'Unknown User' };
+    if (!userId) return null;
+
+    try {
+        const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+
+        return data ? {
+            _id: data._id,
+            name: data.name
+        } : { _id: userId, name: 'Unknown User' };
+    } catch (err) {
+        return { _id: userId, name: 'Unknown User' };
+    }
 };
 
 const populateComment = async (comment) => {
@@ -77,7 +82,6 @@ const populateComment = async (comment) => {
 
         return commentObj;
     } catch (error) {
-        console.log('Error populating comment :', error.message);
         return commentObj;
     }
 };

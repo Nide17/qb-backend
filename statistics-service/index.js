@@ -4,6 +4,7 @@ const os = require('os');
 const process = require('process');
 const dotenv = require('dotenv');
 const { handleError } = require('./utils/error');
+const { redisCache } = require('./utils/helpers');
 
 // Config
 dotenv.config();
@@ -70,5 +71,11 @@ app.get('/health', async (req, res) => {
 app.use((err, req, res, _next) => handleError(res, err));
 
 app.listen(process.env.PORT || 5011, async () => {
-    console.log(`Statistics service is running on port ${process.env.PORT || 5011}, No database required.`);
+    console.log(`🔥 Statistics service is running on port ${process.env.PORT || 5011}, No database required.`);
+
+    try {
+        await redisCache.connect()
+    } catch (error) {
+        console.log(error)
+    }
 });

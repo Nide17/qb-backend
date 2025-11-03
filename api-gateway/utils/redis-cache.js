@@ -25,7 +25,7 @@ class RedisCacheManager {
             });
 
             this.redis.on('connect', () => {
-                console.log('✅ Redis connected successfully');
+                console.log('✅ Redis connected successfully: Host:', process.env.REDIS_HOST);
                 this.isConnected = true;
             });
 

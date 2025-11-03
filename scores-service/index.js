@@ -5,8 +5,8 @@ const process = require('process');
 const cors = require('cors');
 const compression = require('compression');
 const dotenv = require('dotenv');
-const { handleError, startMemoryMonitoring } = require('./utils/error');
-const { memoryMonitorMiddleware, requestTrackerMiddleware, startMemoryMonitoring: startMiddlewareMonitoring } = require('./middlewares/memory-monitor');
+const { handleError } = require('./utils/error');
+const { redisCache } = require('./utils/helpers');
 
 // Config
 dotenv.config();
@@ -17,10 +17,6 @@ app.use(express.json());
 app.use(compression());
 app.use(cors());
 app.options('*', cors());
-
-// Memory monitoring middleware
-app.use(requestTrackerMiddleware);
-app.use(memoryMonitorMiddleware);
 
 // Routes
 app.use('/api/scores', require('./routes/scores'));
@@ -95,15 +91,17 @@ app.use((err, req, res, _next) => handleError(res, err));
 mongoose
     .connect(process.env.MONGODB_URI)
     .then(async (conn) => {
+
         app.listen(process.env.PORT || 5006, async () => {
+
             const db = conn.connection.db;
-            console.log(`Scores service is running on port ${process.env.PORT || 5006}, and MongoDB ${db.databaseName} is connected`);
+            console.log(`🔥 Scores service is running on port ${process.env.PORT || 5006}, and MongoDB ${db.databaseName} is connected`);
 
-            // Start memory monitoring
-            startMemoryMonitoring();
-            startMiddlewareMonitoring();
-
-            console.log('📊 Memory monitoring started');
+            try {
+                await redisCache.connect()
+            } catch (error) {
+                console.log(error)
+            }
         });
     })
     .catch((err) => console.log(err));

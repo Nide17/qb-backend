@@ -21,11 +21,6 @@
 - [x] **File**: `qb-backend-microservices/scores-service/package.json`
   - [x] Add memory limit configuration to scripts
 
-### 4. Add Memory Monitoring Middleware
-- [x] **File**: `qb-backend-microservices/scores-service/middlewares/memory-monitor.js` (new file)
-  - [x] Create middleware to monitor memory usage
-  - [x] Add early warning system
-
 ### 5. Testing
 - [x] Test with large datasets
 - [x] Verify error handling works

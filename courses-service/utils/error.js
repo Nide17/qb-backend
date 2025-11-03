@@ -1,5 +1,4 @@
 const handleError = (res, err, status) => {
-    console.error('Error occurred:', err?.name, err?.message);
 
     // Handle MongoDB Cast Errors
     if (err.name === 'CastError') {
@@ -70,18 +69,34 @@ const handleError = (res, err, status) => {
 
     // Handle Axios Errors
     else if (err.isAxiosError) {
-        if (err.response) {
+        console.error('Axios error occurred:', err.code, err.name);
+        if (err.code === 'ECONNREFUSED') {
+            return res.status(503).json({
+                success: false,
+                message: err.message || 'Service unavailable',
+                code: 'SERVICE_UNAVAILABLE',
+                timestamp: new Date().toISOString()
+            });
+        }
+        // Aggregate errors
+        else if (err.response?.data?.errors) {
+            let numberOfErrors = err.response.data.errors.length;
+            let message = `${numberOfErrors} errors occurred: `;
+            console.error(`${numberOfErrors} errors occurred.`);
+            err.response.data.errors.forEach(e => message += `${e.message}, `);
+            return res.status(err.response.status).json({
+                success: false,
+                numberOfErrors,
+                message,
+                code: `HTTP_${err.response.status}`,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        else if (err.response) {
             return res.status(err.response.status).json({
                 success: false,
                 message: err.response.data?.message || err.response.data?.msg || err.message,
                 code: `HTTP_${err.response.status}`,
-                timestamp: new Date().toISOString()
-            });
-        } else if (err.request) {
-            return res.status(503).json({
-                success: false,
-                message: 'Feedbacks Service Unavailable',
-                code: 'SERVICE_UNAVAILABLE',
                 timestamp: new Date().toISOString()
             });
         }
@@ -93,6 +108,25 @@ const handleError = (res, err, status) => {
             success: false,
             message: err.message || 'Resource not found',
             code: 'NOT_FOUND',
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    // Handle BadRequestError
+    else if (err.code === 'BAD_REQUEST') {
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'Bad Request',
+            code: 'BAD_REQUEST',
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    else if (err.name === 'ReferenceError') {
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'Reference Error',
+            code: 'REFERENCE_ERROR',
             timestamp: new Date().toISOString()
         });
     }

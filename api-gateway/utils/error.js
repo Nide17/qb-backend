@@ -1,5 +1,4 @@
 const handleError = (res, err, status) => {
-    console.error('Error occurred:', err?.name, err?.message);
 
     // Handle MongoDB Cast Errors
     if (err.name === 'CastError') {
@@ -74,7 +73,7 @@ const handleError = (res, err, status) => {
         if (err.code === 'ECONNREFUSED') {
             return res.status(503).json({
                 success: false,
-                message: 'Service Unavailable',
+                message: err.message || 'Service unavailable',
                 code: 'SERVICE_UNAVAILABLE',
                 timestamp: new Date().toISOString()
             });
@@ -109,6 +108,25 @@ const handleError = (res, err, status) => {
             success: false,
             message: err.message || 'Resource not found',
             code: 'NOT_FOUND',
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    // Handle BadRequestError
+    else if (err.code === 'BAD_REQUEST') {
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'Bad Request',
+            code: 'BAD_REQUEST',
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    else if (err.name === 'ReferenceError') {
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'Reference Error',
+            code: 'REFERENCE_ERROR',
             timestamp: new Date().toISOString()
         });
     }

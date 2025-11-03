@@ -53,16 +53,18 @@ exports.getScoresByTaker = async (req, res) => {
         const cacheKey = `scores_user_${req.params.id}`;
 
         // Check cache first
-        let scores = getCachedData(cacheKey);
+        const cached = await getCachedData(cacheKey);
 
-        if (!scores || scores.length === 0) {
-            scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).exec();
-            if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
-
-            // Populate scores
-            scores = await Promise.all(scores.map(score => populateScore(score)));
-            setCachedData(cacheKey, scores);
+        if (cached) {
+            return res.status(200).json(cached);
         }
+
+        let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).exec();
+        if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
+
+        // Populate scores
+        scores = await Promise.all(scores.map(score => populateScore(score)));
+        setCachedData(cacheKey, scores);
 
         res.status(200).json(scores);
     } catch (err) {
@@ -140,21 +142,24 @@ exports.getQuizRanking = async (req, res) => {
         const cacheKey = `ranking_${req.params.id}`;
 
         // Check cache first
-        let scores = getCachedData(cacheKey);
+        const cached = await getCachedData(cacheKey);
 
-        if (!scores || scores.length === 0) {
-            scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).exec();
-            if (!scores || scores.length === 0) {
-                console.warn(`No scores found for the ${req.params.id} quiz`);
-                throw { 'status': 404, 'message': 'No scores to display' };
-            }
-
-            // Populate scores
-            scores = await Promise.all(scores.map(score => populateScore(score)));
-            setCachedData(cacheKey, scores);
+        if (cached) {
+            return res.status(200).json(cached);
         }
 
+        let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).exec();
+        if (!scores || scores.length === 0) {
+            console.warn(`No scores found for the ${req.params.id} quiz`);
+            throw { 'status': 404, 'message': 'No scores to display' };
+        }
+
+        // Populate scores
+        scores = await Promise.all(scores.map(score => populateScore(score)));
+        setCachedData(cacheKey, scores);
+
         res.status(200).json(scores);
+
     } catch (err) {
         handleError(res, err);
     }
@@ -166,41 +171,45 @@ exports.getPopularQuizzes = async (req, res) => {
         const cacheKey = 'popular_quizzes';
 
         // Check cache first
-        let popularQuizzes = getCachedData(cacheKey);
+        const cached = await getCachedData(cacheKey);
 
-        if (!popularQuizzes || popularQuizzes.length === 0) {
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
-
-            const endOfDay = new Date();
-            endOfDay.setHours(23, 59, 59, 999);
-
-            const topQuizzes = await Score.aggregate([
-                { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
-                { $group: { _id: '$quiz', count: { $sum: 1 } } },
-                { $sort: { count: -1 } },
-                { $limit: 3 }
-            ]).exec();
-
-            if (topQuizzes.length > 0) {
-                const quizIds = topQuizzes.map(q => q._id);
-                let quizzes = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/?ids=${quizIds.join(',')}`);
-
-                popularQuizzes = topQuizzes.map(pq => {
-                    const quiz = quizzes?.find(q => String(q._id) === String(pq._id));
-                    return {
-                        _id: pq._id,
-                        qTitle: quiz?.title || 'Unavailable Quiz',
-                        slug: quiz?.slug || '',
-                        count: pq.count
-                    };
-                });
-            } else {
-                popularQuizzes = [];
-            }
-
-            setCachedData(cacheKey, popularQuizzes);
+        if (cached) {
+            return res.status(200).json(cached);
         }
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        let popularQuizzes = null;
+
+        const topQuizzes = await Score.aggregate([
+            { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
+            { $group: { _id: '$quiz', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 3 }
+        ]).exec();
+
+        if (topQuizzes.length > 0) {
+            const quizIds = topQuizzes.map(q => q._id);
+            let quizzes = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/?ids=${quizIds.join(',')}`);
+
+            popularQuizzes = topQuizzes.map(pq => {
+                const quiz = quizzes?.find(q => String(q._id) === String(pq._id));
+                return {
+                    _id: pq._id,
+                    qTitle: quiz?.title || 'Unavailable Quiz',
+                    slug: quiz?.slug || '',
+                    count: pq.count
+                };
+            });
+        } else {
+            popularQuizzes = [];
+        }
+
+        setCachedData(cacheKey, popularQuizzes);
 
         res.status(200).json(popularQuizzes);
     } catch (err) {
@@ -214,42 +223,44 @@ exports.getMonthlyUser = async (req, res) => {
         const cacheKey = 'monthly_user';
 
         // Check cache first
-        let monthlyUserData = getCachedData(cacheKey);
+        const cached = await getCachedData(cacheKey);
 
-        if (!monthlyUserData || monthlyUserData.length === 0) {
-            const startOfMonth = new Date();
-            startOfMonth.setDate(1);
-            startOfMonth.setHours(0, 0, 0, 0);
-
-            const endOfMonth = new Date();
-            endOfMonth.setHours(23, 59, 59, 999);
-
-            const monthlyUser = await Score.aggregate([
-                { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
-                { $group: { _id: '$taken_by', count: { $sum: 1 } } },
-                { $sort: { count: -1 } },
-                { $limit: 1 }
-            ]).exec();
-
-            if (monthlyUser.length > 0) {
-                try {
-                    const user = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${monthlyUser[0]._id}`, 60000);
-
-                    monthlyUserData = user && {
-                        uName: user.name,
-                        uPhoto: user.image,
-                        count: monthlyUser[0].count
-                    };
-                } catch (usererr) {
-                    monthlyUserData = null;
-                }
-            } else {
-                monthlyUserData = null;
-            }
-
-            setCachedData(cacheKey, monthlyUserData);
+        if (cached) {
+            return res.status(200).json(cached);
         }
 
+        let monthlyUserData = null;
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const endOfMonth = new Date();
+        endOfMonth.setHours(23, 59, 59, 999);
+
+        const monthlyUser = await Score.aggregate([
+            { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
+            { $group: { _id: '$taken_by', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 1 }
+        ]).exec();
+
+        if (monthlyUser.length > 0) {
+            try {
+                const user = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${monthlyUser[0]._id}`, 60000);
+
+                monthlyUserData = user && {
+                    uName: user.name,
+                    uPhoto: user.image,
+                    count: monthlyUser[0].count
+                };
+            } catch (usererr) {
+                monthlyUserData = null;
+            }
+        } else {
+            monthlyUserData = null;
+        }
+
+        setCachedData(cacheKey, monthlyUserData);
         res.status(200).json(monthlyUserData);
     } catch (err) {
         handleError(res, err);
@@ -378,34 +389,36 @@ exports.getTop10QuizzingUsers = async (req, res) => {
         const cacheKey = 'top_10_quizzing_users';
 
         // Check cache first
-        let topUsers = getCachedData(cacheKey);
+        const cached = await getCachedData(cacheKey);
 
-        if (!topUsers || topUsers.length === 0) {
-
-            let topUsers = await Score.aggregate([
-                { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
-                { $sort: { totalQuizzes: -1 } },
-                { $limit: 10 }
-            ]).exec();
-
-            if (topUsers.length > 0) {
-
-                const userIds = topUsers.map(u => u._id.toString());
-                const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, 200000);
-
-                topUsers = topUsers.map(usr => {
-                    const user = users?.data?.find(u => u._id === usr._id.toString()) || {};
-                    return {
-                        _id: usr._id,
-                        name: user.name || 'Unknown User',
-                        email: user.email || '',
-                        totalQuizzes: usr.totalQuizzes,
-                        avgMarks: Math.round(usr.avgMarks * 10) / 10
-                    };
-                });
-                setCachedData(cacheKey, topUsers);
-            }
+        if (cached) {
+            return res.status(200).json(cached);
         }
+
+        let topUsers = await Score.aggregate([
+            { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
+            { $sort: { totalQuizzes: -1 } },
+            { $limit: 10 }
+        ]).exec();
+
+        if (topUsers.length > 0) {
+
+            const userIds = topUsers.map(u => u._id.toString());
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, 200000);
+
+            topUsers = topUsers.map(usr => {
+                const user = users?.data?.find(u => u._id === usr._id.toString()) || {};
+                return {
+                    _id: usr._id,
+                    name: user.name || 'Unknown User',
+                    email: user.email || '',
+                    totalQuizzes: usr.totalQuizzes,
+                    avgMarks: Math.round(usr.avgMarks * 10) / 10
+                };
+            });
+            setCachedData(cacheKey, topUsers);
+        }
+
         res.status(200).json(topUsers);
     } catch (err) {
         handleError(res, err);
@@ -418,35 +431,36 @@ exports.getTop10Quizzes = async (req, res) => {
         // Check cache first
         const cacheKey = 'top_10_quizzes';
 
-        let topQuizzes = getCachedData(cacheKey);
+        const cached = await getCachedData(cacheKey);
 
-        if (!topQuizzes || topQuizzes.length === 0) {
-
-            const topQuizzesData = await Score.aggregate([
-                { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
-                { $sort: { totalTaken: -1 } },
-                { $limit: 10 }
-            ]).exec();
-
-            if (topQuizzesData.length > 0) {
-
-                const quizIds = topQuizzesData.map(q => q._id.toString());
-                const quizzes = await axios.post(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/batch`, { quizIds }, 200000);
-
-                topQuizzes = topQuizzesData.map(qz => {
-                    const quiz = quizzes?.data?.find(q => String(q._id) === String(qz._id)) || {};
-                    return {
-                        _id: qz._id,
-                        title: quiz.title || 'Unavailable Quiz',
-                        category: quiz.category || 'Uncategorized',
-                        slug: quiz.slug || '',
-                        totalTaken: qz.totalTaken
-                    };
-                });
-                setCachedData(cacheKey, topQuizzes);
-            }
+        if (cached) {
+            return res.status(200).json(cached);
         }
-        res.status(200).json(topQuizzes);
+
+        const topQuizzesData = await Score.aggregate([
+            { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
+            { $sort: { totalTaken: -1 } },
+            { $limit: 10 }
+        ]).exec();
+
+        if (topQuizzesData.length > 0) {
+
+            const quizIds = topQuizzesData.map(q => q._id.toString());
+            const quizzes = await axios.post(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/batch`, { quizIds }, 200000);
+
+            let topQuizzes = topQuizzesData.map(qz => {
+                const quiz = quizzes?.data?.find(q => String(q._id) === String(qz._id)) || {};
+                return {
+                    _id: qz._id,
+                    title: quiz.title || 'Unavailable Quiz',
+                    category: quiz.category || 'Uncategorized',
+                    slug: quiz.slug || '',
+                    totalTaken: qz.totalTaken
+                };
+            });
+            setCachedData(cacheKey, topQuizzes);
+        }
+
     } catch (err) {
         handleError(res, err);
     }

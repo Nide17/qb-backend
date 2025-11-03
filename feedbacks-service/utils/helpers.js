@@ -15,8 +15,7 @@ const getFromService = async (url, timeout = 20000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
-        return null;
+        throw err;
     }
 };
 
@@ -24,21 +23,25 @@ const getFromService = async (url, timeout = 20000, token) => {
 const populateFeedbackDetails = async (feedback) => {
 
     if (!feedback) return null;
-
     let feedbackObj = feedback.toObject ? feedback.toObject() : feedback;
 
-    // Fetch related quiz and user data
-    const quiz = feedback?.quiz ? await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${feedback.quiz}`) : null;
-    const user = feedback?.user ? await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${feedback.user}`) : null;
+    try {
 
-    // Attach populated data to feedback object
-    feedbackObj.quiz = quiz ? { _id: quiz._id, title: quiz.title } : feedbackObj.quiz;
-    feedbackObj.user = user ? { _id: user._id, name: user.name, email: user.email } : {
-        _id: feedbackObj.user,
-        name: 'N/A',
-    };
+        // Fetch related quiz and user data
+        const quiz = feedback?.quiz ? await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${feedback.quiz}`) : null;
+        const user = feedback?.user ? await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${feedback.user}`) : null;
 
-    return feedbackObj;
+        // Attach populated data to feedback object
+        feedbackObj.quiz = quiz ? { _id: quiz._id, title: quiz.title } : feedbackObj.quiz;
+        feedbackObj.user = user ? { _id: user._id, name: user.name, email: user.email } : {
+            _id: feedbackObj.user,
+            name: 'N/A',
+        };
+
+        return feedbackObj;
+    } catch (err) {
+        return feedbackObj;
+    }
 };
 
 module.exports = {

@@ -23,8 +23,7 @@ const getFromService = async (url, timeout = 40000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
-        return null;
+        throw err;
     }
 };
 
@@ -32,12 +31,17 @@ const getFromService = async (url, timeout = 40000, token) => {
 const populateUser = async (userId) => {
 
     if (!userId) return null;
-    const usr = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
-    return usr ? {
-        _id: usr._id,
-        name: usr.name
-    } : { _id: userId, name: 'Unknown User' };
+    try {
+        const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+
+        return data ? {
+            _id: data._id,
+            name: data.name
+        } : { _id: userId, name: 'Unknown User' };
+    } catch (err) {
+        return { _id: userId, name: 'Unknown User' };
+    }
 };
 
 // Helper function to validate required fields

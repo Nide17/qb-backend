@@ -196,14 +196,8 @@ exports.notifying = async (req, res) => {
         const { slug, title, category, created_by } = req.body;
 
         let subscribers = [];
-
-        try {
-            const { data } = await getFromService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
-            subscribers = data;
-        } catch (err) {
-            console.error('Error fetching subscribers:', err.message);
-        }
-
+        const { data } = await getFromService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
+        subscribers = data;
         const clientURL = req.headers.origin;
 
         subscribers.forEach(sub => {

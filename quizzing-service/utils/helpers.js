@@ -24,20 +24,25 @@ const getFromService = async (url, timeout = 20000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
-        return null;
+        throw err;
     }
 };
 
 // Simple population function for users
 const populateUser = async (userId) => {
-    if (!userId) return null;
-    const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
-    return data ? {
-        _id: data._id,
-        name: data.name
-    } : { _id: userId, name: 'Unknown User' };
+    if (!userId) return null;
+
+    try {
+        const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+
+        return data ? {
+            _id: data._id,
+            name: data.name
+        } : { _id: userId, name: 'Unknown User' };
+    } catch (err) {
+        return { _id: userId, name: 'Unknown User' };
+    }
 };
 
 // Simple population function for category
@@ -65,7 +70,6 @@ const populateCategory = async (category) => {
 
         return categoryObj;
     } catch (error) {
-        console.log('Error populating category details:', error.message);
         return categoryObj;
     }
 };

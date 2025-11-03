@@ -28,8 +28,7 @@ const getFromService = async (url, timeout = 20000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError:`, err.name, err.message);
-        return null;
+        throw err;
     }
 };
 
@@ -59,13 +58,12 @@ const hashPassword = async (password) => {
 
 // Populate user details
 const populateSchoolDetails = async (user) => {
+
     if (!user) return null;
 
-    let userObj = user.toObject ? user.toObject() : user;
-
     try {
+        let userObj = user.toObject ? user.toObject() : user;
 
-        // Fetch school, level, and faculty details
         if (user.school && user.level && user.faculty) {
             const faculty = await getFromService(`${process.env.SCHOOLS_SERVICE_URL}/api/faculties/${user.faculty}`);
             userObj.faculty = { _id: faculty?._id, title: faculty?.title };
@@ -74,7 +72,6 @@ const populateSchoolDetails = async (user) => {
         }
         return userObj;
     } catch (error) {
-        console.log('Error populating user school details:', error.message);
         return userObj;
     }
 };

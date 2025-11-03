@@ -133,8 +133,6 @@ class HealthMonitor {
             const response = await getFromService(`${url}/health`);
 
             const responseTime = Date.now() - startTime;
-
-            // getFromService returns either an object or null; handle both
             const isHealthy = response && (response.status === 200 || response.status === 'healthy' || response.status === 'ok');
 
             const healthStatus = {

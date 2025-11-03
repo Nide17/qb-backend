@@ -10,6 +10,7 @@ const getCachedData = async (key) => {
         // Try Redis first
         if (redisCache.isConnected) {
             const cached = await redisCache.get(key);
+            console.log("cached: ", cached)
             if (cached) {
                 console.log(`📦 Redis cache hit: ${key}`);
                 return cached;
@@ -50,8 +51,7 @@ const getFromService = async (url, timeout = 40000, token) => {
         });
         return response.data;
     } catch (err) {
-        console.warn(`\n\nService call failed for URL: ${url}\nError: ${err}, \n name: ${err.name}, \nmessage: ${err.message}`);
-        return null;
+        throw err;
     }
 };
 

@@ -1,7 +1,4 @@
-const os = require('os');
-
 const handleError = (res, err, status) => {
-    console.error('Error occurred:', err?.name, err?.message);
 
     // Handle MongoDB Cast Errors
     if (err.name === 'CastError') {
@@ -72,18 +69,34 @@ const handleError = (res, err, status) => {
 
     // Handle Axios Errors
     else if (err.isAxiosError) {
-        if (err.response) {
+        console.error('Axios error occurred:', err.code, err.name);
+        if (err.code === 'ECONNREFUSED') {
+            return res.status(503).json({
+                success: false,
+                message: err.message || 'Service unavailable',
+                code: 'SERVICE_UNAVAILABLE',
+                timestamp: new Date().toISOString()
+            });
+        }
+        // Aggregate errors
+        else if (err.response?.data?.errors) {
+            let numberOfErrors = err.response.data.errors.length;
+            let message = `${numberOfErrors} errors occurred: `;
+            console.error(`${numberOfErrors} errors occurred.`);
+            err.response.data.errors.forEach(e => message += `${e.message}, `);
+            return res.status(err.response.status).json({
+                success: false,
+                numberOfErrors,
+                message,
+                code: `HTTP_${err.response.status}`,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        else if (err.response) {
             return res.status(err.response.status).json({
                 success: false,
                 message: err.response.data?.message || err.response.data?.msg || err.message,
                 code: `HTTP_${err.response.status}`,
-                timestamp: new Date().toISOString()
-            });
-        } else if (err.request) {
-            return res.status(503).json({
-                success: false,
-                message: 'Feedbacks Service Unavailable',
-                code: 'SERVICE_UNAVAILABLE',
                 timestamp: new Date().toISOString()
             });
         }
@@ -99,6 +112,25 @@ const handleError = (res, err, status) => {
         });
     }
 
+    // Handle BadRequestError
+    else if (err.code === 'BAD_REQUEST') {
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'Bad Request',
+            code: 'BAD_REQUEST',
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    else if (err.name === 'ReferenceError') {
+        return res.status(400).json({
+            success: false,
+            message: err.message || 'Reference Error',
+            code: 'REFERENCE_ERROR',
+            timestamp: new Date().toISOString()
+        });
+    }
+
     // Default error response
     res.status(status ? status : err.status || 500).json({
         success: false,
@@ -108,52 +140,4 @@ const handleError = (res, err, status) => {
     });
 };
 
-// Memory monitoring configuration
-// const MEMORY_WARNING_THRESHOLD = 0.8; // 80% of available memory
-// const MEMORY_CRITICAL_THRESHOLD = 0.9; // 90% of available memory
-
-// Monitor memory usage and log warnings
-const monitorMemoryUsage = () => {
-    const totalMemory = os.totalmem();
-    const freeMemory = os.freemem();
-    const usedMemory = totalMemory - freeMemory;
-    const memoryUsagePercent = usedMemory / totalMemory;
-
-    // if (memoryUsagePercent >= MEMORY_CRITICAL_THRESHOLD) {
-    //     console.error('🚨 CRITICAL MEMORY USAGE 🚨');
-    //     console.error(`Memory usage: ${(memoryUsagePercent * 100).toFixed(2)}%`);
-    //     console.error(`Used: ${(usedMemory / 1024 / 1024).toFixed(2)} MB`);
-    //     console.error(`Free: ${(freeMemory / 1024 / 1024).toFixed(2)} MB`);
-    //     console.error('Consider implementing pagination or optimizing queries');
-    // } else if (memoryUsagePercent >= MEMORY_WARNING_THRESHOLD) {
-    //     console.warn('⚠️ HIGH MEMORY USAGE WARNING ⚠️');
-    //     console.warn(`Memory usage: ${(memoryUsagePercent * 100).toFixed(2)}%`);
-    //     console.warn(`Used: ${(usedMemory / 1024 / 1024).toFixed(2)} MB`);
-    //     console.warn(`Free: ${(freeMemory / 1024 / 1024).toFixed(2)} MB`);
-    // }
-
-    return {
-        totalMemory,
-        usedMemory,
-        freeMemory,
-        memoryUsagePercent
-    };
-};
-
-// Start memory monitoring interval (every 30 seconds)
-const startMemoryMonitoring = () => {
-    console.log('📊 Starting memory monitoring...');
-    setInterval(monitorMemoryUsage, 30000); // 30 seconds
-};
-
-// Get current memory stats
-const getMemoryStats = () => {
-    return monitorMemoryUsage();
-};
-
-module.exports = {
-    handleError,
-    monitorMemoryUsage,
-    startMemoryMonitoring,
-    getMemoryStats
-};
+module.exports = { handleError };
