@@ -28,8 +28,8 @@ const getFromService = async (url, timeout = 20000, token) => {
     }
 };
 
-// Simple population function for users
-const populateUser = async (userId) => {
+// Simple expansion function for users
+const populateOneUser = async (userId) => {
 
     if (!userId) return null;
 
@@ -45,8 +45,24 @@ const populateUser = async (userId) => {
     }
 };
 
+const populateBatchedUsers = async (userIDs) => {
+
+    if (!userIDs || userIDs.length === 0) return userIDs;
+
+    try {
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, { timeout: 20000 });
+        const usersMap = new Map();
+        for (const user of response.data || []) {
+            usersMap.set(user._id.toString(), user);
+        }
+        return usersMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
 // Simple population function for category
-const populateCategory = async (category) => {
+const populateOneCategory = async (category) => {
 
     if (!category) return null;
 
@@ -62,7 +78,7 @@ const populateCategory = async (category) => {
         }
 
         if (category.created_by) {
-            const userData = await populateUser(category.created_by);
+            const userData = await populateOneUser(category.created_by);
             if (userData) {
                 categoryObj.created_by = userData;
             }
@@ -121,49 +137,44 @@ const deleteImageFromS3 = async (imagePath) => {
     }
 };
 
-// Populate single quiz
-const populateQuiz = async (quiz) => {
-    if (!quiz) return quiz;
-
-    // Convert to plain object to avoid mongoose issues
-    const plainQuiz = quiz.toObject ? quiz.toObject() : quiz;
-
-    if (plainQuiz.created_by) {
-        plainQuiz.created_by = await populateUser(plainQuiz.created_by);
-    }
-
-    return plainQuiz;
-};
-
 // Populate array of quizzes
-const populateQuizzes = async (quizzes) => {
+const populateBatchedQuizzes = async (quizzes) => {
 
     if (!quizzes || quizzes.length === 0) return quizzes;
 
+    try {
     // Convert to plain objects to avoid mongoose issues
     const plainQuizzes = quizzes.map(quiz => quiz.toObject ? quiz.toObject() : quiz);
 
-    for (let quiz of plainQuizzes) {
+    // Extract unique user IDs for better efficiency
+    const userIDs = [...new Set(plainQuizzes.map(q => q.created_by?.toString()))];
 
-        if (quiz.created_by) {
-            quiz.created_by = await populateUser(quiz.created_by);
-        }
+    // Populate all user details in batch (assumed returns a map-like object or record)
+    const batchedUsers = await populateBatchedUsers(userIDs);
 
-        if (quiz.last_updated_by) {
-            quiz.last_updated_by = await populateUser(quiz.last_updated_by);
+    // Map plainQuizzes to expanded objects
+    const expandedPlainQuizzes = plainQuizzes.map(qz => {
+        const expandedQz = { ...qz };
+        if (qz.created_by) {
+            expandedQz.created_by = batchedUsers.get(qz.created_by.toString());
         }
+        return expandedQz;
+    });
+
+    return expandedPlainQuizzes || plainQuizzes;
+    } catch (err) {
+        console.error(err.message);
+        return {}
     }
-
-    return plainQuizzes;
 };
 
 module.exports = {
     getFromService,
     validateRequiredFields,
-    populateUser,
-    populateCategory,
+    populateOneUser,
+    populateBatchedUsers,
+    populateOneCategory,
     updateQuizQuestions,
     deleteImageFromS3,
-    populateQuiz,
-    populateQuizzes,
+    populateBatchedQuizzes,
 };

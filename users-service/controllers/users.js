@@ -6,7 +6,7 @@ const { sendEmail } = require('../utils/emails/sendEmail');
 const User = require('../models/User');
 const PswdResetToken = require('../models/PswdResetToken');
 const { handleError } = require('../utils/error');
-const { deleteImageFromS3, populateSchoolDetails, hashPassword, updateUserToken } = require('../utils/helpers');
+const { deleteImageFromS3, populateOneSchool, hashPassword, updateUserToken } = require('../utils/helpers');
 
 // Get all users
 exports.getUsers = async (req, res) => {
@@ -52,9 +52,9 @@ exports.getOneUser = async (req, res) => {
         let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
         if (!user) throw { 'message': 'User not found!', 'status': 404 };
 
-        // Populate user school details
-        user = await populateSchoolDetails(user);
-        res.status(200).json(user);
+        // Expand user school details
+        const expandeduser = await populateOneSchool(user);
+        res.status(200).json(expandeduser || user);
 
     } catch (err) {
         handleError(res, err);
@@ -67,8 +67,8 @@ exports.loadUser = async (req, res) => {
         let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
 
         if (!user) throw { 'message': 'No active session!', 'status': 204 };
-        user = await populateSchoolDetails(user);
-        return res.status(200).json(user);
+        const expandeduser = await populateOneSchool(user);
+        return res.status(200).json(expandeduser || user);
     } catch (err) {
         handleError(res, err);
     }
@@ -88,8 +88,13 @@ exports.getAdminsEmails = async (req, res) => {
 
 // Get batched users: by IDs list from the post body
 exports.getBatchedUsers = async (req, res) => {
+
+    const userIDs = req.body?.userIDs;
+
     try {
-        const users = await User.find({ _id: { $in: req.body?.userIds } }).select('name email');
+        if (!userIDs || !Array.isArray(userIDs) || userIDs.length === 0) throw { 'message': 'No user IDs provided!', 'status': 400 };
+
+        const users = await User.find({ _id: { $in: userIDs } }).select('name email');
         if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
         res.status(200).json(users);
     } catch (err) {
@@ -356,8 +361,10 @@ exports.updateProfileImage = async (req, res) => {
         user.image && await deleteImageFromS3(user.image);
 
         let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true });
-        updatedUserProfile = await populateSchoolDetails(updatedUserProfile);
-        res.status(200).json(updatedUserProfile);
+
+        // Expand user school details
+        const expandeduser = await populateOneSchool(updatedUserProfile);
+        res.status(200).json(expandeduser || updatedUserProfile);
     } catch (err) {
         handleError(res, err);
     }
@@ -367,8 +374,10 @@ exports.updateProfileImage = async (req, res) => {
 exports.updateProfile = async (req, res) => {
     try {
         let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true });
-        user = await populateSchoolDetails(user);
-        res.status(200).json(user);
+
+        // Expand user school details
+        const expandeduser = await populateOneSchool(user);
+        res.status(200).json(expandeduser || user);
     } catch (err) {
 
         handleError(res, err);

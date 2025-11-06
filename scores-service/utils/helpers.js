@@ -54,8 +54,8 @@ const getFromService = async (url, timeout = 70000, token) => {
     }
 };
 
-// Simple population function for users
-const populateUser = async (userId) => {
+// Simple expansion function for users
+const populateOneUser = async (userId) => {
 
     if (!userId) return null;
 
@@ -70,8 +70,8 @@ const populateUser = async (userId) => {
         return { _id: userId, name: 'Unknown User' };
     }
 };
-// Populate score 
-const populateScore = async (score) => {
+// Expand score 
+const populateOneScore = async (score) => {
 
     if (!score) return null;
     let scoreObj = score.toObject ? score.toObject() : score;
@@ -86,7 +86,7 @@ const populateScore = async (score) => {
         }
 
         if (score.taken_by) {
-            const userData = await populateUser(score.taken_by);
+            const userData = await populateOneUser(score.taken_by);
             if (userData) {
                 scoreObj.taken_by = userData;
             }
@@ -99,7 +99,7 @@ const populateScore = async (score) => {
 };
 
 module.exports = {
-    populateScore,
+    populateOneScore,
     getFromService,
     getCachedData,
     setCachedData,

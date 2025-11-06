@@ -1,7 +1,7 @@
 const axios = require('axios');
 const Score = require('../models/Score');
 const { handleError } = require('../utils/error');
-const { getFromService, getCachedData, setCachedData, cache, populateScore } = require('../utils/helpers');
+const { getFromService, getCachedData, setCachedData, cache, populateOneScore, populateBatchedScores } = require('../utils/helpers');
 
 exports.getScores = async (req, res) => {
 
@@ -27,15 +27,15 @@ exports.getScores = async (req, res) => {
             return res.status(200).json(totalScores);
         }
 
-        // Populate scores
-        scores = await Promise.all(scores.map(score => populateScore(score)));
+        // Expand scores
+        const expandedScores = await populateBatchedScores(scores);
 
         return res.status(200).json({
             totalPages: Math.ceil(totalScores / PAGE_SIZE),
             currentPage: pageNo,
             pageSize: PAGE_SIZE,
             totalScores,
-            scores
+            scores: expandedScores || scores
         });
 
     } catch (err) {
@@ -62,11 +62,11 @@ exports.getScoresByTaker = async (req, res) => {
         let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).exec();
         if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
 
-        // Populate scores
-        scores = await Promise.all(scores.map(score => populateScore(score)));
-        setCachedData(cacheKey, scores);
+        // Expand scores
+        const expandedScores = await populateBatchedScores(scores);
+        setCachedData(cacheKey, expandedScores || scores);
 
-        res.status(200).json(scores);
+        res.status(200).json(expandedScores || scores);
     } catch (err) {
         handleError(res, err);
     }
@@ -86,15 +86,15 @@ exports.getScoresForQuizCreator = async (req, res) => {
             throw { status: 404, message: '404' };
         }
 
-        // Populate scores
-        scores = await Promise.all(scores.map(score => populateScore(score)));
+        // Expand scores
+        const expandedScores = await populateBatchedScores(scores);
 
         res.status(200).json({
             totalPages: Math.ceil(totalScores / PAGE_SIZE),
             currentPage: pageNo,
             pageSize: PAGE_SIZE,
             totalScores: totalScores,
-            scores
+            scores: expandedScores || scores
         });
     } catch (err) {
         // Check if this is a memory exhaustion error
@@ -112,14 +112,13 @@ exports.getOneScore = async (req, res) => {
         let scoreObj = null;
 
         if (score) {
-            // Populate fields
             scoreObj = score.toObject ? score.toObject() : score;
-            scoreObj = await populateScore(scoreObj);
+            scoreObj = await populateOneScore(scoreObj);
         } else {
             // Try by MongoDB _id
             score = await Score.findById(req.params?.id);
             scoreObj = score ? (score.toObject ? score.toObject() : score) : null;
-            if (scoreObj) scoreObj = await populateScore(scoreObj);
+            if (scoreObj) scoreObj = await populateOneScore(scoreObj);
         }
 
         if (!scoreObj) {
@@ -128,7 +127,7 @@ exports.getOneScore = async (req, res) => {
             throw { status: 404, message: 'Score not found!' };
         }
 
-        // Send the populated score as an HTTP response
+        // Send the expanded score as an HTTP response
         return res.status(200).json(scoreObj);
     } catch (err) {
         handleError(res, err);
@@ -154,11 +153,11 @@ exports.getQuizRanking = async (req, res) => {
             throw { 'status': 404, 'message': 'No scores to display' };
         }
 
-        // Populate scores
-        scores = await Promise.all(scores.map(score => populateScore(score)));
-        setCachedData(cacheKey, scores);
+        // Expand scores
+        const expandedScores = await populateBatchedScores(scores);
+        setCachedData(cacheKey, expandedScores || scores);
 
-        res.status(200).json(scores);
+        res.status(200).json(expandedScores || scores);
 
     } catch (err) {
         handleError(res, err);
@@ -403,8 +402,8 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
         if (topUsers.length > 0) {
 
-            const userIds = topUsers.map(u => u._id.toString());
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, 200000);
+            const userIDs = topUsers.map(u => u._id.toString());
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, 200000);
 
             topUsers = topUsers.map(usr => {
                 const user = users?.data?.find(u => u._id === usr._id.toString()) || {};

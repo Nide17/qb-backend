@@ -27,8 +27,8 @@ const getFromService = async (url, timeout = 40000, token) => {
     }
 };
 
-// Simple population function for users
-const populateUser = async (userId) => {
+// Simple expansion function for users
+const populateOneUser = async (userId) => {
 
     if (!userId) return null;
 
@@ -41,6 +41,22 @@ const populateUser = async (userId) => {
         } : { _id: userId, name: 'Unknown User' };
     } catch (err) {
         return { _id: userId, name: 'Unknown User' };
+    }
+};
+
+const populateBatchedUsers = async (userIDs) => {
+
+    if (!userIDs || userIDs.length === 0) return userIDs;
+
+    try {
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, { timeout: 20000 });
+        const usersMap = new Map();
+        for (const user of response.data || []) {
+            usersMap.set(user._id.toString(), user);
+        }
+        return usersMap;
+    } catch (err) {
+        return new Map();
     }
 };
 
@@ -72,9 +88,11 @@ const deleteImageFromS3 = async (imagePath) => {
     }
 };
 
+
 module.exports = {
     s3Config,
-    populateUser,
+    populateOneUser,
+    populateBatchedUsers,
     getFromService,
     validateRequiredFields,
     deleteImageFromS3,

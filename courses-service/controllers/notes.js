@@ -1,10 +1,9 @@
 const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
-const { populateUser, validateRequiredFields } = require('../utils/helpers');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../utils/helpers');
 
-// Helper function to find notes with optional limit
-// NOTE: this helper returns data or throws; it MUST NOT call handleError or accept `res`.
 const findNotes = async (query, limit = 0) => {
+
     let notesQuery = Notes.find(query).sort({ createdAt: -1 })
         .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
         .populate('course chapter courseCategory', 'title');
@@ -14,15 +13,20 @@ const findNotes = async (query, limit = 0) => {
     const notes = await notesQuery;
     if (!notes) throw { status: 204, message: 'No notes found!' };
 
-    // Populate user details for each note
-    return await Promise.all(notes.map(async (note) => {
-        if (note.uploaded_by) {
-            const user = await populateUser(note.uploaded_by);
-            note = note.toObject ? note.toObject() : note;
-            note.uploaded_by = user;
-        }
-        return note;
-    }));
+    // Extract unique user IDs for better efficiency
+    const userIDs = [...new Set(notes.map(n => n.viewer?.toString()))];
+
+    // Populate all user details: a Map
+    const batchedUsers = await populateBatchedUsers(userIDs);
+
+    // Map notes to expanded objects
+    const expandedNotes = notes.map(notes => {
+        const notesObj = notes.toObject();
+        const viewer = batchedUsers.get(notes.viewer?.toString()) || notes.viewer;
+        return { ...notesObj, viewer };
+    });
+
+    return expandedNotes || notes;
 };
 
 exports.getNotes = async (req, res) => {
@@ -73,9 +77,11 @@ exports.getOneNotes = async (req, res) => {
 
         let notesObj = notes.toObject ? notes.toObject() : notes;
         if (notes.uploaded_by) {
-            const user = await populateUser(notes.uploaded_by);
+            const user = await populateOneUser(notes.uploaded_by);
             notesObj.uploaded_by = user;
         }
+
+        notes = notesObj ? notesObj : notes;
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
@@ -182,8 +188,9 @@ exports.deleteNotes = async (req, res) => {
 };
 
 exports.getBatchedNotes = async (req, res) => {
+
     try {
-        const ids = req.body.noteIds;
+        const ids = req.body.notesIDs;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             throw { 'message': 'Invalid or missing note IDs!', 'status': 400 };
         }

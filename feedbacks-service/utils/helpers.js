@@ -20,7 +20,7 @@ const getFromService = async (url, timeout = 20000, token) => {
 };
 
 // Simple population function for feedback details
-const populateFeedbackDetails = async (feedback) => {
+const populateOneFeedback = async (feedback) => {
 
     if (!feedback) return null;
     let feedbackObj = feedback.toObject ? feedback.toObject() : feedback;
@@ -31,7 +31,7 @@ const populateFeedbackDetails = async (feedback) => {
         const quiz = feedback?.quiz ? await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${feedback.quiz}`) : null;
         const user = feedback?.user ? await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${feedback.user}`) : null;
 
-        // Attach populated data to feedback object
+        // Attach expanded data to feedback object
         feedbackObj.quiz = quiz ? { _id: quiz._id, title: quiz.title } : feedbackObj.quiz;
         feedbackObj.user = user ? { _id: user._id, name: user.name, email: user.email } : {
             _id: feedbackObj.user,
@@ -46,5 +46,5 @@ const populateFeedbackDetails = async (feedback) => {
 
 module.exports = {
     getFromService,
-    populateFeedbackDetails,
+    populateOneFeedback,
 };

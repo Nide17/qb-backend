@@ -1,6 +1,6 @@
 const axios = require('axios');
 const Download = require('../models/Download');
-const { populateDownload, validateRequiredFields, getCachedData, setCachedData } = require('../utils/helpers');
+const { populateBatchedDownloads, validateRequiredFields, getCachedData, setCachedData } = require('../utils/helpers');
 const { handleError } = require('../utils/error');
 
 exports.getDownloads = async (req, res) => {
@@ -23,17 +23,15 @@ exports.getDownloads = async (req, res) => {
 
         if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads);
 
-        // Populate downloads
-        for (let i = 0; i < downloads.length; i++) {
-            downloads[i] = await populateDownload(downloads[i]);
-        }
+        // Expand downloads
+        const expandedDownloads = await populateBatchedDownloads(downloads);
 
         res.status(200).json({
             totalPages: Math.ceil(totalDownloads / PAGE_SIZE),
             page: pageNo,
             pageSize: PAGE_SIZE,
             totalDownloads,
-            downloads
+            downloads: expandedDownloads || downloads
         });
     } catch (err) {
         console.log('Error getting downloads:', err.message);
@@ -47,7 +45,9 @@ exports.getOneDownload = async (req, res) => {
         if (!download) {
             throw { 'message': 'Download not found!', 'status': 404 };
         }
-        res.status(200).json(download);
+
+        const expandedDownload = await populateOneDownload(download);
+        res.status(200).json(expandedDownload || download);
     } catch (err) {
         console.log('Error getting download:', err.message);
         handleError(res, err);
@@ -62,11 +62,9 @@ exports.getNotesDownloader = async (req, res) => {
             throw { 'message': 'No downloads found for this user', 'status': 404 };
         }
 
-        // Populate downloads
-        for (let i = 0; i < downloads.length; i++) {
-            downloads[i] = await populateDownload(downloads[i]);
-        }
-        res.status(200).json(downloads);
+        // Expand downloads
+        const expandedDownloads = await populateBatchedDownloads(downloads);
+        res.status(200).json(expandedDownloads || downloads);
     } catch (err) {
         console.log('Error getting downloads by user:', err.message);
         handleError(res, err);
@@ -80,10 +78,9 @@ exports.getCreatorDownloads = async (req, res) => {
             throw { 'message': 'No downloads found for this course', 'status': 404 };
         }
 
-        // Populate downloads
-        for (let i = 0; i < downloads.length; i++) {
-            downloads[i] = await populateDownload(downloads[i]);
-        }
+        // Expand downloads
+        const expandedDownloads = await populateBatchedDownloads(downloads);
+        downloads = expandedDownloads || downloads;
 
         // Get downloads by creator: i.e notes.uploaded_by
         downloads = downloads.filter(download => download.notes.uploaded_by === req.params.id);
@@ -170,8 +167,8 @@ exports.getTop10Downloaders = async (req, res) => {
 
         if (topDownloaders.length > 0) {
 
-            const userIds = topDownloaders.map(u => u?._id?.toString());
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIds }, 200000);
+            const userIDs = topDownloaders.map(u => u?._id?.toString());
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, 200000);
 
             topDownloaders = topDownloaders.map(usr => {
                 const user = users?.data?.find(u => u._id === usr?._id?.toString()) || {};
@@ -195,7 +192,7 @@ exports.getTop10Notes = async (req, res) => {
     try {
         // Check cache first
         const cached = await getCachedData(cacheKey);
-        
+
         if (cached) {
             return res.status(200).json(cached);
         }
@@ -209,8 +206,8 @@ exports.getTop10Notes = async (req, res) => {
 
         if (topNotesData.length > 0) {
 
-            const noteIds = topNotesData.map(note => note?._id?.toString());
-            const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { noteIds }, 200000);
+            const notesIDs = topNotesData.map(note => note?._id?.toString());
+            const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { notesIDs }, 200000);
 
             let topNotes = topNotesData.map(nt => {
                 const note = notes?.data?.find(data => String(data._id) === String(nt._id)) || {};

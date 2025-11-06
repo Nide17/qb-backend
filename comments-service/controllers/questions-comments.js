@@ -1,12 +1,12 @@
 const QuestionComment = require('../models/QuestionComment');
 const { handleError } = require('../utils/error');
-const { populateComment } = require('../utils/helpers');
+const { populateOneComment, populateBatchedComments } = require('../utils/helpers');
 
 exports.getQuestionsComments = async (req, res) => {
     try {
         let questionComments = await QuestionComment.find().sort({ createdAt: -1 });
-        questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
-
+        const expandedComments = await populateBatchedComments(questionComments);
+        questionComments = expandedComments ? expandedComments : questionComments;
         res.status(200).json(questionComments);
     } catch (err) {
         handleError(res, err);
@@ -16,18 +16,17 @@ exports.getQuestionsComments = async (req, res) => {
 exports.getPaginatedComments = async (req, res) => {
     try {
         const { page = 1, limit = 10 } = req.query;
-        let paginatedQuestionsComments = await QuestionComment.find()
+        const paginatedQuestionsComments = await QuestionComment.find()
             .limit(limit * 1)
             .skip((page - 1) * limit)
             .sort({ createdAt: -1 })
             .exec();
 
         const count = await QuestionComment.countDocuments();
-
-        paginatedQuestionsComments = await Promise.all(paginatedQuestionsComments.map(questionComment => populateComment(questionComment)));
+        const expandedComments = await populateBatchedComments(paginatedQuestionsComments);
 
         res.status(200).json({
-            paginatedQuestionsComments,
+            paginatedQuestionsComments: expandedComments,
             totalPages: Math.ceil(count / limit),
             currentPage: page
         });
@@ -38,9 +37,9 @@ exports.getPaginatedComments = async (req, res) => {
 
 exports.getPendingComments = async (req, res) => {
     try {
-        let questionComments = await QuestionComment.find({ status: 'Pending' }).sort({ createdAt: -1 });
-        questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
-        res.status(200).json(questionComments);
+        const questionComments = await QuestionComment.find({ status: 'Pending' }).sort({ createdAt: -1 });
+        const expandedComments = await populateBatchedComments(questionComments);
+        res.status(200).json(expandedComments);
 
     } catch (err) {
         handleError(res, err);
@@ -50,7 +49,8 @@ exports.getPendingComments = async (req, res) => {
 exports.getCommentsByQuestion = async (req, res) => {
     try {
         const questionComments = await QuestionComment.find({ question: req.params.id }).sort({ createdAt: -1 });
-        res.status(200).json(await Promise.all(questionComments.map(questionComment => populateComment(questionComment))));
+        const expandedComments = await populateBatchedComments(questionComments);
+        res.status(200).json(expandedComments);
     } catch (err) {
         handleError(res, err);
     }
@@ -60,7 +60,7 @@ exports.getOneQuestionComment = async (req, res) => {
     try {
         let questionComment = await QuestionComment.findById(req.params.id).select('comment sender question quiz status createdAt updatedAt');
         if (!questionComment) throw { 'message': 'QuestionComment not found!', 'status': 404 };
-        questionComment = await populateComment(questionComment) || questionComment;
+        questionComment = await populateOneComment(questionComment) || questionComment;
         res.status(200).json(questionComment);
     } catch (err) {
         handleError(res, err);
@@ -69,9 +69,9 @@ exports.getOneQuestionComment = async (req, res) => {
 
 exports.getCommentsByQuiz = async (req, res) => {
     try {
-        let questionComments = await QuestionComment.find({ quiz: req.params.id }).sort({ createdAt: -1 });
-        questionComments = await Promise.all(questionComments.map(questionComment => populateComment(questionComment)));
-        res.status(200).json(questionComments);
+        const questionComments = await QuestionComment.find({ quiz: req.params.id }).sort({ createdAt: -1 });
+        const expandedComments = await populateBatchedComments(questionComments);
+        res.status(200).json(expandedComments);
     } catch (err) {
         handleError(res, err);
     }

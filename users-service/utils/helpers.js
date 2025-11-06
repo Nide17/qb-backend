@@ -56,8 +56,8 @@ const hashPassword = async (password) => {
     return hash;
 };
 
-// Populate user details
-const populateSchoolDetails = async (user) => {
+// Expand user details
+const populateOneSchool = async (user) => {
 
     if (!user) return null;
 
@@ -122,7 +122,7 @@ const deleteImageFromS3 = async (imagePath) => {
 
 module.exports = {
     getFromService,
-    populateSchoolDetails,
+    populateOneSchool,
     s3Config,
     generateToken,
     updateUserToken,

@@ -1,7 +1,7 @@
 const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
 const scheduledReportMessage = require('./scheduledReport');
 const { handleError } = require('../../utils/error');
-const { populateUser, deleteImageFromS3 } = require('../../utils/helpers');
+const { populateOneUser, populateBatchedUsers, deleteImageFromS3 } = require('../../utils/helpers');
 
 // SCHEDULED REPORT MESSAGE
 scheduledReportMessage();
@@ -11,15 +11,20 @@ exports.getBlogPostsViews = async (req, res) => {
         let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
         if (!blogPostsViews) throw { 'message': 'No blog Posts Views found!', 'status': 204 };
 
-        let blogPostsViewsObj = blogPostsViews.map(view => view?.toObject ? view.toObject() : view);
-        blogPostsViewsObj = await Promise.all(blogPostsViewsObj?.map(async view => {
-            if (view.viewer) {
-                view.viewer = await populateUser(view.viewer);
-            }
-            return view;
-        }));
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(blogPostsViews.map(bv => bv.viewer?.toString()))];
 
-        res.status(200).json(blogPostsViewsObj);
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map blogPostsViews to expanded objects
+        const expandedBlogPostsViews = blogPostsViews.map(bpv => {
+            const bpvObj = bpv.toObject();
+            const viewer = batchedUsers.get(bpv.viewer?.toString()) || bpv.viewer;
+            return { ...bpvObj, viewer };
+        });
+
+        return res.status(200).json(expandedBlogPostsViews || blogPostsViews);
     } catch (err) {
         handleError(res, err);
     }
@@ -30,6 +35,11 @@ exports.getOneBlogPostsView = async (req, res) => {
         let blogPostsView = await BlogPostsView.findById(req.params.id);
 
         if (!blogPostsView) throw { 'message': 'Blog Post View not found!', 'status': 404 };
+
+        // Populate user
+        blogPostsView = blogPostsView.toObject ? blogPostsView.toObject() : blogPostsView;
+        blogPostsView.viewer = await populateOneUser(blogPostsView.viewer);
+
         res.status(200).json(blogPostsView);
     } catch (err) {
         handleError(res, err);
@@ -41,15 +51,20 @@ exports.getRecentTenViews = async (req, res) => {
         let recentTenViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).limit(10).select('-__v');
         if (!recentTenViews) throw { 'message': '10 blog posts views not found!', 'status': 404 };
 
-        let recentTenViewsObj = recentTenViews.map(view => view?.toObject ? view.toObject() : view);
-        recentTenViewsObj = await Promise.all(recentTenViewsObj?.map(async view => {
-            if (view.viewer) {
-                view.viewer = await populateUser(view.viewer);
-            }
-            return view;
-        }));
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(recentTenViews.map(ch => ch.viewer?.toString()))];
 
-        res.status(200).json(recentTenViewsObj);
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map recentTenViews to expanded objects
+        const expandedRecentTenViews = recentTenViews.map(bpv => {
+            const bpvObj = bpv.toObject();
+            const viewer = batchedUsers.get(bpv.viewer?.toString()) || bpv.viewer;
+            return { ...bpvObj, viewer };
+        });
+
+        return res.status(200).json(expandedRecentTenViews || recentTenViews);
     } catch (err) {
         handleError(res, err);
     }

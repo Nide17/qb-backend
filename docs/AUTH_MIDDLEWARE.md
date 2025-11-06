@@ -15,7 +15,7 @@ Data shapes
 - Error object thrown from `verifyToken` should be `{ status: <httpCode>, message: <string> }`.
 
 Success criteria
-- Valid token: request proceeds to the next handler and `req.user` is populated.
+- Valid token: request proceeds to the next handler and `req.user` is expanded.
 - Invalid/missing/expired token: request returns a consistent 401 (or 403 for role mismatch) JSON response via `handleError`.
 
 Implementation pattern (canonical)

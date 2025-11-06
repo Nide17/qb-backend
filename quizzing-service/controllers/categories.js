@@ -2,7 +2,7 @@ const Category = require('../models/Category');
 const Quiz = require('../models/Quiz');
 const Question = require('../models/Question');
 const { handleError } = require('../utils/error');
-const { validateRequiredFields, populateCategory } = require('../utils/helpers');
+const { validateRequiredFields, populateOneCategory } = require('../utils/helpers');
 
 exports.getCategories = async (req, res) => {
     try {
@@ -10,7 +10,7 @@ exports.getCategories = async (req, res) => {
         if (!categories) throw { 'message': 'No categories found!', 'status': 204 };
 
         for (let i = 0; i < categories.length; i++) {
-            categories[i] = await populateCategory(categories[i]);
+            categories[i] = await populateOneCategory(categories[i]);
         }
         res.status(200).json(categories);
     } catch (err) {
@@ -25,7 +25,7 @@ exports.getOneCategory = async (req, res) => {
         let category = await Category.findOne(query).populate('quizes', '_id title questions slug');
         if (!category) throw { 'message': 'Unexistent category!', 'status': 404 };
 
-        category = await populateCategory(category);
+        category = await populateOneCategory(category);
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);
@@ -51,7 +51,7 @@ exports.createCategory = async (req, res) => {
 
         if (!savedCategory) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
 
-        savedCategory = await populateCategory(savedCategory);
+        savedCategory = await populateOneCategory(savedCategory);
         res.status(200).json(savedCategory);
     } catch (err) {
         handleError(res, err);
@@ -62,7 +62,7 @@ exports.updateCategory = async (req, res) => {
     try {
         let updatedCategory = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
-        updatedCategory = await populateCategory(updatedCategory);
+        updatedCategory = await populateOneCategory(updatedCategory);
 
         res.status(200).json(updatedCategory);
     } catch (err) {

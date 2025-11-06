@@ -2,7 +2,7 @@ const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
 const Question = require('../models/Question');
 const { handleError } = require('../utils/error');
-const { getFromService, populateQuiz, populateQuizzes } = require('../utils/helpers');
+const { getFromService, populateOneUser, populateBatchedQuizzes } = require('../utils/helpers');
 const { sendEmail } = require('../utils/emails/sendEmail');
 const { isValidObjectId } = require('mongoose');
 
@@ -28,14 +28,13 @@ exports.getQuizzes = async (req, res) => {
                 throw { 'message': 'No quizzes found!', 'status': 204 };
             }
 
-            // Populate user data using simple direct calls
-            limitedQuizzes = await populateQuizzes(limitedQuizzes);
+            const expandedQuizzes = await populateBatchedQuizzes(limitedQuizzes);
             res.status(200).json({
                 totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
                 currentPage: pageNo,
                 pageSize: PAGE_SIZE,
                 totalQuizzes,
-                quizzes: limitedQuizzes
+                quizzes: expandedQuizzes || limitedQuizzes
             });
         }
         // PAGINATED
@@ -64,15 +63,13 @@ exports.getQuizzes = async (req, res) => {
                 throw { message: 'No quizzes found!', status: 204 };
             }
 
-            // Populate user data using simple direct calls
-            paginatedQuizzes = await populateQuizzes(paginatedQuizzes);
-
+            const expandedQuizzes = await populateBatchedQuizzes(paginatedQuizzes);
             return res.status(200).json({
                 totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
                 currentPage: pageNo,
                 pageSize: PAGE_SIZE,
                 totalQuizzes,
-                quizzes: paginatedQuizzes
+                quizzes: paginatedQuizzes || expandedQuizzes
             });
 
         }
@@ -86,9 +83,8 @@ exports.getQuizzes = async (req, res) => {
                 throw { message: 'No quizzes found!', status: 204 };
             }
 
-            // Populate user data using simple direct calls
-            // allQuizzes = await populateQuizzes(allQuizzes);
-            res.status(200).json(allQuizzes);
+            const expandedQuizzes = await populateBatchedQuizzes(allQuizzes);
+            res.status(200).json(expandedQuizzes || allQuizzes);
         }
     } catch (err) {
         handleError(res, err);
@@ -106,9 +102,10 @@ exports.getOneQuiz = async (req, res) => {
             throw { status: 404, message: `Quiz with id ${id} not found` };
         }
 
-        // Populate user data using simple direct calls
-        const populatedQuiz = await populateQuiz(quiz);
-        res.status(200).json(populatedQuiz);
+        // Expand user data using simple direct calls
+        const expandedUser = await populateOneUser(quiz);
+        const expandedQuiz = { ...quiz, ...expandedUser };
+        res.status(200).json(expandedQuiz || quiz);
     } catch (err) {
         handleError(res, err);
     }
@@ -122,8 +119,8 @@ exports.getQuizzesByCategory = async (req, res) => {
             throw { message: 'No quizzes found', status: 204 };
         }
 
-        quizzes = await populateQuizzes(quizzes);
-        res.status(200).json(quizzes);
+        const expandedQuizzes = await populateBatchedQuizzes(quizzes);
+        res.status(200).json(expandedQuizzes || quizzes);
     } catch (err) {
         handleError(res, err);
     }
@@ -137,9 +134,8 @@ exports.getQuizzesByNotes = async (req, res) => {
             throw { message: 'No quizzes found!', status: 204 };
         }
 
-        quizzes = await populateQuizzes(quizzes);
-
-        res.status(200).json(quizzes);
+        const expandedQuizzes = await populateBatchedQuizzes(quizzes);
+        res.status(200).json(expandedQuizzes || quizzes);
     } catch (err) {
         handleError(res, err);
     }

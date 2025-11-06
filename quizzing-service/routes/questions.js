@@ -1,5 +1,5 @@
 const express = require('express');
-const { getQuestions, getOneQuestion, createQuestion, updateQuestion, deleteQuestion } = require('../controllers/questions');
+const { getQuestions, getBatchedQuestions, getOneQuestion, createQuestion, updateQuestion, deleteQuestion } = require('../controllers/questions');
 const { authRole } = require('../middlewares/auth');
 
 const router = express.Router();
@@ -9,6 +9,7 @@ router.get('/', getQuestions);
 router.get('/:id', getOneQuestion);
 
 // POST routes
+router.post('/batch', getBatchedQuestions);
 router.post('/', authRole(['Admin', 'SuperAdmin']), createQuestion);
 
 // PUT routes

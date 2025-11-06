@@ -1,6 +1,6 @@
 const PostCategory = require('../../models/blog-posts/PostCategory');
 const { handleError } = require('../../utils/error');
-const { populateUser, validateRequiredFields } = require('../../utils/helpers');
+const { populateOneUser, validateRequiredFields } = require('../../utils/helpers');
 
 // Refactored code to use reusable utilities and align with patterns from other services.
 exports.getPostCategories = async (req, res) => {
@@ -8,14 +8,20 @@ exports.getPostCategories = async (req, res) => {
         const postCategories = await PostCategory.find().sort({ createdAt: -1 });
         if (!postCategories || postCategories.length === 0) throw { 'status': 204, 'message': 'No postCategories found!' };
 
-        // Populate creator field for each post category
-        let populatedCategories = await Promise.all(
-            postCategories.map(async (category) => {
-                let creator = await populateUser(category.creator) || category.creator;
-                return { ...category.toObject(), creator };
-            })
-        ) || postCategories;
-        res.status(200).json(populatedCategories);
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(postCategories.map(ch => ch.creator?.toString()))];
+
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map postCategories to expanded objects
+        const expandedPostCategories = postCategories.map(pc => {
+            const pcObj = pc.toObject();
+            const creator = batchedUsers.get(pc.creator?.toString()) || pc.creator;
+            return { ...pcObj, creator };
+        });
+
+        return res.status(200).json(expandedPostCategories || postCategories);
 
     } catch (err) {
         handleError(res, err);
@@ -30,7 +36,7 @@ exports.getOnePostCategory = async (req, res) => {
 
         // Populate user
         postCategory = postCategory.toObject ? postCategory.toObject() : postCategory;
-        postCategory.creator = await populateUser(postCategory.creator);
+        postCategory.creator = await populateOneUser(postCategory.creator);
         res.status(200).json(postCategory);
     } catch (err) {
         handleError(res, err);

@@ -15,6 +15,25 @@ exports.getQuestions = async (req, res) => {
     }
 };
 
+exports.getBatchedQuestions = async (req, res) => {
+    try {
+        const ids = req.body.questionIds;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            throw { 'message': 'Invalid or missing note IDs!', 'status': 400 };
+        }
+
+        const questions = await Question.find({ _id: { $in: ids } }).populate('quiz', 'questionText title');
+        if (!questions.length) {
+            throw { 'message': 'No questions found!', 'status': 204 };
+        }
+
+        res.status(200).json(questions);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+
 exports.getOneQuestion = async (req, res) => {
     try {
         const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');

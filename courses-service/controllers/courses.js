@@ -2,35 +2,48 @@ const Course = require('../models/Course');
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
-const { populateUser, validateRequiredFields } = require('../utils/helpers');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../utils/helpers');
+
+const findCourses = async (query, limit = 0) => {
+
+    let coursesQuery = Chapter.find(query).sort({ createdAt: -1 })
+        .select('title description courseCategory created_by createdAt')
+        .populate('courseCategory', 'title');
+
+    if (limit > 0) coursesQuery = coursesQuery.limit(limit);
+
+    const courses = await coursesQuery;
+    if (!courses) throw { status: 204, message: 'No courses found!' };
+
+    // Extract unique user IDs for better efficiency
+    const userIDs = [...new Set(courses.map(c => c.created_by?.toString()))];
+
+    // Populate all user details: a Map
+    const batchedUsers = await populateBatchedUsers(userIDs);
+
+    // Map courses to expanded objects
+    const expandedCourses = courses.map(chapter => {
+        const chapterObj = chapter.toObject();
+        const created_by = batchedUsers.get(chapter.created_by?.toString()) || chapter.created_by;
+        return { ...chapterObj, created_by };
+    });
+
+    return expandedCourses || courses;
+};
 
 exports.getCourses = async (req, res) => {
     try {
-        const courses = await Course.find().populate('courseCategory', 'title').sort({ createdAt: -1 }).select('title description courseCategory created_by');
-        if (!courses) throw { 'message': 'No courses found!', 'status': 204 };
-
-        // Populate created_by field
-        const populatedCourses = await Promise.all(courses.map(async (course) => {
-            let created_by = await populateUser(course.created_by) || course.created_by;
-            return { ...course.toObject(), created_by };
-        }));
-        res.status(200).json(populatedCourses);
+        const courses = await findCourses({}, 0);
+        res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);
     }
 };
 
 exports.getCoursesByCategory = async (req, res) => {
-    try {
-        let courses = await Course.find({ courseCategory: req.params.id }).populate('courseCategory', 'title').select('title description courseCategory created_by');
-        if (!courses) throw { 'message': 'No courses found!', 'status': 404 };
 
-        // Populate created_by field
-        const populatedCourses = await Promise.all(courses.map(async (course) => {
-            let created_by = await populateUser(course.created_by) || course.created_by;
-            return { ...course.toObject(), created_by };
-        }));
-        courses = populatedCourses;
+    try {
+        const courses = await findCourses({ courseCategory: req.params.id }, 0);
         res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);
@@ -43,7 +56,7 @@ exports.getOneCourse = async (req, res) => {
         let course = await Course.findById(req.params.id).populate('courseCategory', 'title description courseCategory created_by');
 
         // Populate creator
-        let created_by = await populateUser(course.created_by) || course.created_by;
+        let created_by = await populateOneUser(course.created_by) || course.created_by;
         course = { ...course.toObject(), created_by };
 
         res.status(200).json(course);

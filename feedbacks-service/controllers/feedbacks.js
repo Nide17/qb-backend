@@ -1,6 +1,6 @@
 const Feedback = require('../models/Feedback');
 const { handleError } = require('../utils/error');
-const { populateFeedbackDetails } = require('../utils/helpers');
+const { populateOneFeedback, populateBatchedFeedbacks } = require('../utils/helpers');
 
 exports.getFeedbacks = async (req, res) => {
 
@@ -19,11 +19,11 @@ exports.getFeedbacks = async (req, res) => {
             throw { 'message': 'No feedbacks found!', 'status': 204 };
         }
 
-        // Populate feedback details
-        feedbacks = await Promise.all(feedbacks.map(feedback => populateFeedbackDetails(feedback)));
+        // Expand feedback details
+        const expandedFeedbacks = await populateBatchedFeedbacks(feedbacks);
 
         res.status(200).json({
-            feedbacks: feedbacks,
+            feedbacks: expandedFeedbacks || feedbacks,
             totalPages: Math.ceil(totalPages / PAGE_SIZE)
         });
     } catch (err) {
@@ -36,7 +36,7 @@ exports.getOneFeedback = async (req, res) => {
         let feedback = await Feedback.findById(req.params.id).select('quiz score user comment rating');
         if (!feedback) throw { 'message': 'Feedback not found!', 'status': 404 };
 
-        feedback = await populateFeedbackDetails(feedback);
+        feedback = await populateOneFeedback(feedback);
         res.status(200).json(feedback);
     } catch (err) {
         handleError(res, err);

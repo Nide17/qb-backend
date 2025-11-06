@@ -1,6 +1,6 @@
 const BlogPost = require('../../models/blog-posts/BlogPost.js');
 const { handleError } = require('../../utils/error');
-const { deleteImageFromS3, populateUser, validateRequiredFields } = require('../../utils/helpers');
+const { deleteImageFromS3, populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../../utils/helpers');
 
 exports.getBlogPosts = async (req, res) => {
 
@@ -12,14 +12,20 @@ exports.getBlogPosts = async (req, res) => {
             throw { 'message': 'No blog posts found', 'status': 204 };
         }
 
-        // Populate creator data for each blog post (keep full post object, only replace creator)
-        blogPosts = await Promise.all(blogPosts.map(async (post) => {
-            const postObj = post.toObject ? post.toObject() : post;
-            const creator = await populateUser(postObj.creator);
-            return { ...postObj, creator: creator || { _id: postObj.creator, name: 'Unknown User' } };
-        }));
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(blogPostsViews.map(ch => ch.creator?.toString()))];
 
-        res.status(200).json(blogPosts);
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map blogPostsViews to expanded objects
+        const expandedBlogPostsViews = blogPostsViews.map(bp => {
+            const bpObj = bp.toObject();
+            const creator = batchedUsers.get(bp.creator?.toString()) || bp.creator;
+            return { ...bpObj, creator };
+        });
+
+        return res.status(200).json(expandedBlogPostsViews || blogPostsViews);
     } catch (err) {
         handleError(res, err);
     }
@@ -40,7 +46,7 @@ exports.getOneBlogPost = async (req, res) => {
 
         // Populate creator data for the blog post (keep full post object, only replace creator)
         const blogPostObj = blogPost.toObject ? blogPost.toObject() : blogPost;
-        const creator = await populateUser(blogPostObj.creator);
+        const creator = await populateOneUser(blogPostObj.creator);
         blogPostObj.creator = creator || { _id: blogPostObj.creator, name: 'Unknown User' };
 
         res.status(200).json({
@@ -69,9 +75,20 @@ exports.getBlogPostsByCategory = async (req, res) => {
             throw { 'message': 'No blog posts found for this category', 'status': 404 };
         }
 
-        // Populate creator data for each blog post
-        blogPosts = await Promise.all(blogPosts.map(post => populateUser(post.creator)));
-        res.status(200).json(blogPosts);
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(blogPosts.map(b => b.creator?.toString()))];
+
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map blogPosts to expanded objects
+        const expandedBlogPosts = blogPosts.map(bp => {
+            const bpObj = bp.toObject();
+            const creator = batchedUsers.get(bp.creator?.toString()) || bp.creator;
+            return { ...bpObj, creator };
+        });
+
+        return res.status(200).json(expandedBlogPosts || blogPosts);
     } catch (err) {
         handleError(res, err);
     }

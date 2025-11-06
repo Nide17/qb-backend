@@ -90,32 +90,27 @@ const validateRoomMessageData = (data) => {
     return true;
 };
 
-// Helper function to populate users in chat rooms
+// Helper function to expand users in chat rooms
 const populateUsersInChatRooms = async (chatRooms) => {
-    const userIds = chatRooms.map(room => room.users).flat();
-    const uniqueUserIds = [...new Set(userIds)].filter(id => id);
+
+    const ids = chatRooms.map(room => room.users).flat();
+    const userIDs = [...new Set(ids)].filter(id => id);
 
     try {
-        const userResults = await Promise.allSettled(
-            uniqueUserIds.map(async (userId) => {
-                if (!userId) return null;
-                const response = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
-                return response;
-            })
-        );
-
-        const usersResponse = userResults
-            .filter(result => result.status === 'fulfilled' && result.value)
-            .map(result => result.value);
-
-        const usersMap = usersResponse.reduce((acc, user) => {
-            acc[user._id] = user;
-            return acc;
-        }, {});
-
-        chatRooms.forEach(room => {
-            room.users = room.users.map(userId => usersMap[userId]);
-        });
+        if (userIDs.length > 0) {
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, 200000);
+            const usersMap = users?.data?.reduce((acc, user) => {
+                acc[user._id] = user;
+                return acc;
+            }, {});
+            chatRooms.forEach(room => {
+                room.users = room.users.map(userId => usersMap[userId]);
+            });
+        } else {
+            chatRooms.forEach(room => {
+                room.users = [];
+            });
+        }
 
         return chatRooms;
     } catch (error) {

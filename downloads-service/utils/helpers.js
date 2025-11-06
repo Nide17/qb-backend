@@ -64,7 +64,7 @@ const validateRequiredFields = (fields) => {
 };
 
 // Helper function to populate related entity details based on download type
-const populateDownload = async (download) => {
+const populateOneDownload = async (download) => {
 
     let downloadObj = download.toObject ? download.toObject() : download;
     try {
@@ -79,8 +79,88 @@ const populateDownload = async (download) => {
     }
 };
 
+const populateBatchedUsers = async (userIDs) => {
+
+    if (!userIDs || userIDs.length === 0) return userIDs;
+
+    try {
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, { timeout: 20000 });
+        const usersMap = new Map();
+        for (const user of response.data || []) {
+            usersMap.set(user._id.toString(), user);
+        }
+        return usersMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+const populateBatchedNotes = async (notesIDs) => {
+
+    if (!notesIDs || notesIDs.length === 0) return notesIDs;
+
+    try {
+        const response = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { notesIDs }, { timeout: 20000 });
+        const notesMap = new Map();
+        for (const note of response.data || []) {
+            notesMap.set(note._id.toString(), note);
+        }
+        return notesMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+// Populate array of downloads
+const populateBatchedDownloads = async (downloads) => {
+
+    if (!downloads || downloads.length === 0) return downloads;
+
+    try {
+        // Convert to plain objects to avoid mongoose issues
+        const plainDwds = downloads.map(dwd => dwd.toObject ? dwd.toObject() : dwd);
+
+        // Extract unique note IDs for better efficiency
+        const notesIDs = [...new Set(plainDwds.map(d => d.notes?.toString()))];
+
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(plainDwds.map(d => d.downloaded_by?.toString()))];
+
+        // Populating
+        const batchedNotes = await populateBatchedNotes(notesIDs);
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map plainDwds to expanded objects
+        const expandedPlainDwds = plainDwds.map(dwd => {
+            const expandedDwd = { ...dwd };
+
+            if (dwd.notes) {
+                let notes = batchedNotes.get(dwd.notes.toString());
+
+                if (notes) {
+                    expandedDwd.notes = notes;
+                    expandedDwd.chapter = notes.chapter;
+                    expandedDwd.course = notes.course;
+                    expandedDwd.courseCategory = notes.courseCategory;
+                }
+            }
+
+            if (dwd.downloaded_by) {
+                expandedDwd.downloaded_by = batchedUsers.get(dwd.downloaded_by.toString());
+            }
+            return expandedDwd;
+        });
+
+        return expandedPlainDwds || plainDwds;
+    } catch (err) {
+        console.error(err.message);
+        return {}
+    }
+};
+
 module.exports = {
-    populateDownload,
+    populateOneDownload,
+    populateBatchedDownloads,
     getFromService,
     validateRequiredFields,
     getCachedData,

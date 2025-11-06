@@ -1,5 +1,6 @@
 const handleError = (res, err, status) => {
 
+    console.log(err.config.url);
     // Handle MongoDB Cast Errors
     if (err.name === 'CastError') {
         if (err.kind === 'ObjectId') {
@@ -73,7 +74,7 @@ const handleError = (res, err, status) => {
         if (err.code === 'ECONNREFUSED') {
             return res.status(503).json({
                 success: false,
-                message: err.message || 'Service unavailable',
+                message: err.message || `Service for ${err.config.url} is unavailable`,
                 code: 'SERVICE_UNAVAILABLE',
                 timestamp: new Date().toISOString()
             });

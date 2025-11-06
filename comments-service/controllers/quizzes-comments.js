@@ -1,11 +1,12 @@
 const QuizComment = require('../models/QuizComment');
 const { handleError } = require('../utils/error');
-const { populateComment, validateRequiredFields } = require('../utils/helpers');
+const { populateOneComment, populateBatchedComments, validateRequiredFields } = require('../utils/helpers');
 
 exports.getQuizzesComments = async (req, res) => {
     try {
         let quizComments = await QuizComment.find().sort({ createdAt: -1 });
-        quizComments = await Promise.all(quizComments.map(quizComment => populateComment(quizComment)));
+        const expandedComments = await populateBatchedComments(quizComments);
+        quizComments = expandedComments ? expandedComments : quizComments;
         res.status(200).json(quizComments);
     } catch (err) {
         handleError(res, err);
@@ -17,7 +18,7 @@ exports.getOneQuizComment = async (req, res) => {
     try {
         let quizComment = await QuizComment.findById(req.params.id);
         if (!quizComment) throw { 'message': 'QuizComment not found!', 'status': 404 };
-        quizComment = await populateComment(quizComment);
+        quizComment = await populateOneComment(quizComment);
         res.status(200).json(quizComment);
     } catch (err) {
         handleError(res, err);
@@ -27,7 +28,8 @@ exports.getOneQuizComment = async (req, res) => {
 exports.getCommentsByQuiz = async (req, res) => {
     try {
         let quizComments = await QuizComment.find({ quiz: req.params.id }).sort({ createdAt: -1 });
-        quizComments = await Promise.all(quizComments.map(quizComment => populateComment(quizComment)));
+        const expandedComments = await populateBatchedComments(quizComments);
+        quizComments = expandedComments ? expandedComments : quizComments;
         res.status(200).json(quizComments);
     } catch (err) {
         handleError(res, err);

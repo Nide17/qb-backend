@@ -1,17 +1,26 @@
 const ImageUpload = require('../../models/blog-posts/ImageUpload');
 const { handleError } = require('../../utils/error');
-const { populateUser, validateRequiredFields, deleteImageFromS3 } = require('../../utils/helpers');
+const { populateOneUser, validateRequiredFields, deleteImageFromS3 } = require('../../utils/helpers');
 
 exports.getImageUploads = async (req, res) => {
     try {
         let imageUploads = await ImageUpload.find().sort({ createdAt: -1 });
         if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 204 };
-        imageUploads = await Promise.all(imageUploads.map(async (imgUp) => {
-            imgUp = imgUp.toObject ? imgUp.toObject() : imgUp;
-            imgUp.owner = await populateUser(imgUp.owner);
-            return imgUp;
-        }));
-        res.status(200).json(imageUploads);
+
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
+
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map imageUploads to expanded objects
+        const expandedImageUploads = imageUploads.map(img => {
+            const imgObj = img.toObject();
+            const owner = batchedUsers.get(img.owner?.toString()) || img.owner;
+            return { ...imgObj, owner };
+        });
+
+        return res.status(200).json(expandedImageUploads || imageUploads);
     } catch (err) {
         handleError(res, err);
     }
@@ -24,7 +33,7 @@ exports.getOneImageUpload = async (req, res) => {
 
         // Populate user
         imageUpload = imageUpload.toObject ? imageUpload.toObject() : imageUpload;
-        imageUpload.owner = await populateUser(imageUpload.owner);
+        imageUpload.owner = await populateOneUser(imageUpload.owner);
         res.status(200).json(imageUpload);
     } catch (err) {
         handleError(res, err);
@@ -36,13 +45,20 @@ exports.getImageUploadsByOwner = async (req, res) => {
         let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 });
         if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
-        imageUploads = await Promise.all(imageUploads.map(async (imgUp) => {
-            imgUp = imgUp.toObject ? imgUp.toObject() : imgUp;
-            imgUp.owner = await populateUser(imgUp.owner);
-            return imgUp;
-        }));
+        // Extract unique user IDs for better efficiency
+        const userIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
 
-        res.status(200).json(imageUploads);
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(userIDs);
+
+        // Map imageUploads to expanded objects
+        const expandedImageUploads = imageUploads.map(img => {
+            const imgObj = img.toObject();
+            const owner = batchedUsers.get(img.owner?.toString()) || img.owner;
+            return { ...imgObj, owner };
+        });
+
+        return res.status(200).json(expandedImageUploads || imageUploads);
     } catch (err) {
         handleError(res, err);
     }

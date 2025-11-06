@@ -1,39 +1,49 @@
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
-const { populateUser, validateRequiredFields } = require('../utils/helpers');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../utils/helpers');
+
+const findChapters = async (query, limit = 0) => {
+
+    let chaptersQuery = Chapter.find(query).sort({ createdAt: -1 })
+        .select('title description course courseCategory created_by createdAt')
+        .populate('course courseCategory', 'title');
+
+    if (limit > 0) chaptersQuery = chaptersQuery.limit(limit);
+
+    const chapters = await chaptersQuery;
+    if (!chapters) throw { status: 204, message: 'No chapters found!' };
+
+    // Extract unique user IDs for better efficiency
+    const userIDs = [...new Set(chapters.map(c => c.created_by?.toString()))];
+
+    // Populate all user details: a Map
+    const batchedUsers = await populateBatchedUsers(userIDs);
+
+    // Map chapters to expanded objects
+    const expandedChapters = chapters.map(chapter => {
+        const chapterObj = chapter.toObject();
+        const created_by = batchedUsers.get(chapter.created_by?.toString()) || chapter.created_by;
+        return { ...chapterObj, created_by };
+    });
+
+    return expandedChapters || chapters;
+};
 
 exports.getChapters = async (req, res) => {
     try {
-        const chapters = await Chapter.find().populate('course courseCategory', 'title').sort({ createdAt: -1 }).select('title description course courseCategory created_by');
-        if (!chapters) throw { 'message': 'No chapters found!', 'status': 204 };
-
-        // Populate created_by field for each chapter
-        const populatedChapters = await Promise.all(
-            chapters.map(async (chapter) => {
-                let created_by = await populateUser(chapter.created_by) || chapter.created_by;
-                return { ...chapter.toObject(), created_by };
-            })
-        ) || chapters;
-
-        res.status(200).json(populatedChapters);
+        const chapters = await findChapters({}, 0);
+        res.status(200).json(chapters);
     } catch (err) {
         handleError(res, err);
     }
 };
 
 exports.getChaptersByCourse = async (req, res) => {
+
     try {
-        const chapters = await Chapter.find({ course: req.params.id }).populate('course courseCategory', 'title').select('title description course courseCategory created_by');
-
-        const populatedChapters = await Promise.all(
-            chapters.map(async (chapter) => {
-                let created_by = await populateUser(chapter.created_by) || chapter.created_by;
-                return { ...chapter.toObject(), created_by };
-            })
-        ) || chapters;
-
-        res.status(200).json(populatedChapters);
+        const notes = await findNotes({ course: req.params.id }, 0);
+        res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
     }
@@ -46,7 +56,7 @@ exports.getOneChapter = async (req, res) => {
 
         // Populate user
         chapter = chapter.toObject ? chapter.toObject() : chapter;
-        chapter.created_by = await populateUser(chapter.created_by);
+        chapter.created_by = await populateOneUser(chapter.created_by);
         res.status(200).json(chapter);
     } catch (err) {
         handleError(res, err);
