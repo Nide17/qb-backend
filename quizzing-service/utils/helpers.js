@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Quiz = require('../models/Quiz');
 const { S3 } = require('@aws-sdk/client-s3');
+const RedisCacheManager = require('./redis-cache');
 
 const s3Config = new S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -8,6 +9,40 @@ const s3Config = new S3({
     Bucket: process.env.S3_BUCKET,
     region: process.env.AWS_REGION
 });
+
+// Initialize Redis cache manager
+const redisCache = new RedisCacheManager();
+
+// Enhanced cache functions with Redis
+const getCachedData = async (key) => {
+    try {
+        // Try Redis first
+        if (redisCache.isConnected) {
+            const cached = await redisCache.get(key);
+            if (cached) {
+                console.log(`📦 Redis cache hit: ${key}`);
+                return cached;
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Cache get error:\n', error.message);
+        return null;
+    }
+};
+
+const setCachedData = async (key, data, ttl = 300) => {
+    try {
+        // Set in Redis first
+        if (redisCache.isConnected) {
+            await redisCache.set(key, data, ttl);
+            console.log(`📦 Redis cache set: ${key} (TTL: ${ttl}s)`);
+        }
+    } catch (error) {
+        console.error('Cache set error:\n', error.message);
+    }
+};
 
 // Helper function to call other services
 const getFromService = async (url, timeout = 20000, token) => {
@@ -87,6 +122,51 @@ const populateOneCategory = async (category) => {
         return categoryObj;
     } catch (error) {
         return categoryObj;
+    }
+};
+
+const populateBatchedCourseCategories = async (courseCategoriesIDs) => {
+
+    if (!courseCategoriesIDs || courseCategoriesIDs.length === 0) return courseCategoriesIDs;
+
+    try {
+        const response = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/course-categories/batch`, { courseCategoriesIDs }, { timeout: 20000 });
+        const courseCategoriesMap = new Map();
+        for (const cc of response.data || []) {
+            courseCategoriesMap.set(cc._id.toString(), cc);
+        }
+        return courseCategoriesMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+const populateCategories = async (categories) => {
+
+    if (!categories || categories.length === 0) return categories;
+
+    try {
+        // Convert to plain objects to avoid mongoose issues
+        const plainCategories = categories.map(category => category.toObject ? category.toObject() : category);
+
+        // Extract unique courseCategory IDs for better efficiency
+        const courseCategoriesIDs = [...new Set(plainCategories.map(c => c.courseCategory?.toString()))];
+
+        // Populate all courseCategory details in batch (assumed returns a map-like object or record)
+        const courseCategoriesMap = await populateBatchedCourseCategories(courseCategoriesIDs);
+
+        // Map plainCategories to expanded objects
+        const expandedPlainCategories = plainCategories.map(category => {
+            const expandedCategory = { ...category };
+            if (category.courseCategory && courseCategoriesMap.has(category.courseCategory.toString())) {
+                expandedCategory.courseCategory = courseCategoriesMap.get(category.courseCategory.toString());
+            }
+            return expandedCategory;
+        });
+
+        return expandedPlainCategories || plainCategories;
+    } catch (err) {
+        return categories;
     }
 };
 
@@ -177,4 +257,8 @@ module.exports = {
     updateQuizQuestions,
     deleteImageFromS3,
     populateBatchedQuizzes,
+    populateCategories,
+    redisCache,
+    setCachedData,
+    getCachedData,
 };

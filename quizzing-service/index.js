@@ -5,6 +5,7 @@ const os = require('os');
 const process = require('process');
 const dotenv = require('dotenv');
 const { handleError } = require('./utils/error');
+const { redisCache } = require('./utils/helpers');
 
 // Config
 dotenv.config();
@@ -99,7 +100,15 @@ mongoose
     .then(async (conn) => {
         app.listen(process.env.PORT || 5002, async () => {
             const db = conn.connection.db;
-            console.log(`Quizzing service is running on port ${process.env.PORT || 5002}, and MongoDB ${db.databaseName} is connected`);
+            console.log(`🗑️ MongoDB ${db.databaseName} is connected`)
+            console.log(`🗑️ MongoDB ${db.databaseName} is connected`)
+            console.log(`🔥 Quizzing service is running on port ${process.env.PORT || 5002}`);
+
+            try {
+                await redisCache.connect()
+            } catch (error) {
+                console.log(error)
+            }
         });
     })
     .catch((err) => console.log(err));

@@ -95,7 +95,8 @@ mongoose
     .then(async (conn) => {
         app.listen(process.env.PORT || 5003, async () => {
             const db = conn.connection.db;
-            console.log(`Posts service is running on port ${process.env.PORT || 5003}, and MongoDB ${db.databaseName} is connected`);
+            console.log(`🗑️ MongoDB ${db.databaseName} is connected`)
+            console.log(`🔥 Posts service is running on port ${process.env.PORT || 5003}`);
         });
     })
     .catch((err) => console.log(err));

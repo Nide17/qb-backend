@@ -27,6 +27,17 @@ exports.getOneCategory = async (req, res) => {
     }
 };
 
+exports.getBatchedCourseCategories = async (req, res) => {
+    try {
+        const ids = req.body?.courseCategoriesIDs;
+        const courseCategories = await CourseCategory.find({ _id: { $in: ids } }).select('title');
+        if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 404 };
+        res.status(200).json(courseCategories);
+    } catch (err) {
+        handleError(res, err);
+    }
+}
+
 exports.createCategory = async (req, res) => {
     const { title, description, created_by } = req.body;
 

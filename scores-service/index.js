@@ -95,7 +95,8 @@ mongoose
         app.listen(process.env.PORT || 5006, async () => {
 
             const db = conn.connection.db;
-            console.log(`🔥 Scores service is running on port ${process.env.PORT || 5006}, and MongoDB ${db.databaseName} is connected`);
+            console.log(`🗑️ MongoDB ${db.databaseName} is connected`)
+            console.log(`🔥 Scores service is running on port ${process.env.PORT || 5006}`);
 
             try {
                 await redisCache.connect()

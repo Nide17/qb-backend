@@ -98,7 +98,8 @@ mongoose
     .then(async (conn) => {
         httpServer.listen(process.env.PORT || 5008, async () => {
             const db = conn.connection.db;
-            console.log(`Contacts service is running on port ${process.env.PORT || 5008}, and MongoDB ${db.databaseName} is connected`);
+            console.log(`🗑️ MongoDB ${db.databaseName} is connected`)
+            console.log(`🔥 Contacts service is running on port ${process.env.PORT || 5008}`);
 
             // Initialize Socket.io with enhanced contacts functionality
             const io = new Server(httpServer, {

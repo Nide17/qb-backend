@@ -2,16 +2,24 @@ const Category = require('../models/Category');
 const Quiz = require('../models/Quiz');
 const Question = require('../models/Question');
 const { handleError } = require('../utils/error');
-const { validateRequiredFields, populateOneCategory } = require('../utils/helpers');
+const { validateRequiredFields, populateOneCategory, populateCategories, redisCache, setCachedData, getCachedData } = require('../utils/helpers');
 
 exports.getCategories = async (req, res) => {
     try {
+
+        const cacheKey = 'categories';
+        const cachedCategories = await getCachedData(cacheKey);
+        if (cachedCategories) {
+            return res.status(200).json(cachedCategories);
+        }
+
         let categories = await Category.find().sort({ creation_date: -1 }).select('_id title description quizes courseCategory').populate('quizes', '_id title slug');
         if (!categories) throw { 'message': 'No categories found!', 'status': 204 };
 
-        for (let i = 0; i < categories.length; i++) {
-            categories[i] = await populateOneCategory(categories[i]);
-        }
+        const expandedCategories = await populateCategories(categories);
+        categories = expandedCategories || categories;
+
+        await setCachedData(cacheKey, categories);
         res.status(200).json(categories);
     } catch (err) {
         handleError(res, err);

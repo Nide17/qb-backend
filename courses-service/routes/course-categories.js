@@ -1,5 +1,5 @@
 const express = require('express');
-const { getCourseCategories, getOneCategory, createCategory, updateCategory, deleteCategory } = require('../controllers/course-categories');
+const { getCourseCategories, getBatchedCourseCategories, getOneCategory, createCategory, updateCategory, deleteCategory } = require('../controllers/course-categories');
 const { authRole } = require('../middlewares/auth');
 
 const router = express.Router();
@@ -10,6 +10,7 @@ router.get('/:id', getOneCategory);
 
 // POST routes
 router.post('/', authRole(['Creator', 'Admin', 'SuperAdmin']), createCategory);
+router.post('/batch', getBatchedCourseCategories);
 
 // PUT routes
 router.put('/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), updateCategory);
