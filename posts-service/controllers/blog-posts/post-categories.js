@@ -9,10 +9,10 @@ exports.getPostCategories = async (req, res) => {
         if (!postCategories || postCategories.length === 0) throw { 'status': 204, 'message': 'No postCategories found!' };
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(postCategories.map(ch => ch.creator?.toString()))];
+        const usersIDs = [...new Set(postCategories.map(ch => ch.creator?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map postCategories to expanded objects
         const expandedPostCategories = postCategories.map(pc => {

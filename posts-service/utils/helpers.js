@@ -44,12 +44,12 @@ const populateOneUser = async (userId) => {
     }
 };
 
-const populateBatchedUsers = async (userIDs) => {
+const populateBatchedUsers = async (usersIDs) => {
 
-    if (!userIDs || userIDs.length === 0) return userIDs;
+    if (!usersIDs || usersIDs.length === 0) return usersIDs;
 
     try {
-        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, { timeout: 20000 });
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, { timeout: 20000 });
         const usersMap = new Map();
         for (const user of response.data || []) {
             usersMap.set(user._id.toString(), user);

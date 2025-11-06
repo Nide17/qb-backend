@@ -87,11 +87,11 @@ const populateOneComment = async (comment) => {
 };
 
 const populateBatchedComments = async (comments) => {
+
     if (!comments || comments.length === 0) return [];
 
     // Convert all comments to plain objects first to ensure consistent access
     const plainComments = comments.map(comment => {
-        // Handle both MongoDB documents and plain objects
         if (comment.toObject) {
             return comment.toObject();
         }
@@ -99,15 +99,15 @@ const populateBatchedComments = async (comments) => {
     });
 
     // Collect all IDs needed
-    const questionIds = plainComments
+    const questionsIds = plainComments
         .filter(c => c.question) // Only include comments with questions
         .map(c => typeof c.question === 'object' ? c.question.toString() : c.question);
 
-    const userIds = plainComments
+    const usersIDs = plainComments
         .filter(c => c.sender) // Only include comments with senders
         .map(c => typeof c.sender === 'object' ? c.sender.toString() : c.sender);
 
-    const quizIds = plainComments
+    const quizzesIDs = plainComments
         .filter(c => c.quiz && !c.question) // Only include quiz comments without questions
         .map(c => typeof c.quiz === 'object' ? c.quiz.toString() : c.quiz);
 
@@ -118,11 +118,11 @@ const populateBatchedComments = async (comments) => {
         const quizzesMap = new Map();
 
         // Batch fetch questions
-        if (questionIds.length > 0) {
+        if (questionsIds.length > 0) {
             try {
                 const questionsResponse = await axios.post(
                     `${process.env.QUIZZING_SERVICE_URL}/api/questions/batch`,
-                    { questionIds },
+                    { questionsIds },
                     { timeout: 200000 }
                 );
 
@@ -137,11 +137,11 @@ const populateBatchedComments = async (comments) => {
         }
 
         // Batch fetch users
-        if (userIds.length > 0) {
+        if (usersIDs.length > 0) {
             try {
                 const usersResponse = await axios.post(
                     `${process.env.USERS_SERVICE_URL}/api/users/batch`,
-                    { userIds },
+                    { usersIDs },
                     { timeout: 200000 }
                 );
 
@@ -156,11 +156,11 @@ const populateBatchedComments = async (comments) => {
         }
 
         // Batch fetch quizzes
-        if (quizIds.length > 0) {
+        if (quizzesIDs.length > 0) {
             try {
                 const quizzesResponse = await axios.post(
                     `${process.env.QUIZZING_SERVICE_URL}/api/quizzes/batch`,
-                    { quizIds },
+                    { quizzesIDs },
                     { timeout: 200000 }
                 );
 

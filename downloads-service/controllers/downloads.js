@@ -167,8 +167,8 @@ exports.getTop10Downloaders = async (req, res) => {
 
         if (topDownloaders.length > 0) {
 
-            const userIDs = topDownloaders.map(u => u?._id?.toString());
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, 200000);
+            const usersIDs = topDownloaders.map(u => u?._id?.toString());
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, 200000);
 
             topDownloaders = topDownloaders.map(usr => {
                 const user = users?.data?.find(u => u._id === usr?._id?.toString()) || {};

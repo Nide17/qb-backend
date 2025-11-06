@@ -98,8 +98,98 @@ const populateOneScore = async (score) => {
     }
 };
 
+const populateBatchedUsers = async (usersIDs) => {
+
+    if (!usersIDs || usersIDs.length === 0) return usersIDs;
+
+    try {
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, { timeout: 20000 });
+        const usersMap = new Map();
+        for (const user of response.data || []) {
+            usersMap.set(user._id.toString(), user);
+        }
+        return usersMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+const populateBatchedQuizzes = async (quizzesIDs) => {
+
+    if (!quizzesIDs || quizzesIDs.length === 0) return quizzesIDs;
+
+    try {
+        const response = await axios.post(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/batch`, { quizzesIDs }, { timeout: 20000 });
+        const quizzesMap = new Map();
+        for (const quiz of response.data || []) {
+            quizzesMap.set(quiz._id.toString(), {
+                _id: quiz._id,
+                title: quiz.title,
+                category: {
+                    _id: quiz.category._id,
+                    title: quiz.category.title
+                }
+            });
+        }
+        return quizzesMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+const populateBatchedScores = async (scores) => {
+
+    if (!scores || scores.length === 0) return null;
+
+    try {
+        // Convert to plain objects to avoid mongoose issues
+        const plainScores = scores.map(score => score.toObject ? score.toObject() : score);
+
+        // Extract unique quizzes IDs for better efficiency
+        const quizzesIDs = [...new Set(plainScores.map(sc => sc.quiz?.toString()))];
+
+        // Extract unique user IDs for better efficiency
+        const usersIDs = [...new Set(plainScores.map(s => s.taken_by?.toString()))];
+
+        // Populating
+        const batchedQuizzes = await populateBatchedQuizzes(quizzesIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
+
+        // Map plainScores to expanded objects
+        const expandedPlainScores = plainScores.map(score => {
+
+            const expandedScore = { ...score };
+
+            if (score.quiz) {
+
+                let quiz = batchedQuizzes.get(score.quiz.toString());
+
+                expandedScore.quiz = {
+                    _id: quiz?._id,
+                    title: quiz?.title,
+                }
+                expandedScore.category = {
+                    _id: quiz?.category?._id,
+                    title: quiz?.category?.title
+                }
+            }
+
+            if (score.taken_by) {
+                expandedScore.taken_by = batchedUsers.get(score.taken_by.toString());
+            }
+            return expandedScore;
+        });
+
+        return expandedPlainScores || plainScores;
+    } catch (err) {
+        console.error(err.message);
+        return {}
+    }
+}
+
 module.exports = {
     populateOneScore,
+    populateBatchedScores,
     getFromService,
     getCachedData,
     setCachedData,

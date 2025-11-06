@@ -79,12 +79,12 @@ const populateOneDownload = async (download) => {
     }
 };
 
-const populateBatchedUsers = async (userIDs) => {
+const populateBatchedUsers = async (usersIDs) => {
 
-    if (!userIDs || userIDs.length === 0) return userIDs;
+    if (!usersIDs || usersIDs.length === 0) return usersIDs;
 
     try {
-        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, { timeout: 20000 });
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, { timeout: 20000 });
         const usersMap = new Map();
         for (const user of response.data || []) {
             usersMap.set(user._id.toString(), user);
@@ -124,11 +124,11 @@ const populateBatchedDownloads = async (downloads) => {
         const notesIDs = [...new Set(plainDwds.map(d => d.notes?.toString()))];
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(plainDwds.map(d => d.downloaded_by?.toString()))];
+        const usersIDs = [...new Set(plainDwds.map(d => d.downloaded_by?.toString()))];
 
         // Populating
         const batchedNotes = await populateBatchedNotes(notesIDs);
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map plainDwds to expanded objects
         const expandedPlainDwds = plainDwds.map(dwd => {
@@ -138,10 +138,22 @@ const populateBatchedDownloads = async (downloads) => {
                 let notes = batchedNotes.get(dwd.notes.toString());
 
                 if (notes) {
-                    expandedDwd.notes = notes;
-                    expandedDwd.chapter = notes.chapter;
-                    expandedDwd.course = notes.course;
-                    expandedDwd.courseCategory = notes.courseCategory;
+                    expandedDwd.notes = {
+                        _id: notes._id,
+                        title: notes.title,
+                    };
+                    expandedDwd.chapter = {
+                        _id: notes.chapter._id,
+                        title: notes.chapter.title
+                    }
+                    expandedDwd.course = {
+                        _id: notes.course._id,
+                        title: notes.course.title
+                    }
+                    expandedDwd.courseCategory = {
+                        _id: notes.courseCategory._id,
+                        title: notes.courseCategory.title
+                    }
                 }
             }
 

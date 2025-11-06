@@ -16,10 +16,10 @@ const findCourses = async (query, limit = 0) => {
     if (!courses) throw { status: 204, message: 'No courses found!' };
 
     // Extract unique user IDs for better efficiency
-    const userIDs = [...new Set(courses.map(c => c.created_by?.toString()))];
+    const usersIDs = [...new Set(courses.map(c => c.created_by?.toString()))];
 
     // Populate all user details: a Map
-    const batchedUsers = await populateBatchedUsers(userIDs);
+    const batchedUsers = await populateBatchedUsers(usersIDs);
 
     // Map courses to expanded objects
     const expandedCourses = courses.map(chapter => {

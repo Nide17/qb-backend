@@ -192,8 +192,8 @@ exports.getPopularQuizzes = async (req, res) => {
         ]).exec();
 
         if (topQuizzes.length > 0) {
-            const quizIds = topQuizzes.map(q => q._id);
-            let quizzes = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/?ids=${quizIds.join(',')}`);
+            const quizzesIDs = topQuizzes.map(q => q._id);
+            let quizzes = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/?ids=${quizzesIDs.join(',')}`);
 
             popularQuizzes = topQuizzes.map(pq => {
                 const quiz = quizzes?.find(q => String(q._id) === String(pq._id));
@@ -402,8 +402,8 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
         if (topUsers.length > 0) {
 
-            const userIDs = topUsers.map(u => u._id.toString());
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, 200000);
+            const usersIDs = topUsers.map(u => u._id.toString());
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, 200000);
 
             topUsers = topUsers.map(usr => {
                 const user = users?.data?.find(u => u._id === usr._id.toString()) || {};
@@ -444,8 +444,8 @@ exports.getTop10Quizzes = async (req, res) => {
 
         if (topQuizzesData.length > 0) {
 
-            const quizIds = topQuizzesData.map(q => q._id.toString());
-            const quizzes = await axios.post(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/batch`, { quizIds }, 200000);
+            const quizzesIDs = topQuizzesData.map(q => q._id.toString());
+            const quizzes = await axios.post(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/batch`, { quizzesIDs }, 200000);
 
             let topQuizzes = topQuizzesData.map(qz => {
                 const quiz = quizzes?.data?.find(q => String(q._id) === String(qz._id)) || {};

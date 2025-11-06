@@ -12,10 +12,10 @@ exports.getBlogPostsViews = async (req, res) => {
         if (!blogPostsViews) throw { 'message': 'No blog Posts Views found!', 'status': 204 };
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(blogPostsViews.map(bv => bv.viewer?.toString()))];
+        const usersIDs = [...new Set(blogPostsViews.map(bv => bv.viewer?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map blogPostsViews to expanded objects
         const expandedBlogPostsViews = blogPostsViews.map(bpv => {
@@ -52,10 +52,10 @@ exports.getRecentTenViews = async (req, res) => {
         if (!recentTenViews) throw { 'message': '10 blog posts views not found!', 'status': 404 };
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(recentTenViews.map(ch => ch.viewer?.toString()))];
+        const usersIDs = [...new Set(recentTenViews.map(ch => ch.viewer?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map recentTenViews to expanded objects
         const expandedRecentTenViews = recentTenViews.map(bpv => {

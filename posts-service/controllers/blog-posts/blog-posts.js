@@ -13,10 +13,10 @@ exports.getBlogPosts = async (req, res) => {
         }
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(blogPostsViews.map(ch => ch.creator?.toString()))];
+        const usersIDs = [...new Set(blogPostsViews.map(ch => ch.creator?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map blogPostsViews to expanded objects
         const expandedBlogPostsViews = blogPostsViews.map(bp => {
@@ -76,10 +76,10 @@ exports.getBlogPostsByCategory = async (req, res) => {
         }
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(blogPosts.map(b => b.creator?.toString()))];
+        const usersIDs = [...new Set(blogPosts.map(b => b.creator?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map blogPosts to expanded objects
         const expandedBlogPosts = blogPosts.map(bp => {

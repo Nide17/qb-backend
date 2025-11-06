@@ -17,7 +17,7 @@ exports.getQuestions = async (req, res) => {
 
 exports.getBatchedQuestions = async (req, res) => {
     try {
-        const ids = req.body.questionIds;
+        const ids = req.body.questionsIds;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             throw { 'message': 'Invalid or missing note IDs!', 'status': 400 };
         }

@@ -14,10 +14,10 @@ const findNotes = async (query, limit = 0) => {
     if (!notes) throw { status: 204, message: 'No notes found!' };
 
     // Extract unique user IDs for better efficiency
-    const userIDs = [...new Set(notes.map(n => n.viewer?.toString()))];
+    const usersIDs = [...new Set(notes.map(n => n.viewer?.toString()))];
 
     // Populate all user details: a Map
-    const batchedUsers = await populateBatchedUsers(userIDs);
+    const batchedUsers = await populateBatchedUsers(usersIDs);
 
     // Map notes to expanded objects
     const expandedNotes = notes.map(notes => {

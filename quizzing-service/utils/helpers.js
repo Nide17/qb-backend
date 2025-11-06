@@ -45,12 +45,12 @@ const populateOneUser = async (userId) => {
     }
 };
 
-const populateBatchedUsers = async (userIDs) => {
+const populateBatchedUsers = async (usersIDs) => {
 
-    if (!userIDs || userIDs.length === 0) return userIDs;
+    if (!usersIDs || usersIDs.length === 0) return usersIDs;
 
     try {
-        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, { timeout: 20000 });
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, { timeout: 20000 });
         const usersMap = new Map();
         for (const user of response.data || []) {
             usersMap.set(user._id.toString(), user);
@@ -143,25 +143,25 @@ const populateBatchedQuizzes = async (quizzes) => {
     if (!quizzes || quizzes.length === 0) return quizzes;
 
     try {
-    // Convert to plain objects to avoid mongoose issues
-    const plainQuizzes = quizzes.map(quiz => quiz.toObject ? quiz.toObject() : quiz);
+        // Convert to plain objects to avoid mongoose issues
+        const plainQuizzes = quizzes.map(quiz => quiz.toObject ? quiz.toObject() : quiz);
 
-    // Extract unique user IDs for better efficiency
-    const userIDs = [...new Set(plainQuizzes.map(q => q.created_by?.toString()))];
+        // Extract unique user IDs for better efficiency
+        const usersIDs = [...new Set(plainQuizzes.map(q => q.created_by?.toString()))];
 
-    // Populate all user details in batch (assumed returns a map-like object or record)
-    const batchedUsers = await populateBatchedUsers(userIDs);
+        // Populate all user details in batch (assumed returns a map-like object or record)
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
-    // Map plainQuizzes to expanded objects
-    const expandedPlainQuizzes = plainQuizzes.map(qz => {
-        const expandedQz = { ...qz };
-        if (qz.created_by) {
-            expandedQz.created_by = batchedUsers.get(qz.created_by.toString());
-        }
-        return expandedQz;
-    });
+        // Map plainQuizzes to expanded objects
+        const expandedPlainQuizzes = plainQuizzes.map(qz => {
+            const expandedQz = { ...qz };
+            if (qz.created_by) {
+                expandedQz.created_by = batchedUsers.get(qz.created_by.toString());
+            }
+            return expandedQz;
+        });
 
-    return expandedPlainQuizzes || plainQuizzes;
+        return expandedPlainQuizzes || plainQuizzes;
     } catch (err) {
         console.error(err.message);
         return {}

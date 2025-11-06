@@ -8,10 +8,10 @@ exports.getImageUploads = async (req, res) => {
         if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 204 };
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
+        const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map imageUploads to expanded objects
         const expandedImageUploads = imageUploads.map(img => {
@@ -46,10 +46,10 @@ exports.getImageUploadsByOwner = async (req, res) => {
         if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
         // Extract unique user IDs for better efficiency
-        const userIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
+        const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(userIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
 
         // Map imageUploads to expanded objects
         const expandedImageUploads = imageUploads.map(img => {

@@ -89,12 +89,12 @@ exports.getAdminsEmails = async (req, res) => {
 // Get batched users: by IDs list from the post body
 exports.getBatchedUsers = async (req, res) => {
 
-    const userIDs = req.body?.userIDs;
+    const usersIDs = req.body?.usersIDs;
 
     try {
-        if (!userIDs || !Array.isArray(userIDs) || userIDs.length === 0) throw { 'message': 'No user IDs provided!', 'status': 400 };
+        if (!usersIDs || !Array.isArray(usersIDs) || usersIDs.length === 0) throw { 'message': 'No user IDs provided!', 'status': 400 };
 
-        const users = await User.find({ _id: { $in: userIDs } }).select('name email');
+        const users = await User.find({ _id: { $in: usersIDs } }).select('name email');
         if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
         res.status(200).json(users);
     } catch (err) {

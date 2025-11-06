@@ -94,11 +94,11 @@ const validateRoomMessageData = (data) => {
 const populateUsersInChatRooms = async (chatRooms) => {
 
     const ids = chatRooms.map(room => room.users).flat();
-    const userIDs = [...new Set(ids)].filter(id => id);
+    const usersIDs = [...new Set(ids)].filter(id => id);
 
     try {
-        if (userIDs.length > 0) {
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { userIDs }, 200000);
+        if (usersIDs.length > 0) {
+            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, 200000);
             const usersMap = users?.data?.reduce((acc, user) => {
                 acc[user._id] = user;
                 return acc;

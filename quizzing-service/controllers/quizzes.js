@@ -143,7 +143,7 @@ exports.getQuizzesByNotes = async (req, res) => {
 
 exports.getBatchedQuizzes = async (req, res) => {
     try {
-        const ids = req.body.quizIds;
+        const ids = req.body.quizzesIDs;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             throw { message: 'No quiz IDs provided!', status: 400 };
         }

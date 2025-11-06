@@ -15,10 +15,10 @@ const findChapters = async (query, limit = 0) => {
     if (!chapters) throw { status: 204, message: 'No chapters found!' };
 
     // Extract unique user IDs for better efficiency
-    const userIDs = [...new Set(chapters.map(c => c.created_by?.toString()))];
+    const usersIDs = [...new Set(chapters.map(c => c.created_by?.toString()))];
 
     // Populate all user details: a Map
-    const batchedUsers = await populateBatchedUsers(userIDs);
+    const batchedUsers = await populateBatchedUsers(usersIDs);
 
     // Map chapters to expanded objects
     const expandedChapters = chapters.map(chapter => {
