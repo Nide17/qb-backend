@@ -1,10 +1,17 @@
 const BlogPost = require('../../models/blog-posts/BlogPost.js');
 const { handleError } = require('../../utils/error');
-const { deleteImageFromS3, populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../../utils/helpers');
+const { deleteImageFromS3, populateOneUser, populateBatchedUsers, validateRequiredFields, setCachedData, getCachedData } = require('../../utils/helpers');
 
 exports.getBlogPosts = async (req, res) => {
 
     try {
+
+        const cacheKey = 'blogPosts';
+        const cached = await getCachedData(cacheKey);
+        if (cached) {
+            return res.status(200).json(cached);
+        }
+
         let blogPosts = await BlogPost.find().sort({ createdAt: -1 })
             .populate('postCategory', 'title');
 
@@ -24,8 +31,10 @@ exports.getBlogPosts = async (req, res) => {
             const creator = batchedUsers.get(bp.creator?.toString()) || bp.creator;
             return { ...bpObj, creator };
         });
+        blogPosts = expandedBlogPosts || blogPosts;
 
-        return res.status(200).json(expandedBlogPosts || blogPosts);
+        await setCachedData(cacheKey, blogPosts);
+        res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
     }
@@ -49,11 +58,7 @@ exports.getOneBlogPost = async (req, res) => {
         const creator = await populateOneUser(blogPostObj.creator);
         blogPostObj.creator = creator || { _id: blogPostObj.creator, name: 'Unknown User' };
 
-        res.status(200).json({
-            success: true,
-            data: blogPostObj,
-            timestamp: new Date().toISOString()
-        });
+        res.status(200).json(blogPostObj);
     } catch (err) {
         handleError(res, err);
     }
@@ -63,6 +68,12 @@ exports.getBlogPostsByCategory = async (req, res) => {
 
     try {
         const id = req.params.id;
+
+        const cacheKey = `blogPostsByCategory-${id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) {
+            return res.status(200).json(cached);
+        }
 
         if (!id) {
             throw { 'message': 'Category id not provided', 'status': 400 };
@@ -88,7 +99,9 @@ exports.getBlogPostsByCategory = async (req, res) => {
             return { ...bpObj, creator };
         });
 
-        return res.status(200).json(expandedBlogPosts || blogPosts);
+        blogPosts = expandedBlogPosts || blogPosts;
+        await setCachedData(cacheKey, blogPosts);
+        res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
     }
@@ -96,8 +109,20 @@ exports.getBlogPostsByCategory = async (req, res) => {
 
 exports.getCreatedBy = async (req, res) => {
     try {
+
+        if (!req.params.id) {
+            throw { 'message': 'User id not provided', 'status': 400 };
+        }
+
+        const cacheKey = `blogPostsByCreator-${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) {
+            return res.status(200).json(cached);
+        }
         const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
         if (!blogPosts) throw { 'message': 'No blogPosts found!', 'status': 404 };
+
+        await setCachedData(cacheKey, blogPosts);
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);

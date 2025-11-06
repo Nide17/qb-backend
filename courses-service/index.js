@@ -4,6 +4,7 @@ const os = require('os');
 const process = require('process');
 const cors = require('cors');
 const { handleError } = require('./utils/error');
+const { redisCache } = require('./utils/helpers');
 const dotenv = require('dotenv');
 
 // Config
@@ -94,6 +95,12 @@ mongoose
             const db = conn.connection.db;
             console.log(`🗑️ MongoDB ${db.databaseName} is connected`)
             console.log(`🔥 Courses service is running on port ${process.env.PORT || 5005}`);
+
+            try {
+                await redisCache.connect()
+            } catch (error) {
+                console.log(error)
+            }
         });
     })
     .catch((err) => console.log(err));

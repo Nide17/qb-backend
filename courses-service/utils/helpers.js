@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { S3 } = require('@aws-sdk/client-s3');
+const RedisCacheManager = require('./redis-cache');
 
 // Helper function to call other services
 const getFromService = async (url, timeout = 20000, token) => {
@@ -71,6 +72,39 @@ const s3Config = new S3({
     region: process.env.AWS_REGION
 });
 
+// Initialize Redis cache manager
+const redisCache = new RedisCacheManager();
+
+// Enhanced cache functions with Redis
+const getCachedData = async (key) => {
+    try {
+        // Try Redis first
+        if (redisCache.isConnected) {
+            const cached = await redisCache.get(key);
+            if (cached) {
+                console.log(`📦 Redis cache hit: ${key}`);
+                return cached;
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Cache get error:\n', error.message);
+        return null;
+    }
+};
+
+const setCachedData = async (key, data, ttl = 300) => {
+    try {
+        // Set in Redis first
+        if (redisCache.isConnected) {
+            await redisCache.set(key, data, ttl);
+            console.log(`📦 Redis cache set: ${key} (TTL: ${ttl}s)`);
+        }
+    } catch (error) {
+        console.error('Cache set error:\n', error.message);
+    }
+};
 
 module.exports = {
     getFromService,
@@ -78,4 +112,7 @@ module.exports = {
     populateBatchedUsers,
     validateRequiredFields,
     s3Config,
+    redisCache,
+    setCachedData,
+    getCachedData,
 };

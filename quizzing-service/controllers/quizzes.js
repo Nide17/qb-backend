@@ -2,7 +2,7 @@ const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
 const Question = require('../models/Question');
 const { handleError } = require('../utils/error');
-const { getFromService, populateOneUser, populateBatchedQuizzes, redisCache, setCachedData, getCachedData } = require('../utils/helpers');
+const { getFromService, populateOneUser, populateBatchedQuizzes, setCachedData, getCachedData } = require('../utils/helpers');
 const { sendEmail } = require('../utils/emails/sendEmail');
 const { isValidObjectId } = require('mongoose');
 

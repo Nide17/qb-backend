@@ -1,6 +1,6 @@
 const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../utils/helpers');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields, setCachedData, getCachedData } = require('../utils/helpers');
 
 const expandNotes = async (notes) => {
 
@@ -22,7 +22,14 @@ const expandNotes = async (notes) => {
     return expandedNotes || notes;
 };
 
-const findNotes = async (query, limit = 0) => {
+const findNotes = async (query, limit = 0, key) => {
+
+    const cacheKey = `notes_${key}`
+    console.log(cacheKey)
+    const cached = await getCachedData(cacheKey);
+    if (cached) {
+        return cached;
+    }
 
     let notes = await Notes.find(query).sort({ createdAt: -1 })
         .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
@@ -36,7 +43,7 @@ const findNotes = async (query, limit = 0) => {
 exports.getNotes = async (req, res) => {
 
     try {
-        const notes = await findNotes({}, 0);
+        const notes = await findNotes({}, 0, 'all');
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
@@ -47,7 +54,7 @@ exports.getLimitedNotes = async (req, res) => {
 
     try {
         const limit = parseInt(req.query.limit) || 5;
-        const notes = await findNotes({}, limit);
+        const notes = await findNotes({}, limit, `limit_${limit}`);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
@@ -56,7 +63,7 @@ exports.getLimitedNotes = async (req, res) => {
 
 exports.getNotesByCategory = async (req, res) => {
     try {
-        const notes = await findNotes({ courseCategory: req.params.id });
+        const notes = await findNotes({ courseCategory: req.params.id }, 0, `category_${req.params.id}`);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
@@ -65,7 +72,7 @@ exports.getNotesByCategory = async (req, res) => {
 
 exports.getNotesByChapter = async (req, res) => {
     try {
-        const notes = await findNotes({ chapter: req.params.id });
+        const notes = await findNotes({ chapter: req.params.id }, 0, `chapter_${req.params.id}`);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
