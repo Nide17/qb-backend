@@ -123,7 +123,6 @@ exports.getOneScore = async (req, res) => {
 
         if (!scoreObj) {
             // Throw an object that the controllers can pass to handleError
-            console.log('Score not found!');
             throw { status: 404, message: 'Score not found!' };
         }
 
@@ -149,7 +148,6 @@ exports.getQuizRanking = async (req, res) => {
 
         let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).exec();
         if (!scores || scores.length === 0) {
-            console.warn(`No scores found for the ${req.params.id} quiz`);
             throw { 'status': 404, 'message': 'No scores to display' };
         }
 
@@ -261,6 +259,20 @@ exports.getMonthlyUser = async (req, res) => {
 
         setCachedData(cacheKey, monthlyUserData);
         res.status(200).json(monthlyUserData);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+exports.getBatchedScores = async (req, res) => {
+    try {
+        const ids = req.body.scoresIDs;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            throw { message: 'No score IDs provided!', status: 400 };
+        }
+
+        const scores = await Score.find({ _id: { $in: ids } }).select('id marks out_of quiz');
+        res.status(200).json(scores);
     } catch (err) {
         handleError(res, err);
     }

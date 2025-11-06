@@ -1,6 +1,6 @@
 const handleError = (res, err, status) => {
 
-    console.log(err.config.url);
+    console.log(err?.message);
     // Handle MongoDB Cast Errors
     if (err.name === 'CastError') {
         if (err.kind === 'ObjectId') {

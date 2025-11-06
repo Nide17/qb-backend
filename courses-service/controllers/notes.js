@@ -2,19 +2,12 @@ const Notes = require('../models/Notes');
 const { handleError } = require('../utils/error');
 const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../utils/helpers');
 
-const findNotes = async (query, limit = 0) => {
+const expandNotes = async (notes) => {
 
-    let notesQuery = Notes.find(query).sort({ createdAt: -1 })
-        .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
-        .populate('course chapter courseCategory', 'title');
-
-    if (limit > 0) notesQuery = notesQuery.limit(limit);
-
-    const notes = await notesQuery;
-    if (!notes) throw { status: 204, message: 'No notes found!' };
+    if (!notes) throw { status: 404, message: 'No notes found!' };
 
     // Extract unique user IDs for better efficiency
-    const usersIDs = [...new Set(notes.map(n => n.viewer?.toString()))];
+    const usersIDs = [...new Set(notes.map(n => n.uploaded_by?.toString()))];
 
     // Populate all user details: a Map
     const batchedUsers = await populateBatchedUsers(usersIDs);
@@ -22,11 +15,22 @@ const findNotes = async (query, limit = 0) => {
     // Map notes to expanded objects
     const expandedNotes = notes.map(notes => {
         const notesObj = notes.toObject();
-        const viewer = batchedUsers.get(notes.viewer?.toString()) || notes.viewer;
-        return { ...notesObj, viewer };
+        const uploaded_by = batchedUsers.get(notes.uploaded_by?.toString()) || notes.uploaded_by;
+        return { ...notesObj, uploaded_by };
     });
 
     return expandedNotes || notes;
+};
+
+const findNotes = async (query, limit = 0) => {
+
+    let notes = await Notes.find(query).sort({ createdAt: -1 })
+        .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
+        .populate('course chapter courseCategory', 'title')
+        .limit(limit);
+
+    notes = await expandNotes(notes);
+    return notes;
 };
 
 exports.getNotes = async (req, res) => {

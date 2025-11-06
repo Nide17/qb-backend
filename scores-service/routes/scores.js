@@ -1,5 +1,5 @@
 const express = require('express');
-const { getScores, getScoresByTaker, getScoresForQuizCreator, getOneScore, getQuizRanking, getPopularQuizzes, getMonthlyUser, getTop10QuizzingUsers, getTop10Quizzes, createScore, deleteScore } = require('../controllers/scores');
+const { getScores, getScoresByTaker, getScoresForQuizCreator, getOneScore, getBatchedScores, getQuizRanking, getPopularQuizzes, getMonthlyUser, getTop10QuizzingUsers, getTop10Quizzes, createScore, deleteScore } = require('../controllers/scores');
 const { auth, authRole } = require('../middlewares/auth');
 
 const router = express.Router();
@@ -17,6 +17,7 @@ router.get('/:id', getOneScore);
 
 // POST routes
 router.post('/', createScore);
+router.post('/batch', getBatchedScores);
 
 // DELETE routes
 router.delete('/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), deleteScore);

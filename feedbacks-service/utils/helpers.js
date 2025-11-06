@@ -44,7 +44,88 @@ const populateOneFeedback = async (feedback) => {
     }
 };
 
+const populateBatchedUsers = async (usersIDs) => {
+
+    if (!usersIDs || usersIDs.length === 0) return usersIDs;
+
+    try {
+        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, { timeout: 20000 });
+        const usersMap = new Map();
+        for (const user of response.data || []) {
+            usersMap.set(user._id.toString(), user);
+        }
+        return usersMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+const populateBatchedScores = async (scoresIDs) => {
+
+    if (!scoresIDs || scoresIDs.length === 0) return scoresIDs;
+
+    try {
+        const response = await axios.post(`${process.env.SCORES_SERVICE_URL}/api/scores/batch`, { scoresIDs }, { timeout: 20000 });
+        const scoresMap = new Map();
+        for (const score of response.data || []) {
+            scoresMap.set(score._id.toString(), score);
+        }
+        return scoresMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+const populateBatchedFeedbacks = async (feedbacks) => {
+
+    if (!feedbacks || feedbacks.length === 0) return null;
+
+    try {
+        // Convert to plain objects to avoid mongoose issues
+        const plainFeedbacks = feedbacks.map(feedback => feedback.toObject ? feedback.toObject() : feedback);
+
+        // Extract unique scores IDs for better efficiency
+        const scoresIDs = [...new Set(plainFeedbacks.map(fb => fb.score?.toString()).filter(Boolean))];
+
+        // Extract unique user IDs for better efficiency
+        const usersIDs = [...new Set(plainFeedbacks.map(fb => fb.user?.toString()).filter(Boolean))];
+
+        // Populating
+        const batchedScores = await populateBatchedScores(scoresIDs);
+        const batchedUsers = await populateBatchedUsers(usersIDs);
+
+        // Map plainFeedbacks to expanded objects
+        const expandedPlainFeedbacks = plainFeedbacks.map(feedback => {
+
+            const expandedFeedback = { ...feedback };
+
+            if (feedback.score) {
+
+                let score = batchedScores.get(feedback.score.toString());
+
+                expandedFeedback.score = {
+                    _id: score?._id,
+                    id: score?.id,
+                    marks: score?.marks,
+                    out_of: score?.out_of
+                }
+            }
+
+            if (feedback.user) {
+                expandedFeedback.user = batchedUsers.get(feedback.user.toString());
+            }
+            return expandedFeedback;
+        });
+
+        return expandedPlainFeedbacks || plainFeedbacks;
+    } catch (err) {
+        console.error(err.message);
+        return {}
+    }
+}
+
 module.exports = {
     getFromService,
     populateOneFeedback,
+    populateBatchedFeedbacks,
 };

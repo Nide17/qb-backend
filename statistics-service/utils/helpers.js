@@ -10,9 +10,8 @@ const getCachedData = async (key) => {
         // Try Redis first
         if (redisCache.isConnected) {
             const cached = await redisCache.get(key);
-            console.log("cached: ", cached)
             if (cached) {
-                console.log(`📦 Redis cache hit: ${key}`);
+                console.log(`📦 Redis cache hit for: ${key}`);
                 return cached;
             }
         }
