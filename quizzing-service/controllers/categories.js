@@ -60,6 +60,10 @@ exports.createCategory = async (req, res) => {
         if (!savedCategory) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
 
         savedCategory = await populateOneCategory(savedCategory);
+
+        // Clear cache for categories
+        const cacheKey = 'categories';
+        await redisCache.del(cacheKey);
         res.status(200).json(savedCategory);
     } catch (err) {
         handleError(res, err);
@@ -92,6 +96,9 @@ exports.deleteCategory = async (req, res) => {
         const removedCategory = await Category.deleteOne({ _id: req.params.id });
         if (removedCategory.deletedCount === 0) throw { 'message': 'Something went wrong while deleting the category!', 'status': 500 };
 
+        // Clear cache for categories
+        const cacheKey = 'categories';
+        await redisCache.del(cacheKey);
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);

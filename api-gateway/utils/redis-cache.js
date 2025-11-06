@@ -4,7 +4,7 @@ class RedisCacheManager {
     constructor() {
         this.redis = null;
         this.isConnected = false;
-        this.defaultTTL = 300; // 5 minutes in seconds
+        this.defaultTTL = 600; // 10 minutes in seconds
         this.retryDelay = 30000; // 30 seconds
         this.maxRetries = 1;
     }

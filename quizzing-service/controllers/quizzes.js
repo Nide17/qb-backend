@@ -2,7 +2,7 @@ const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
 const Question = require('../models/Question');
 const { handleError } = require('../utils/error');
-const { getFromService, populateOneUser, populateBatchedQuizzes } = require('../utils/helpers');
+const { getFromService, populateOneUser, populateBatchedQuizzes, redisCache, setCachedData, getCachedData } = require('../utils/helpers');
 const { sendEmail } = require('../utils/emails/sendEmail');
 const { isValidObjectId } = require('mongoose');
 
@@ -18,6 +18,13 @@ exports.getQuizzes = async (req, res) => {
 
         // LIMITED
         if (limit) {
+
+            const cacheKey = `limited_quizzes_${limit}_${skip}`;
+            const cached = await getCachedData(cacheKey);
+            if (cached) {
+                return res.status(200).json(cached);
+            }
+            
             let limitedQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
                 .populate('category questions')
@@ -29,16 +36,25 @@ exports.getQuizzes = async (req, res) => {
             }
 
             const expandedQuizzes = await populateBatchedQuizzes(limitedQuizzes);
-            res.status(200).json({
+            const result = {
                 totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
                 currentPage: pageNo,
                 pageSize: PAGE_SIZE,
                 totalQuizzes,
-                quizzes: expandedQuizzes || limitedQuizzes
-            });
+                quizzes: expandedQuizzes || limitedQuizzes,
+            };
+
+            await setCachedData(cacheKey, result);
+            res.status(200).json(result);
         }
         // PAGINATED
         else if (pageNo && pageNo > 0) {
+
+            const cacheKey = `paginated_quizzes_${pageNo}`;
+            const cached = await getCachedData(cacheKey);
+            if (cached) {
+                return res.status(200).json(cached);
+            }
 
             // If limit & skip undefined: Pagination - ENFORCE pagination to prevent memory exhaustion
             var PAGE_SIZE = 20;
@@ -64,17 +80,25 @@ exports.getQuizzes = async (req, res) => {
             }
 
             const expandedQuizzes = await populateBatchedQuizzes(paginatedQuizzes);
-            return res.status(200).json({
+            const result = {
                 totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
                 currentPage: pageNo,
                 pageSize: PAGE_SIZE,
                 totalQuizzes,
-                quizzes: paginatedQuizzes || expandedQuizzes
-            });
+                quizzes: expandedQuizzes || paginatedQuizzes,
+            };
+            await setCachedData(cacheKey, result);
+            res.status(200).json(result);
 
         }
         // NO LIMIT AND NO SKIP AT ALL
         else {
+
+            const cacheKey = 'all_quizzes';
+            const cached = await getCachedData(cacheKey);
+            if (cached) {
+                return res.status(200).json(cached);
+            }
             let allQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
                 .populate('category questions');
@@ -84,7 +108,10 @@ exports.getQuizzes = async (req, res) => {
             }
 
             const expandedQuizzes = await populateBatchedQuizzes(allQuizzes);
-            res.status(200).json(expandedQuizzes || allQuizzes);
+            allQuizzes = expandedQuizzes || allQuizzes;
+
+            await setCachedData(cacheKey, allQuizzes);
+            res.status(200).json(allQuizzes);
         }
     } catch (err) {
         handleError(res, err);
@@ -113,6 +140,13 @@ exports.getOneQuiz = async (req, res) => {
 
 exports.getQuizzesByCategory = async (req, res) => {
     try {
+
+        const cacheKey = `category_quizzes_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) {
+            return res.status(200).json(cached);
+        }
+
         let quizzes = await Quiz.find({ category: req.params.id })
             .populate('category questions');
         if (!quizzes.length) {
@@ -120,7 +154,10 @@ exports.getQuizzesByCategory = async (req, res) => {
         }
 
         const expandedQuizzes = await populateBatchedQuizzes(quizzes);
-        res.status(200).json(expandedQuizzes || quizzes);
+        quizzes = expandedQuizzes || quizzes;
+
+        await setCachedData(cacheKey, quizzes);
+        res.status(200).json(quizzes);
     } catch (err) {
         handleError(res, err);
     }
@@ -128,6 +165,13 @@ exports.getQuizzesByCategory = async (req, res) => {
 
 exports.getQuizzesByNotes = async (req, res) => {
     try {
+
+        const cacheKey = `notes_quizzes_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) {
+            return res.status(200).json(cached);
+        }
+
         const categories = await Category.find({ category: req.params.id });
         let quizzes = await Quiz.find({ category: { $in: categories } }).populate('category questions');
         if (!quizzes.length) {
@@ -135,7 +179,10 @@ exports.getQuizzesByNotes = async (req, res) => {
         }
 
         const expandedQuizzes = await populateBatchedQuizzes(quizzes);
-        res.status(200).json(expandedQuizzes || quizzes);
+        quizzes = expandedQuizzes || quizzes;
+
+        await setCachedData(cacheKey, quizzes);
+        res.status(200).json(quizzes);
     } catch (err) {
         handleError(res, err);
     }
@@ -271,7 +318,6 @@ exports.deleteQuiz = async (req, res) => {
         );
 
         await Question.deleteMany({ quiz: quiz._id });
-
         await Quiz.deleteOne({ _id: req.params.id });
 
         res.status(200).json(quiz);
