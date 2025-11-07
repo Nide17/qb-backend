@@ -16,7 +16,7 @@ const findCourses = async (query, limit = 0) => {
     if (!courses) throw { status: 204, message: 'No courses found!' };
 
     // Extract unique user IDs for better efficiency
-    const usersIDs = [...new Set(courses.map(c => c.created_by?.toString()))];
+    const usersIDs = [...new Set(courses.map(c => c?.created_by?.toString()))];
 
     // Populate all user details: a Map
     const batchedUsers = await populateBatchedUsers(usersIDs);
@@ -24,7 +24,7 @@ const findCourses = async (query, limit = 0) => {
     // Map courses to expanded objects
     const expandedCourses = courses.map(chapter => {
         const chapterObj = chapter.toObject();
-        const created_by = batchedUsers.get(chapter.created_by?.toString()) || chapter.created_by;
+        const created_by = batchedUsers.get(chapter?.created_by?.toString()) || chapter?.created_by;
         return { ...chapterObj, created_by };
     });
 
@@ -52,12 +52,17 @@ exports.getCoursesByCategory = async (req, res) => {
 
 exports.getOneCourse = async (req, res) => {
 
+    if (!req.params.id) throw { 'message': 'Course ID is required!', 'status': 400 };
+    console.log("req.params.id: ", req.params.id)
+
     try {
         let course = await Course.findById(req.params.id).populate('courseCategory', 'title description courseCategory created_by');
 
+        console.log("course: ", course)
+
         // Populate creator
-        let created_by = await populateOneUser(course.created_by) || course.created_by;
-        course = { ...course.toObject(), created_by };
+        let created_by = await populateOneUser(course?.created_by) || course?.created_by;
+        course = { ...course?.toObject(), created_by };
 
         res.status(200).json(course);
     } catch (err) {
@@ -96,7 +101,7 @@ exports.createCourse = async (req, res) => {
             title: savedCourse.title,
             description: savedCourse.description,
             courseCategory: savedCourse.courseCategory,
-            created_by: savedCourse.created_by,
+            created_by: savedCourse?.created_by,
             createdAt: savedCourse.createdAt,
         });
     } catch (err) {

@@ -32,11 +32,11 @@ const populateOneUser = async (userId) => {
     if (!userId) return null;
 
     try {
-        const data = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
+        const usr = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
 
-        return data ? {
-            _id: data._id,
-            name: data.name
+        return usr ? {
+            _id: usr._id,
+            name: usr.name
         } : { _id: userId, name: 'Unknown User' };
     } catch (err) {
         return { _id: userId, name: 'Unknown User' };

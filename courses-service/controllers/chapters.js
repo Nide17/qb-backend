@@ -42,7 +42,7 @@ exports.getChapters = async (req, res) => {
 exports.getChaptersByCourse = async (req, res) => {
 
     try {
-        const notes = await findNotes({ course: req.params.id }, 0);
+        const notes = await findChapters({ course: req.params.id }, 0);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);

@@ -466,10 +466,10 @@ async function startServer() {
         try {
             await redisCache.connect()
         } catch (error) {
-            console.log(error)
+            console.log(`Redis error: ${error?.message || error}`);
         }
     } catch (err) {
-        console.error('Failed to start server:\n', err);
+        console.error('Failed to start server:\n', err?.message || err);
     }
 }
 

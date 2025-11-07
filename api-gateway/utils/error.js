@@ -1,6 +1,6 @@
 const handleError = (res, err, status) => {
 
-    console.log(err?.message);
+    console.log(`Handling error: ${err?.message || err}`);
     // Handle MongoDB Cast Errors
     if (err.name === 'CastError') {
         if (err.kind === 'ObjectId') {
@@ -70,7 +70,7 @@ const handleError = (res, err, status) => {
 
     // Handle Axios Errors
     else if (err.isAxiosError) {
-        console.error('Axios error occurred:', err.code, err.name);
+        console.error('Axios error occurred:', err.code, err.name, err.message);
         if (err.code === 'ECONNREFUSED') {
             return res.status(503).json({
                 success: false,

@@ -23,7 +23,7 @@ const getCachedData = async (key) => {
     }
 };
 
-const setCachedData = async (key, data, ttl = 300) => {
+const setCachedData = async (key, data, ttl = 600) => {
     try {
         // Set in Redis first
         if (redisCache.isConnected) {

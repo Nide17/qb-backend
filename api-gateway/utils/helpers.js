@@ -22,11 +22,11 @@ const getCachedData = async (key) => {
 
         return null;
     } catch (error) {
-        console.error('Cache get error:\n', error);
+        console.error('Cache get error:\n', error?.message || error);
     }
 };
 
-const setCachedData = async (key, data, ttl = 300) => {
+const setCachedData = async (key, data, ttl = 600) => {
     try {
         // Set in Redis first
         if (redisCache.isConnected) {
@@ -34,7 +34,7 @@ const setCachedData = async (key, data, ttl = 300) => {
             console.log(`📦 Redis cache set: ${key} (TTL: ${ttl}s)`);
         }
     } catch (error) {
-        console.error('Cache set error:\n', error);
+        console.error('Cache set error:\n', error?.message || error);
     }
 };
 
@@ -110,7 +110,7 @@ const routeToService = (serviceName, serviceUrl) => async (req, res) => {
         const response = await makeRequest(req, serviceUrl);
         res.status(response.status).json(response.data);
     } catch (err) {
-        console.error('Route to service error occurred:', err);
+        console.error('Route to service error occurred:', err?.message || err);
         handleError(res, err);
     }
 };
