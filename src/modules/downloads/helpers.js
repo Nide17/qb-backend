@@ -1,3 +1,6 @@
+const { getBatchedNotes } = require('../courses/helpers');
+const { getBatchedUsers } = require('../users/helpers');
+
 // Helper function to populate related entity details based on download type
 const populateOneDownload = async (download) => {
 
@@ -30,22 +33,6 @@ const populateBatchedUsers = async (usersIDs) => {
     }
 };
 
-const populateBatchedNotes = async (notesIDs) => {
-
-    if (!notesIDs || notesIDs.length === 0) return notesIDs;
-
-    try {
-        const response = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { notesIDs }, { timeout: 20000 });
-        const notesMap = new Map();
-        for (const note of response.data || []) {
-            notesMap.set(note._id.toString(), note);
-        }
-        return notesMap;
-    } catch (err) {
-        return new Map();
-    }
-};
-
 // Populate array of downloads
 const populateBatchedDownloads = async (downloads) => {
 
@@ -62,8 +49,8 @@ const populateBatchedDownloads = async (downloads) => {
         const usersIDs = [...new Set(plainDwds.map(d => d.downloaded_by?.toString()))];
 
         // Populating
-        const batchedNotes = await populateBatchedNotes(notesIDs);
-        const batchedUsers = await populateBatchedUsers(usersIDs);
+        const batchedNotes = await getBatchedNotes(notesIDs);
+        const batchedUsers = await getBatchedUsers(usersIDs);
 
         // Map plainDwds to expanded objects
         const expandedPlainDwds = plainDwds.map(dwd => {

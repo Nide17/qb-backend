@@ -1,7 +1,9 @@
 const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields, setCachedData, getCachedData } = require('../helpers');
+const { getBatchedUsers } = require('../../users/helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+let keysToClear = [];
 const expandNotes = async (notes) => {
 
     if (!notes) throw { status: 404, message: 'No notes found!' };
@@ -10,7 +12,7 @@ const expandNotes = async (notes) => {
     const usersIDs = [...new Set(notes.map(n => n.uploaded_by?.toString()))];
 
     // Populate all user details: a Map
-    const batchedUsers = await populateBatchedUsers(usersIDs);
+    const batchedUsers = await getBatchedUsers(usersIDs);
 
     // Map notes to expanded objects
     const expandedNotes = notes.map(notes => {
@@ -36,7 +38,8 @@ const findNotes = async (query, limit = 0, key) => {
         .populate('course chapter courseCategory', 'title')
         .limit(limit);
 
-    notes = await expandNotes(notes);
+    notes = await expandNotes(notes) || notes;
+    setCachedData(cacheKey, notes) && keysToClear.push(cacheKey);
     return notes;
 };
 
@@ -131,6 +134,7 @@ exports.createNotes = async (req, res) => {
         const savedNotes = await newNotes.save();
         if (!savedNotes) throw { message: 'Could not save notes, try again!', status: 500 };
 
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(savedNotes);
 
     } catch (err) {
@@ -192,25 +196,8 @@ exports.deleteNotes = async (req, res) => {
 
         // Delete this notes entry
         await notes.deleteOne();
-        res.status(200).json(notes);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
 
-exports.getBatchedNotes = async (req, res) => {
-
-    try {
-        const ids = req.body.notesIDs;
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            throw { 'message': 'Invalid or missing note IDs!', 'status': 400 };
-        }
-
-        const notes = await Notes.find({ _id: { $in: ids } }).populate('chapter course courseCategory', 'title');
-        if (!notes.length) {
-            throw { 'message': 'No notes found!', 'status': 204 };
-        }
-
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);

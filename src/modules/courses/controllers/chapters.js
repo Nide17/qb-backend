@@ -1,8 +1,11 @@
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
+const User = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../helpers');
+const { getBatchedUsers } = require('../../users/helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+let keysToClear = []
 const findChapters = async (query, limit = 0) => {
 
     let chaptersQuery = Chapter.find(query).sort({ createdAt: -1 })
@@ -18,7 +21,7 @@ const findChapters = async (query, limit = 0) => {
     const usersIDs = [...new Set(chapters.map(c => c.created_by?.toString()))];
 
     // Populate all user details: a Map
-    const batchedUsers = await populateBatchedUsers(usersIDs);
+    const batchedUsers = await getBatchedUsers(usersIDs);
 
     // Map chapters to expanded objects
     const expandedChapters = chapters.map(chapter => {
@@ -32,7 +35,12 @@ const findChapters = async (query, limit = 0) => {
 
 exports.getChapters = async (req, res) => {
     try {
+        const cacheKey = 'chapters';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         const chapters = await findChapters({}, 0);
+
+        await setCachedData(cacheKey, chapters) && keysToClear.push(cacheKey);
         res.status(200).json(chapters);
     } catch (err) {
         handleError(res, err);
@@ -42,7 +50,13 @@ exports.getChapters = async (req, res) => {
 exports.getChaptersByCourse = async (req, res) => {
 
     try {
+        const cacheKey = `course_chapters_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const notes = await findChapters({ course: req.params.id }, 0);
+
+        await setCachedData(cacheKey, notes) && keysToClear.push(cacheKey);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
@@ -56,7 +70,7 @@ exports.getOneChapter = async (req, res) => {
 
         // Populate user
         chapter = chapter.toObject ? chapter.toObject() : chapter;
-        chapter.created_by = await populateOneUser(chapter.created_by);
+        chapter.created_by = await User.findById(chapter.created_by).select('name email');
         res.status(200).json(chapter);
     } catch (err) {
         handleError(res, err);
@@ -92,6 +106,8 @@ exports.createChapter = async (req, res) => {
         const savedChapter = await newChapter.save();
         if (!savedChapter) throw { 'message': 'Something went wrong during creation!', 'status': 503 };
 
+        // Clear redis cache
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(savedChapter);
     } catch (err) {
         handleError(res, err);
@@ -117,7 +133,10 @@ exports.deleteChapter = async (req, res) => {
 
         // Delete this chapter
         await Chapter.deleteOne({ _id: req.params.id });
-        res.status(200).json({ message: 'Chapter Deleted!' });
+
+        // Clear redis cache
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(chapter);
     } catch (err) {
         handleError(res, err);
     }
