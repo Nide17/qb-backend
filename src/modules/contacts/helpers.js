@@ -1,23 +1,4 @@
-const axios = require('axios');
-const { sendEmail } = require('../utils/emails/sendEmail');
-
-// Helper function to call other services (shared pattern)
-const getFromService = async (url, timeout = 20000, token) => {
-    if (!url || typeof url !== 'string' || url.startsWith('undefined')) return null;
-
-    try {
-        const response = await axios.get(url, {
-            timeout,
-            headers: {
-                'Content-Type': 'application/json',
-                'x-auth-token': token
-            }
-        });
-        return response.data;
-    } catch (err) {
-        throw err;
-    }
-};
+const { sendEmail } = require('../../../utils/emails/sendEmail');
 
 // Helper function to send emails
 const sendEmails = (recipients, title, message, clientURL) => {
@@ -71,15 +52,6 @@ const notifyAdmins = async (newContact) => {
     }
 };
 
-// Generalized helper function to validate required fields
-const validateRequiredFields = (fields) => {
-    for (const field of fields) {
-        if (!field.value) {
-            throw { message: `Missing required field: ${field.name}`, status: 400 };
-        }
-    }
-};
-
 // Lightweight validator for room message payloads used by room-messages controller
 const validateRoomMessageData = (data) => {
     if (!data) throw { message: 'No data provided', status: 400 };
@@ -119,10 +91,8 @@ const populateUsersInChatRooms = async (chatRooms) => {
 };
 
 module.exports = {
-    getFromService,
     notifyAdmins,
     sendEmails,
-    validateRequiredFields,
     validateRoomMessageData,
     populateUsersInChatRooms,
 };

@@ -14,8 +14,6 @@ exports.getUsers = async (req, res) => {
 
     try {
         const cacheKey = `users`;
-
-        // Check cache first
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
 
@@ -120,22 +118,6 @@ exports.getAdminsEmails = async (req, res) => {
         // Set cache
         setCachedData(cacheKey, adminEmails);
         return res.status(200).json(adminEmails);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-// Get batched users: by IDs list from the post body
-exports.getBatchedUsers = async (req, res) => {
-
-    const usersIDs = req.body?.usersIDs;
-
-    try {
-        if (!usersIDs || !Array.isArray(usersIDs) || usersIDs.length === 0) throw { 'message': 'No user IDs provided!', 'status': 400 };
-
-        const users = await User.find({ _id: { $in: usersIDs } }).select('name email');
-        if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
-        res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
     }
@@ -289,9 +271,7 @@ exports.register = async (req, res) => {
         }
 
         // del cache
-        const cacheKeys = ['users', 'latest-users', 'admins-creators', 'admins-emails', 'daily-user-registration'];
-        await redisCache.invalidateKeysCache(cacheKeys);
-
+        await redisCache.invalidateKeysCache(['users', 'latest-users', 'admins-creators', 'admins-emails', 'daily-user-registration']);
         res.status(200).json({ message: 'Registration successful! Please verify your email to login.', email });
     } catch (err) {
         handleError(res, err);
@@ -459,8 +439,7 @@ exports.deleteUser = async (req, res) => {
         if (removedUser.deletedCount === 0) throw { 'status': 500, 'message': 'Failed to delete user!' };
 
         // del cache
-        const cacheKeys = ['users', 'latest-users', 'admins-creators', 'admins-emails', 'daily-user-registration'];
-        await redisCache.invalidateKeysCache(cacheKeys);
+        await redisCache.invalidateKeysCache(['users', 'latest-users', 'admins-creators', 'admins-emails', 'daily-user-registration']);
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);

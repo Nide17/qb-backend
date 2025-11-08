@@ -18,10 +18,10 @@ app.use(cors());
 app.use('/api/users', require('./modules/users/routes/users'));
 app.use('/api/subscribed-users', require('./modules/users/routes/subscribed-users'));
 
-// // Quizzing
-// app.use('/api/categories', require('./modules/quizzing/routes/categories'));
-// app.use('/api/quizzes', require('./modules/quizzing/routes/quizzes'));
-// app.use('/api/questions', require('./modules/quizzing/routes/questions'));
+// Quizzing
+app.use('/api/categories', require('./modules/quizzing/routes/categories'));
+app.use('/api/quizzes', require('./modules/quizzing/routes/quizzes'));
+app.use('/api/questions', require('./modules/quizzing/routes/questions'));
 
 // // Posts
 // app.use('/api/adverts', require('./modules/posts/routes/adverts'));
