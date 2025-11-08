@@ -1,7 +1,7 @@
 const express = require('express');
 const { getNotes, getLimitedNotes, getNotesByCategory, getNotesByChapter, getOneNotes, getBatchedNotes, createNotes, updateNotesQuizzes, updateNotes, removeQuizFromNotes, deleteNotes } = require('../controllers/notes');
-const { authRole } = require('../middlewares/auth');
-const { notesUpload } = require('../middlewares/notesUpload');
+const { authRole } = require('../../middlewares/auth');
+const { notesUpload } = require('../../middlewares/notesUpload');
 
 const router = express.Router();
 

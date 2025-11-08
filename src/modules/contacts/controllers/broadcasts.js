@@ -1,6 +1,6 @@
 const Broadcast = require('../models/Broadcast');
-const { handleError } = require('../utils/error');
-const { validateRequiredFields, notifyAdmins, sendEmails, getFromService } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { validateRequiredFields, notifyAdmins, sendEmails, getFromService } = require('../../utils/helpers');
 
 exports.getBroadcasts = async (req, res) => {
     try {

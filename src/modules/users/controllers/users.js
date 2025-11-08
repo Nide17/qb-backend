@@ -2,11 +2,11 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendEmail } = require('../utils/emails/sendEmail');
+const { sendEmail } = require('../../utils/emails/sendEmail');
 const User = require('../models/User');
 const PswdResetToken = require('../models/PswdResetToken');
-const { handleError } = require('../utils/error');
-const { deleteImageFromS3, populateOneSchool, hashPassword, updateUserToken } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { deleteImageFromS3, populateOneSchool, hashPassword, updateUserToken } = require('../../utils/helpers');
 
 // Get all users
 exports.getUsers = async (req, res) => {

@@ -1,6 +1,6 @@
 const express = require('express');
 const { getQuizzesComments, getOneQuizComment, getCommentsByQuiz, createQuizComment, approveRejectComment, deleteQuizComment } = require('../controllers/quizzes-comments');
-const { auth, authRole } = require('../middlewares/auth');
+const { auth, authRole } = require('../../middlewares/auth');
 
 const router = express.Router();
 

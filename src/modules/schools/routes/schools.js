@@ -1,6 +1,6 @@
 const express = require('express');
 const { getSchools, getOneSchool, createSchool, updateSchool, deleteSchool } = require('../controllers/schools');
-const { authRole } = require('../middlewares/auth');
+const { authRole } = require('../../middlewares/auth');
 
 const router = express.Router();
 
