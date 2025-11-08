@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('courses', process.env.COURSES_URI);
+
 //create a schema object
 const CourseCategorySchema = new Schema({
     title: {
@@ -23,4 +26,4 @@ const CourseCategorySchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('CourseCategory', CourseCategorySchema);
+module.exports = conn.model('CourseCategory', CourseCategorySchema);

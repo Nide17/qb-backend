@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('posts', process.env.POSTS_URI);
+
 //create a schema object
 const FaqSchema = new Schema({
     title: {
@@ -33,4 +36,4 @@ const FaqSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Faq', FaqSchema);
+module.exports = conn.model('Faq', FaqSchema);

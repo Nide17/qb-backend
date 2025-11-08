@@ -5,6 +5,9 @@ const slugify = require('slugify');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('courses', process.env.COURSES_URI);
+
 //create a schema object
 const NotesSchema = new Schema({
     title: {
@@ -54,4 +57,4 @@ NotesSchema.pre('validate', function (next) {
     next();
 });
 
-module.exports = mongoose.model('Notes', NotesSchema);
+module.exports = conn.model('Notes', NotesSchema);

@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('posts', process.env.POSTS_URI);
+
 //create a schema object
 const AdvertSchema = new Schema({
     caption: {
@@ -36,4 +39,4 @@ const AdvertSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Advert', AdvertSchema);
+module.exports = conn.model('Advert', AdvertSchema);

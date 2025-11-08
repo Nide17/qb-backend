@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('downloads', process.env.DOWNLOADS_URI);
+
 //create a schema object
 const DownloadSchema = new Schema({
     notes: {
@@ -23,4 +26,4 @@ const DownloadSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Download', DownloadSchema);
+module.exports = conn.model('Download', DownloadSchema);

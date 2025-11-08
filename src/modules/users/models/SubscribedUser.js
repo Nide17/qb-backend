@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('users', process.env.USERS_URI);
+
 //create a schema object
 const SubscribedUserSchema = new Schema({
   name: {
@@ -17,4 +20,4 @@ const SubscribedUserSchema = new Schema({
   }
 }, { timestamps: true });
 
-module.exports = mongoose.model('SubscribedUser', SubscribedUserSchema);
+module.exports = conn.model('SubscribedUser', SubscribedUserSchema);

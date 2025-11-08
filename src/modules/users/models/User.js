@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 // Initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('users', process.env.USERS_URI);
+
 // Create a schema object
 const UserSchema = new Schema({
   name: {
@@ -72,4 +75,4 @@ const UserSchema = new Schema({
   }
 });
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = conn.model('User', UserSchema);

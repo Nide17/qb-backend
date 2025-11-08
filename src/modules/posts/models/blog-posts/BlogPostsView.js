@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 // initialize Mongo schema 
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('posts', process.env.POSTS_URI);
+
 // Create Schema for blogPostsView 
 const BlogPostsViewSchema = new Schema({
     blogPost: {
@@ -27,4 +30,4 @@ const BlogPostsViewSchema = new Schema({
     }
 }, { timestamps: true, });
 
-module.exports = mongoose.model('BlogPostsView', BlogPostsViewSchema);
+module.exports = conn.model('BlogPostsView', BlogPostsViewSchema);

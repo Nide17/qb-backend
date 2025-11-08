@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 // Initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('posts', process.env.POSTS_URI);
+
 // ImageUpload Schema
 const ImageUploadSchema = new Schema({
     imageTitle: {
@@ -20,4 +23,4 @@ const ImageUploadSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('ImageUpload', ImageUploadSchema);
+module.exports = conn.model('ImageUpload', ImageUploadSchema);

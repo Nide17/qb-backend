@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('contacts', process.env.CONTACTS_URI);
+
 //create a schema object
 const BroadcastSchema = new Schema({
     title: {
@@ -20,4 +23,4 @@ const BroadcastSchema = new Schema({
 },
     { timestamps: true });
 
-module.exports = mongoose.model('Broadcast', BroadcastSchema);
+module.exports = conn.model('Broadcast', BroadcastSchema);

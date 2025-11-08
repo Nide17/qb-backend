@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('schools', process.env.SCHOOLS_URI);
+
 //create a schema object
 const SchoolSchema = new Schema({
     title: {
@@ -21,4 +24,4 @@ const SchoolSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('School', SchoolSchema);
+module.exports = conn.model('School', SchoolSchema);

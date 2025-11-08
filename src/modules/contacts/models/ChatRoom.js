@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('contacts', process.env.CONTACTS_URI);
+
 //create a schema object
 const ChatRoomSchema = new Schema({
     name: {
@@ -13,4 +16,4 @@ const ChatRoomSchema = new Schema({
     users: [{ type: Schema.Types.ObjectId, }]
 }, { timestamps: true });
 
-module.exports = mongoose.model('ChatRoom', ChatRoomSchema);
+module.exports = conn.model('ChatRoom', ChatRoomSchema);
