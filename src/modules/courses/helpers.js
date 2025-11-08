@@ -1,4 +1,5 @@
 const CourseCategory = require('./models/CourseCategory');
+const Notes = require('./models/Notes');
 
 const getBatchedCourseCategories = async (courseCategoriesIDs) => {
 
@@ -18,6 +19,25 @@ const getBatchedCourseCategories = async (courseCategoriesIDs) => {
     }
 }
 
+getBatchedNotes = async (req, res) => {
+
+    try {
+        if (!notesIDs || !Array.isArray(notesIDs) || notesIDs.length === 0) return new Map();
+
+        const notes = await Notes.find({ _id: { $in: notesIDs } }).populate('chapter course courseCategory', 'title');
+        if (!notes.length) throw { 'message': 'No notes found!', 'status': 204 };
+
+        const notesMap = new Map();
+        for (const note of notes || []) {
+            notesMap.set(note._id.toString(), note);
+        }
+        return notesMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
 module.exports = {
     getBatchedCourseCategories,
+    getBatchedNotes,
 };

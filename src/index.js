@@ -36,11 +36,11 @@ app.use('/api/schools', require('./modules/schools/routes/schools'));
 app.use('/api/levels', require('./modules/schools/routes/levels'));
 app.use('/api/faculties', require('./modules/schools/routes/faculties'));
 
-// // Courses
-// app.use('/api/course-categories', require('./modules/courses/routes/course-categories'));
-// app.use('/api/courses', require('./modules/courses/routes/courses'));
-// app.use('/api/chapters', require('./modules/courses/routes/chapters'));
-// app.use('/api/notes', require('./modules/courses/routes/notes'));
+// Courses
+app.use('/api/course-categories', require('./modules/courses/routes/course-categories'));
+app.use('/api/courses', require('./modules/courses/routes/courses'));
+app.use('/api/chapters', require('./modules/courses/routes/chapters'));
+app.use('/api/notes', require('./modules/courses/routes/notes'));
 
 // // Scores
 // app.use('/api/scores', require('./modules/scores/routes/scores'));

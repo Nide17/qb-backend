@@ -2,8 +2,10 @@ const Course = require('../models/Course');
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../helpers');
+const { populateBatchedUsers } = require('../../users/helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+let keysToClear = [];
 const findCourses = async (query, limit = 0) => {
 
     let coursesQuery = Chapter.find(query).sort({ createdAt: -1 })
@@ -33,7 +35,12 @@ const findCourses = async (query, limit = 0) => {
 
 exports.getCourses = async (req, res) => {
     try {
+        const cacheKey = 'courses';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const courses = await findCourses({}, 0);
+        await setCachedData(cacheKey, courses) && keysToClear.push(cacheKey);
         res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);
@@ -43,7 +50,13 @@ exports.getCourses = async (req, res) => {
 exports.getCoursesByCategory = async (req, res) => {
 
     try {
+        const cacheKey = `category_courses_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const courses = await findCourses({ courseCategory: req.params.id }, 0);
+
+        await setCachedData(cacheKey, courses) && keysToClear.push(cacheKey);
         res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);
@@ -96,14 +109,8 @@ exports.createCourse = async (req, res) => {
         const savedCourse = await newCourse.save();
         if (!savedCourse) throw { 'message': 'Could not save course, try again!', 'status': 500 };
 
-        res.status(200).json({
-            _id: savedCourse._id,
-            title: savedCourse.title,
-            description: savedCourse.description,
-            courseCategory: savedCourse.courseCategory,
-            created_by: savedCourse?.created_by,
-            createdAt: savedCourse.createdAt,
-        });
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedCourse);
     } catch (err) {
         handleError(res, err);
     }
@@ -133,7 +140,9 @@ exports.deleteCourse = async (req, res) => {
 
         // Delete this course
         await Course.deleteOne({ _id: req.params.id });
-        res.status(200).json({ message: 'Deleted!' });
+
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(course);
     } catch (err) {
         handleError(res, err);
     }
