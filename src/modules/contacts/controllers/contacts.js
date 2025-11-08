@@ -1,5 +1,5 @@
 const Contact = require('../models/Contact');
-const { sendEmail } = require('../../utils/emails/sendEmail');
+const { sendEmail } = require('../../../utils/emails/sendEmail');
 const { convertFromRaw } = require('draft-js');
 const { stateToHTML } = require('draft-js-export-html');
 const { handleError } = require('../../../utils/error');

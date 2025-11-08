@@ -1,6 +1,6 @@
 const express = require('express');
 const { getScores, getScoresByTaker, getScoresForQuizCreator, getOneScore, getBatchedScores, getQuizRanking, getPopularQuizzes, getMonthlyUser, getTop10QuizzingUsers, getTop10Quizzes, createScore, deleteScore } = require('../controllers/scores');
-const { auth, authRole } = require('../../middlewares/auth');
+const { auth, authRole } = require('../../../middlewares/auth');
 
 const router = express.Router();
 

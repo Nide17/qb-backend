@@ -1,6 +1,6 @@
 const express = require('express');
 const { getChatRooms, createOpenChatRoom, getOneChatRoom, createChatRoom, updateChatRoom, deleteChatRoom } = require('../controllers/chat-rooms');
-const { auth, authRole } = require('../../middlewares/auth');
+const { auth, authRole } = require('../../../middlewares/auth');
 
 const router = express.Router();
 

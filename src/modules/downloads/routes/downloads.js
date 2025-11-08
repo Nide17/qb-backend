@@ -1,6 +1,6 @@
 const express = require('express');
 const { getDownloads, getOneDownload, getNotesDownloader, getCreatorDownloads, getTop10Downloaders, getTop10Notes, createDownload, deleteDownload } = require('../controllers/downloads');
-const { auth, authRole } = require('../../middlewares/auth');
+const { auth, authRole } = require('../../../middlewares/auth');
 
 const router = express.Router();
 

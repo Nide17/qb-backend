@@ -2,16 +2,15 @@ const Category = require('../models/Category');
 const Quiz = require('../models/Quiz');
 const Question = require('../models/Question');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields, populateOneCategory, populateCategories, redisCache, setCachedData, getCachedData } = require('../helpers');
+const { populateOneCategory, populateCategories } = require('../helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+let keysToClear = []
 exports.getCategories = async (req, res) => {
     try {
-
         const cacheKey = 'categories';
         const cachedCategories = await getCachedData(cacheKey);
-        if (cachedCategories) {
-            return res.status(200).json(cachedCategories);
-        }
+        if (cachedCategories) return res.status(200).json(cachedCategories);
 
         let categories = await Category.find().sort({ creation_date: -1 }).select('_id title description quizes courseCategory').populate('quizes', '_id title slug');
         if (!categories) throw { 'message': 'No categories found!', 'status': 204 };
@@ -19,7 +18,7 @@ exports.getCategories = async (req, res) => {
         const expandedCategories = await populateCategories(categories);
         categories = expandedCategories || categories;
 
-        await setCachedData(cacheKey, categories);
+        await setCachedData(cacheKey, categories) && keysToClear.push(cacheKey);
         res.status(200).json(categories);
     } catch (err) {
         handleError(res, err);
@@ -62,8 +61,7 @@ exports.createCategory = async (req, res) => {
         savedCategory = await populateOneCategory(savedCategory);
 
         // Clear cache for categories
-        const cacheKey = 'categories';
-        await redisCache.del(cacheKey);
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(savedCategory);
     } catch (err) {
         handleError(res, err);
@@ -97,8 +95,7 @@ exports.deleteCategory = async (req, res) => {
         if (removedCategory.deletedCount === 0) throw { 'message': 'Something went wrong while deleting the category!', 'status': 500 };
 
         // Clear cache for categories
-        const cacheKey = 'categories';
-        await redisCache.del(cacheKey);
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);

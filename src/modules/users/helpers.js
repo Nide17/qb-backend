@@ -51,15 +51,6 @@ const populateOneSchool = async (user) => {
     }
 };
 
-// Generalized helper function to validate required fields
-const validateRequiredFields = (fields) => {
-    for (const field of fields) {
-        if (!field.value) {
-            throw { 'message': `Missing required field: ${field.name}`, 'status': 400 };
-        }
-    }
-};
-
 // Helper function to send subscription email
 const sendSubscriptionEmail = (subscriber) => {
     const clientURL = process.env.NODE_ENV === 'production' ?
@@ -76,22 +67,23 @@ const sendSubscriptionEmail = (subscriber) => {
     );
 };
 
-// Helper function to delete image from S3
-const deleteImageFromS3 = async (imagePath) => {
+const getBatchedUsers = async (usersIDs) => {
+
     try {
-        const deleteParams = {
-            Bucket: process.env.S3_BUCKET,
-            Key: imagePath.split('/').pop()
-        };
-        s3Config.deleteObject(deleteParams, function (err, data) {
-            if (err) {
-                console.error('Error deleting object:', err.message);
-            } else {
-                console.log('Deleted Object:', data);
-            }
-        });
+        if (!usersIDs || !Array.isArray(usersIDs) || usersIDs.length === 0) return new Map();
+
+        const users = await User.find({ _id: { $in: usersIDs } }).select('name email');
+        if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
+
+        const usersMap = new Map();
+        for (const user of users || []) {
+            usersMap.set(user._id.toString(), user);
+        }
+        return usersMap;
+
     } catch (err) {
-        throw { 'message': `Error deleting image: ${err.message}`, 'status': 500 };
+        console.error(err.message);
+        return new Map();
     }
 };
 
@@ -101,7 +93,6 @@ module.exports = {
     updateUserToken,
     sendOtpEmail,
     hashPassword,
-    validateRequiredFields,
     sendSubscriptionEmail,
-    deleteImageFromS3,
+    getBatchedUsers,
 };

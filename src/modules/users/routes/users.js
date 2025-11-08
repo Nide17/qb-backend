@@ -1,5 +1,5 @@
 const express = require('express');
-const { getUsers, getLatestUsers, getAdminsCreators, loadUser, getOneUser, getAdminsEmails, login, register, verifyOTP, logout, updateProfile, updateUser, deleteUser, sendResetLink, sendNewPassword, updateProfileImage, getDailyUserRegistration, getBatchedUsers
+const { getUsers, getLatestUsers, getAdminsCreators, loadUser, getOneUser, getAdminsEmails, login, register, verifyOTP, logout, updateProfile, updateUser, deleteUser, sendResetLink, sendNewPassword, updateProfileImage, getDailyUserRegistration
 } = require('../controllers/users.js');
 const { auth, authRole } = require('../../../middlewares/auth.js');
 const { profileUpload } = require('../../../middlewares/profileUpload.js');
@@ -21,7 +21,6 @@ router.post('/register', register);
 router.post('/verify-otp', verifyOTP);
 router.post('/forgot-password', sendResetLink);
 router.post('/reset-password', sendNewPassword);
-router.post('/batch', getBatchedUsers);
 
 // PUT routes
 router.put('/user-image/:id', auth, profileUpload.single('profilePicture'), updateProfileImage);

@@ -1,11 +1,13 @@
 const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
 const Question = require('../models/Question');
+const User = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
-const { getFromService, populateOneUser, populateBatchedQuizzes, setCachedData, getCachedData } = require('../helpers');
-const { sendEmail } = require('../../utils/emails/sendEmail');
-const { isValidObjectId } = require('mongoose');
+const { sendEmail } = require('../../../utils/emails/sendEmail');
+const { populateBatchedQuizzes } = require('../helpers');
+const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+let keysToClear = []
 exports.getQuizzes = async (req, res) => {
 
     try {
@@ -21,9 +23,7 @@ exports.getQuizzes = async (req, res) => {
 
             const cacheKey = `limited_quizzes_${limit}_${skip}`;
             const cached = await getCachedData(cacheKey);
-            if (cached) {
-                return res.status(200).json(cached);
-            }
+            if (cached) return res.status(200).json(cached);
 
             let limitedQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
@@ -44,7 +44,7 @@ exports.getQuizzes = async (req, res) => {
                 quizzes: expandedQuizzes || limitedQuizzes,
             };
 
-            await setCachedData(cacheKey, result);
+            await setCachedData(cacheKey, result) && keysToClear.push(cacheKey);
             res.status(200).json(result);
         }
         // PAGINATED
@@ -52,9 +52,7 @@ exports.getQuizzes = async (req, res) => {
 
             const cacheKey = `paginated_quizzes_${pageNo}`;
             const cached = await getCachedData(cacheKey);
-            if (cached) {
-                return res.status(200).json(cached);
-            }
+            if (cached) return res.status(200).json(cached);
 
             // If limit & skip undefined: Pagination - ENFORCE pagination to prevent memory exhaustion
             var PAGE_SIZE = 20;
@@ -87,18 +85,15 @@ exports.getQuizzes = async (req, res) => {
                 totalQuizzes,
                 quizzes: expandedQuizzes || paginatedQuizzes,
             };
-            await setCachedData(cacheKey, result);
+            await setCachedData(cacheKey, result) && keysToClear.push(cacheKey);
             res.status(200).json(result);
 
         }
         // NO LIMIT AND NO SKIP AT ALL
         else {
-
             const cacheKey = 'all_quizzes';
             const cached = await getCachedData(cacheKey);
-            if (cached) {
-                return res.status(200).json(cached);
-            }
+            if (cached) return res.status(200).json(cached);
             let allQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
                 .populate('category questions');
@@ -110,7 +105,7 @@ exports.getQuizzes = async (req, res) => {
             const expandedQuizzes = await populateBatchedQuizzes(allQuizzes);
             allQuizzes = expandedQuizzes || allQuizzes;
 
-            await setCachedData(cacheKey, allQuizzes);
+            await setCachedData(cacheKey, allQuizzes) && keysToClear.push(cacheKey);
             res.status(200).json(allQuizzes);
         }
     } catch (err) {
@@ -125,12 +120,10 @@ exports.getOneQuiz = async (req, res) => {
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
 
         const quiz = await Quiz.findOne(query).populate('category questions');
-        if (!quiz) {
-            throw { status: 404, message: `Quiz with id ${id} not found` };
-        }
+        if (!quiz) throw { status: 404, message: `Quiz with id ${id} not found` };
 
         // Expand user data using simple direct calls
-        const expandedUser = await populateOneUser(quiz);
+        const expandedUser = await User.findById(quiz.created_by).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
         const expandedQuiz = { ...quiz, ...expandedUser };
         res.status(200).json(expandedQuiz || quiz);
     } catch (err) {
@@ -140,7 +133,6 @@ exports.getOneQuiz = async (req, res) => {
 
 exports.getQuizzesByCategory = async (req, res) => {
     try {
-
         const cacheKey = `category_quizzes_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
@@ -154,7 +146,7 @@ exports.getQuizzesByCategory = async (req, res) => {
         const expandedQuizzes = await populateBatchedQuizzes(quizzes);
         quizzes = expandedQuizzes || quizzes;
 
-        await setCachedData(cacheKey, quizzes);
+        await setCachedData(cacheKey, quizzes) && keysToClear.push(cacheKey);
         res.status(200).json(quizzes);
     } catch (err) {
         handleError(res, err);
@@ -177,7 +169,7 @@ exports.getQuizzesByNotes = async (req, res) => {
         const expandedQuizzes = await populateBatchedQuizzes(quizzes);
         quizzes = expandedQuizzes || quizzes;
 
-        await setCachedData(cacheKey, quizzes);
+        await setCachedData(cacheKey, quizzes) && keysToClear.push(cacheKey);
         res.status(200).json(quizzes);
     } catch (err) {
         handleError(res, err);
@@ -224,6 +216,8 @@ exports.createQuiz = async (req, res) => {
         const savedQuiz = await newQuiz.save();
         if (!savedQuiz) throw { message: 'Something went wrong during creation!', status: 400 };
 
+        // Clear cache for keys
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(savedQuiz);
     } catch (err) {
         handleError(res, err);
@@ -316,6 +310,8 @@ exports.deleteQuiz = async (req, res) => {
         await Question.deleteMany({ quiz: quiz._id });
         await Quiz.deleteOne({ _id: req.params.id });
 
+        // Clear cache for keys
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(quiz);
     } catch (err) {
         handleError(res, err);
@@ -323,9 +319,7 @@ exports.deleteQuiz = async (req, res) => {
 };
 
 exports.deleteVideo = async (req, res) => {
-    if (!isValidObjectId(req.body.qID)) {
-        throw { message: 'Invalid quiz ID', status: 400 };
-    }
+
     try {
         const quiz = await Quiz.findById(req.params.id);
         if (!quiz) throw { message: 'Quiz not found!', status: 404 };

@@ -41,9 +41,19 @@ const s3Config = new S3({
     region: process.env.AWS_REGION
 });
 
+// Helper function to validate required fields
+const validateRequiredFields = (fields) => {
+    for (const field of fields) {
+        if (!field.value) {
+            throw { message: `Missing required field: ${field.name}`, status: 400 };
+        }
+    }
+};
+
 module.exports = {
     getCachedData,
     setCachedData,
     redisCache,
     s3Config,
+    validateRequiredFields,
 };

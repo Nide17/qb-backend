@@ -1,32 +1,21 @@
 const Question = require('../models/Question');
 const slugify = require('slugify');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields, updateQuizQuestions, deleteImageFromS3 } = require('../helpers');
+const { updateQuizQuestions } = require('../helpers');
+const { deleteImageFromS3, validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
-
+let keysToClear = []
 exports.getQuestions = async (req, res) => {
 
     try {
+        const cacheKey = 'all_questions'
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const questions = await Question.find().sort({ creation_date: -1 }).populate('category quiz');
         if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 204 };
-        res.status(200).json(questions);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
 
-exports.getBatchedQuestions = async (req, res) => {
-    try {
-        const ids = req.body.questionsIds;
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            throw { 'message': 'Invalid or missing note IDs!', 'status': 400 };
-        }
-
-        const questions = await Question.find({ _id: { $in: ids } }).populate('quiz', 'questionText title');
-        if (!questions.length) {
-            throw { 'message': 'No questions found!', 'status': 204 };
-        }
-
+        await setCachedData(cacheKey, questions) && keysToClear.push(cacheKey);
         res.status(200).json(questions);
     } catch (err) {
         handleError(res, err);
@@ -92,6 +81,8 @@ exports.createQuestion = async (req, res) => {
             throw { 'message': 'Cannot update corresponding quiz!', 'status': 500 };
         }
 
+        // Clear cache for keys
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(savedQuestion);
     } catch (err) {
         handleError(res, err);
@@ -163,6 +154,8 @@ exports.deleteQuestion = async (req, res) => {
 
         if (removedQuestion.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
 
+        // Clear cache for keys
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(question);
     } catch (err) {
         handleError(res, err);
