@@ -57,9 +57,9 @@ app.use('/api/notes', require('./modules/courses/routes/notes'));
 // Feedbacks
 app.use('/api/feedbacks', require('./modules/feedbacks/routes/feedbacks'));
 
-// // Comments
-// app.use('/api/quizzes-comments', require('./modules/comments/routes/quizzes-comments'));
-// app.use('/api/questions-comments', require('./modules/comments/routes/questions-comments'));
+// Comments
+app.use('/api/quizzes-comments', require('./modules/comments/routes/quizzes-comments'));
+app.use('/api/questions-comments', require('./modules/comments/routes/questions-comments'));
 
 // // Statistics
 // app.use('/api/statistics', require('./modules/statistics/routes/statistics'));
