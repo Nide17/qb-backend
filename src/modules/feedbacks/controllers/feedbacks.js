@@ -1,6 +1,6 @@
 const Feedback = require('../models/Feedback');
-const { handleError } = require('../../utils/error');
-const { populateOneFeedback, populateBatchedFeedbacks } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { populateOneFeedback, populateBatchedFeedbacks } = require('../helpers');
 
 exports.getFeedbacks = async (req, res) => {
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const { get50NewUsers, getAllUsers, getUsersWithImage, getUsersWithSchool, getUsersWithLevel, getUsersWithFaculty, getUsersWithInterests, getUsersWithAbout, getTop10QuizzingUsers, getTop10Downloaders, getTop10Quizzes, getTop10Notes, getDailyUserRegistration, getDashboardStats, updateDashboardStats, getLiveAnalytics, clearStatsCache, getSystemMetrics } = require('../controllers/statistics');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 

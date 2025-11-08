@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../db/dbManager');
+const { getConnection } = require('../../../utils/db-manager');
 const conn = getConnection('posts', process.env.POSTS_URI);
 
 //create a schema object

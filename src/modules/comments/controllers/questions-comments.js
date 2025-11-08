@@ -1,6 +1,6 @@
 const QuestionComment = require('../models/QuestionComment');
-const { handleError } = require('../../utils/error');
-const { populateOneComment, populateBatchedComments } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { populateOneComment, populateBatchedComments } = require('../helpers');
 
 exports.getQuestionsComments = async (req, res) => {
     try {

@@ -1,8 +1,8 @@
 const express = require('express');
 const { getUsers, getLatestUsers, getAdminsCreators, loadUser, getOneUser, getAdminsEmails, login, register, verifyOTP, logout, updateProfile, updateUser, deleteUser, sendResetLink, sendNewPassword, updateProfileImage, getDailyUserRegistration, getBatchedUsers
 } = require('../controllers/users.js');
-const { auth, authRole } = require('../../middlewares/auth.js');
-const { profileUpload } = require('../../middlewares/profileUpload.js');
+const { auth, authRole } = require('../../../middlewares/auth.js');
+const { profileUpload } = require('../../../middlewares/profileUpload.js');
 
 const router = express.Router();
 

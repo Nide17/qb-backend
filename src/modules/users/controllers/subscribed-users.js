@@ -1,6 +1,6 @@
 const SubscribedUser = require('../models/SubscribedUser');
-const { handleError } = require('../../utils/error');
-const { validateRequiredFields, sendSubscriptionEmail } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { validateRequiredFields, sendSubscriptionEmail } = require('../helpers');
 
 exports.getSubscribedUsers = async (req, res) => {
     try {

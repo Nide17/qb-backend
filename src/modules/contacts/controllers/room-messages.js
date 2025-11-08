@@ -1,6 +1,6 @@
 const RoomMessage = require('../models/RoomMessage');
-const { handleError } = require('../../utils/error');
-const { getFromService, validateRequiredFields, notifyAdmins, validateRoomMessageData } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { getFromService, validateRequiredFields, notifyAdmins, validateRoomMessageData } = require('../helpers');
 
 exports.getRoomMessages = async (req, res) => {
     try {

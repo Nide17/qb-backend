@@ -2,8 +2,8 @@ const CourseCategory = require('../models/CourseCategory');
 const Course = require('../models/Course');
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
-const { handleError } = require('../../utils/error');
-const { validateRequiredFields } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { validateRequiredFields } = require('../helpers');
 
 exports.getCourseCategories = async (req, res) => {
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const { getSubscribedUsers, getOneSubscribedUser, createSubscribedUser, updateSubscribedUser, deleteSubscribedUser } = require('../controllers/subscribed-users');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 

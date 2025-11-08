@@ -1,6 +1,6 @@
 const express = require('express');
 const { getChapters, getChaptersByCourse, getOneChapter, createChapter, updateChapter, deleteChapter } = require('../controllers/chapters');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 

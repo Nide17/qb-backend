@@ -1,6 +1,6 @@
 const Notes = require('../models/Notes');
-const { handleError } = require('../../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields, setCachedData, getCachedData } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields, setCachedData, getCachedData } = require('../helpers');
 
 const expandNotes = async (notes) => {
 

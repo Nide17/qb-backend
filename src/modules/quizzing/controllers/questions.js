@@ -1,7 +1,7 @@
 const Question = require('../models/Question');
 const slugify = require('slugify');
-const { handleError } = require('../../utils/error');
-const { validateRequiredFields, updateQuizQuestions, deleteImageFromS3 } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { validateRequiredFields, updateQuizQuestions, deleteImageFromS3 } = require('../helpers');
 
 
 exports.getQuestions = async (req, res) => {

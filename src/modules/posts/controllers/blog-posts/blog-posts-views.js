@@ -1,7 +1,7 @@
 const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
 const scheduledReportMessage = require('./scheduledReport');
-const { handleError } = require('../../utils/error');
-const { populateOneUser, populateBatchedUsers, deleteImageFromS3 } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { populateOneUser, populateBatchedUsers, deleteImageFromS3 } = require('../helpers');
 
 // SCHEDULED REPORT MESSAGE
 scheduledReportMessage();

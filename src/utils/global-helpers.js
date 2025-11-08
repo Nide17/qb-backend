@@ -1,3 +1,4 @@
+const { S3 } = require('@aws-sdk/client-s3');
 const RedisCacheManager = require('./redis-cache');
 
 // Initialize Redis cache manager
@@ -33,8 +34,16 @@ const setCachedData = async (key, data, ttl = 600) => {
     }
 };
 
+const s3Config = new S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    Bucket: process.env.S3_BUCKET,
+    region: process.env.AWS_REGION
+});
+
 module.exports = {
     getCachedData,
     setCachedData,
     redisCache,
+    s3Config,
 };

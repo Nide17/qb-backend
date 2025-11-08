@@ -1,6 +1,6 @@
 const express = require('express');
 const { getAdverts, getOneAdvert, getActiveAdverts, getCreatedBy, createAdvert, updateAdvertStatus, updateAdvert, deleteAdvert } = require('../controllers/adverts');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 const { advertUpload } = require('../../../middlewares/advertUpload');
 
 const router = express.Router();

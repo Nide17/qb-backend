@@ -1,7 +1,7 @@
 const axios = require('axios');
 const Score = require('../models/Score');
-const { handleError } = require('../../utils/error');
-const { getFromService, getCachedData, setCachedData, cache, populateOneScore, populateBatchedScores } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { getFromService, getCachedData, setCachedData, cache, populateOneScore, populateBatchedScores } = require('../helpers');
 
 exports.getScores = async (req, res) => {
 
@@ -55,9 +55,7 @@ exports.getScoresByTaker = async (req, res) => {
         // Check cache first
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).exec();
         if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
@@ -142,9 +140,7 @@ exports.getQuizRanking = async (req, res) => {
         // Check cache first
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).exec();
         if (!scores || scores.length === 0) {
@@ -170,9 +166,7 @@ exports.getPopularQuizzes = async (req, res) => {
         // Check cache first
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
@@ -222,9 +216,7 @@ exports.getMonthlyUser = async (req, res) => {
         // Check cache first
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let monthlyUserData = null;
         const startOfMonth = new Date();
@@ -402,9 +394,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
         // Check cache first
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let topUsers = await Score.aggregate([
             { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
@@ -444,9 +434,7 @@ exports.getTop10Quizzes = async (req, res) => {
 
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         const topQuizzesData = await Score.aggregate([
             { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },

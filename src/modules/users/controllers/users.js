@@ -2,21 +2,30 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendEmail } = require('../../utils/emails/sendEmail');
+const { sendEmail } = require('../../../utils/emails/sendEmail');
 const User = require('../models/User');
 const PswdResetToken = require('../models/PswdResetToken');
-const { handleError } = require('../../utils/error');
-const { deleteImageFromS3, populateOneSchool, hashPassword, updateUserToken } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { deleteImageFromS3, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { populateOneSchool, hashPassword, updateUserToken } = require('../helpers');
 
 // Get all users
 exports.getUsers = async (req, res) => {
 
     try {
+        const cacheKey = `users`;
+
+        // Check cache first
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const limit = req.query.limit ? parseInt(req.query.limit) : 0;
         const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
         let users = await User.find(filter ? { [filter]: { $exists: true } } : {}).limit(limit).sort({ register_date: -1 }).select('name email role register_date' + (filter ? ` ${filter}` : ''));
         if (!users.length) throw { 'message': 'No users found!', 'status': 204 };
 
+        // Set cache
+        setCachedData(cacheKey, users, 60 * 60); // 1 hour
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -26,8 +35,18 @@ exports.getUsers = async (req, res) => {
 // Get 8 latest users
 exports.getLatestUsers = async (req, res) => {
     try {
+
+        const cacheKey = `latest-users`;
+
+        // Check cache first
+        const cached = await getCachedData(cacheKey);
+
+        if (cached) return res.status(200).json(cached);
         let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
         if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
+
+        // Set cache
+        setCachedData(cacheKey, users);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -37,8 +56,18 @@ exports.getLatestUsers = async (req, res) => {
 // Get Admin and Creators users
 exports.getAdminsCreators = async (req, res) => {
     try {
+
+        const cacheKey = `admins-creators`;
+
+        // Check cache first
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
         if (!adminsCreators.length) throw { 'message': 'No users found!', 'status': 404 };
+
+        // Set cache
+        setCachedData(cacheKey, adminsCreators);
         res.status(200).json(adminsCreators);
     } catch (err) {
         handleError(res, err);
@@ -77,9 +106,19 @@ exports.loadUser = async (req, res) => {
 // Get emails of all admins
 exports.getAdminsEmails = async (req, res) => {
     try {
+
+        const cacheKey = `admins-emails`;
+
+        // Check cache first
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
         if (!admins) throw { 'message': 'No admins found!', 'status': 404 };
         const adminEmails = admins.map(admin => admin.email);
+
+        // Set cache
+        setCachedData(cacheKey, adminEmails);
         return res.status(200).json(adminEmails);
     } catch (err) {
         handleError(res, err);
@@ -105,6 +144,13 @@ exports.getBatchedUsers = async (req, res) => {
 // Get daily user registration statistics
 exports.getDailyUserRegistration = async (req, res) => {
     try {
+
+        const cacheKey = `daily-user-registration`;
+
+        // Check cache first
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const usersStats = await User.aggregate([
             {
                 $project: {
@@ -134,6 +180,8 @@ exports.getDailyUserRegistration = async (req, res) => {
             }
         ]).exec();
 
+        // Set cache
+        setCachedData(cacheKey, usersStats);
         res.status(200).json(usersStats);
     } catch (err) {
         handleError(res, err);
@@ -239,6 +287,10 @@ exports.register = async (req, res) => {
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
             console.log('new user\'s otp: ', otp);
         }
+
+        // del cache
+        const cacheKeys = ['users', 'latest-users', 'admins-creators', 'admins-emails', 'daily-user-registration'];
+        await redisCache.invalidateKeysCache(cacheKeys);
 
         res.status(200).json({ message: 'Registration successful! Please verify your email to login.', email });
     } catch (err) {
@@ -406,6 +458,9 @@ exports.deleteUser = async (req, res) => {
         const removedUser = await User.deleteOne({ _id: req.params.id });
         if (removedUser.deletedCount === 0) throw { 'status': 500, 'message': 'Failed to delete user!' };
 
+        // del cache
+        const cacheKeys = ['users', 'latest-users', 'admins-creators', 'admins-emails', 'daily-user-registration'];
+        await redisCache.invalidateKeysCache(cacheKeys);
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);

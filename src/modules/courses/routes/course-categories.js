@@ -1,6 +1,6 @@
 const express = require('express');
 const { getCourseCategories, getBatchedCourseCategories, getOneCategory, createCategory, updateCategory, deleteCategory } = require('../controllers/course-categories');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 

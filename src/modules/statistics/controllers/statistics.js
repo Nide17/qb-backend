@@ -1,7 +1,7 @@
 const os = require('os');
 const process = require('process');
-const { handleError } = require('../../utils/error');
-const { getCachedData, setCachedData, getFromService, redisCache, deleteCacheKey } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { getCachedData, setCachedData, getFromService, redisCache, deleteCacheKey } = require('../helpers');
 
 // Enhanced system monitoring
 exports.getSystemMetrics = async (req, res) => {
@@ -11,9 +11,7 @@ exports.getSystemMetrics = async (req, res) => {
     try {
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         // Get system information
         const cpuUsage = process.cpuUsage();
@@ -91,9 +89,7 @@ exports.getDashboardStats = async (req, res) => {
         const cacheKey = 'dashboard_stats';
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         // Get actual data from working endpoints and count them through API Gateway
         const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
@@ -224,9 +220,7 @@ exports.get50NewUsers = async (req, res) => {
         const cacheKey = 'new_users_50';
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
 
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?limit=50`);
@@ -245,9 +239,7 @@ exports.getAllUsers = async (req, res) => {
         const cacheKey = 'all_users';
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users`);
         setCachedData(cacheKey, users);
@@ -266,9 +258,7 @@ exports.getUsersWithImage = async (req, res) => {
         const cacheKey = `users_with_image`;
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=image`);
         setCachedData(cacheKey, users);
 
@@ -283,9 +273,7 @@ exports.getUsersWithSchool = async (req, res) => {
         const cacheKey = `users_with_school`;//`users_with_school_${req.params?.school}`;
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=school`);
         if (users) setCachedData(cacheKey, users);
 
@@ -300,9 +288,7 @@ exports.getUsersWithLevel = async (req, res) => {
         const cacheKey = `users_with_level`;
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=level`);
         if (users) setCachedData(cacheKey, users);
 
@@ -317,9 +303,7 @@ exports.getUsersWithFaculty = async (req, res) => {
         const cacheKey = `users_with_faculty`;
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=faculty`);
         if (users) setCachedData(cacheKey, users);
 
@@ -334,9 +318,7 @@ exports.getUsersWithYear = async (req, res) => {
         const cacheKey = `users_with_year`;
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=year`);
         if (users) setCachedData(cacheKey, users);
 
@@ -351,9 +333,7 @@ exports.getUsersWithInterests = async (req, res) => {
         const cacheKey = `users_with_interests`;
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=interests`);
         if (users) setCachedData(cacheKey, users);
 
@@ -368,9 +348,7 @@ exports.getUsersWithAbout = async (req, res) => {
         const cacheKey = `users_with_about`;
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let users = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users?filter=about`);
         if (users) setCachedData(cacheKey, users);
 
@@ -387,9 +365,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
         const cacheKey = 'top_10_quizzing_users';
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let quizStats = await getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores/top-10-quizzing-users`);
         if (quizStats) setCachedData(cacheKey, quizStats);
 
@@ -405,9 +381,7 @@ exports.getTop10Quizzes = async (req, res) => {
         const cacheKey = 'top_10_quizzes';
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let quizStatistics = await getFromService(`${process.env.SCORES_SERVICE_URL}/api/scores/top-10-quizzes`);
         if (quizStatistics) setCachedData(cacheKey, quizStatistics);
@@ -424,9 +398,7 @@ exports.getTop10Downloaders = async (req, res) => {
     try {
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let downloadStats = await getFromService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/top-10-downloaders`, null, req?.header('x-auth-token'));
 
@@ -443,9 +415,7 @@ exports.getTop10Notes = async (req, res) => {
         const cacheKey = 'top_10_notes';
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let top10 = await getFromService(`${process.env.DOWNLOADS_SERVICE_URL}/api/downloads/top-10-notes`, null, req?.header('x-auth-token'));
         if (top10) setCachedData(cacheKey, top10);
 
@@ -461,9 +431,7 @@ exports.getDailyUserRegistration = async (req, res) => {
         const cacheKey = 'daily_user_registration';
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         let dailyReg = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/daily-user-registration`);
         if (dailyReg) setCachedData(cacheKey, dailyReg);
 
@@ -480,9 +448,7 @@ exports.getLiveAnalytics = async (req, res) => {
     try {
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());

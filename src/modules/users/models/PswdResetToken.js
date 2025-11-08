@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../db/dbManager');
+const { getConnection } = require('../../../utils/db-manager');
 const conn = getConnection('users', process.env.USERS_URI);
 
 const PswdResetTokenSchema = new Schema({

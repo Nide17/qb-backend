@@ -1,6 +1,6 @@
 const QuizComment = require('../models/QuizComment');
-const { handleError } = require('../../utils/error');
-const { populateOneComment, populateBatchedComments, validateRequiredFields } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { populateOneComment, populateBatchedComments, validateRequiredFields } = require('../helpers');
 
 exports.getQuizzesComments = async (req, res) => {
     try {

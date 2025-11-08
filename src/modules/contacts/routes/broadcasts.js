@@ -1,6 +1,6 @@
 const express = require('express');
 const { getBroadcasts, getOneBroadcast, createBroadcast, updateBroadcast, deleteBroadcast } = require('../controllers/broadcasts');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 
