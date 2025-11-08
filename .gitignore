@@ -105,4 +105,4 @@ commands.md
 .env.*
 
 # Don't push
-secrets/*
+secrets
