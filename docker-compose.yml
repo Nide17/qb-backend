@@ -1,0 +1,235 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: qb-mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=qb_microservices
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - qb-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: qb-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - qb-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./api-gateway/Dockerfile
+    container_name: qb-api-gateway
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./api-gateway/.env.docker
+    depends_on:
+      - redis
+      - mongodb
+    networks:
+      - qb-network
+
+  # Users Service
+  users-service:
+    build:
+      context: .
+      dockerfile: ./users-service/Dockerfile
+    container_name: qb-users-service
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./users-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Quizzing Service
+  quizzing-service:
+    build:
+      context: .
+      dockerfile: ./quizzing-service/Dockerfile
+    container_name: qb-quizzing-service
+    restart: unless-stopped
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./quizzing-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Posts Service
+  posts-service:
+    build:
+      context: .
+      dockerfile: ./posts-service/Dockerfile
+    container_name: qb-posts-service
+    restart: unless-stopped
+    ports:
+      - "5003:5003"
+    env_file:
+      - ./posts-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Schools Service
+  schools-service:
+    build:
+      context: .
+      dockerfile: ./schools-service/Dockerfile
+    container_name: qb-schools-service
+    restart: unless-stopped
+    ports:
+      - "5004:5004"
+    env_file:
+      - ./schools-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Courses Service
+  courses-service:
+    build:
+      context: .
+      dockerfile: ./courses-service/Dockerfile
+    container_name: qb-courses-service
+    restart: unless-stopped
+    ports:
+      - "5005:5005"
+    env_file:
+      - ./courses-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Scores Service
+  scores-service:
+    build:
+      context: .
+      dockerfile: ./scores-service/Dockerfile
+    container_name: qb-scores-service
+    restart: unless-stopped
+    ports:
+      - "5006:5006"
+    env_file:
+      - ./scores-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Downloads Service
+  downloads-service:
+    build:
+      context: .
+      dockerfile: ./downloads-service/Dockerfile
+    container_name: qb-downloads-service
+    restart: unless-stopped
+    ports:
+      - "5007:5007"
+    env_file:
+      - ./downloads-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Contacts Service
+  contacts-service:
+    build:
+      context: .
+      dockerfile: ./contacts-service/Dockerfile
+    container_name: qb-contacts-service
+    restart: unless-stopped
+    ports:
+      - "5008:5008"
+    env_file:
+      - ./contacts-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Feedbacks Service
+  feedbacks-service:
+    build:
+      context: .
+      dockerfile: ./feedbacks-service/Dockerfile
+    container_name: qb-feedbacks-service
+    restart: unless-stopped
+    ports:
+      - "5009:5009"
+    env_file:
+      - ./feedbacks-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Comments Service
+  comments-service:
+    build:
+      context: .
+      dockerfile: ./comments-service/Dockerfile
+    container_name: qb-comments-service
+    restart: unless-stopped
+    ports:
+      - "5010:5010"
+    env_file:
+      - ./comments-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+  # Statistics Service
+  statistics-service:
+    build:
+      context: .
+      dockerfile: ./statistics-service/Dockerfile
+    container_name: qb-statistics-service
+    restart: unless-stopped
+    ports:
+      - "5011:5011"
+    env_file:
+      - ./statistics-service/.env.docker
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qb-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  qb-network:
+    driver: bridge

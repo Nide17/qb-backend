@@ -1,0 +1,26 @@
+{
+  "name": "feedbacks-service",
+  "version": "1.0.0",
+  "description": "Feedbacks service for quiz blog",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "feedbacks": "nodemon index.js"
+  },
+  "author": "Niyomwungeri Parmenide Ishimwe",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.699.0",
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.2",
+    "slugify": "^1.6.6"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "nodemon": "^3.1.7"
+  }
+}

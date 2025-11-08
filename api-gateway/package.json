@@ -1,0 +1,51 @@
+{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "API gateway for quiz blog backend services",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "users": "cd ../users-service && npm start",
+    "dev-users": "cd ../users-service && npm run users",
+    "quizzing": "cd ../quizzing-service && npm start",
+    "dev-quizzing": "cd ../quizzing-service && npm run quizzing",
+    "posts": "cd ../posts-service && npm start",
+    "dev-posts": "cd ../posts-service && npm run posts",
+    "schools": "cd ../schools-service && npm start",
+    "dev-schools": "cd ../schools-service && npm run schools",
+    "courses": "cd ../courses-service && npm start",
+    "dev-courses": "cd ../courses-service && npm run courses",
+    "scores": "cd ../scores-service && npm start",
+    "dev-scores": "cd ../scores-service && npm run scores",
+    "downloads": "cd ../downloads-service && npm start",
+    "dev-downloads": "cd ../downloads-service && npm run downloads",
+    "contacts": "cd ../contacts-service && npm start",
+    "dev-contacts": "cd ../contacts-service && npm run contacts",
+    "feedbacks": "cd ../feedbacks-service && npm start",
+    "dev-feedbacks": "cd ../feedbacks-service && npm run feedbacks",
+    "comments": "cd ../comments-service && npm start",
+    "dev-comments": "cd ../comments-service && npm run comments",
+    "statistics": "cd ../statistics-service && npm start",
+    "dev-statistics": "cd ../statistics-service && npm run statistics",
+    "start-all": "concurrently \"npm start\" \"npm run users\" \"npm run quizzing\" \"npm run posts\" \"npm run schools\" \"npm run courses\" \"npm run scores\" \"npm run downloads\" \"npm run contacts\" \"npm run feedbacks\" \"npm run comments\" \"npm run statistics\"",
+    "dev-all": "concurrently \"docker compose up -d mongodb redis\" \"npm run dev\" \"npm run dev-users\" \"npm run dev-quizzing\" \"npm run dev-posts\" \"npm run dev-schools\" \"npm run dev-courses\" \"npm run dev-scores\" \"npm run dev-downloads\" \"npm run dev-contacts\" \"npm run dev-feedbacks\" \"npm run dev-comments\" \"npm run dev-statistics\""
+  },
+  "author": "Niyomwungeri Parmenide Ishimwe",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "http-proxy-middleware": "^3.0.5",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "nodemon": "^3.1.7"
+  }
+}
