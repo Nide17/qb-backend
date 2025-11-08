@@ -1,7 +1,7 @@
 const ChatRoom = require('../models/ChatRoom');
 const RoomMessage = require('../models/RoomMessage');
-const { handleError } = require('../utils/error');
-const { validateRequiredFields, notifyAdmins, populateUsersInChatRooms } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { validateRequiredFields, notifyAdmins, populateUsersInChatRooms } = require('../../utils/helpers');
 
 exports.getChatRooms = async (req, res) => {
     try {

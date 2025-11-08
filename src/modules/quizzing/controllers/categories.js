@@ -1,8 +1,8 @@
 const Category = require('../models/Category');
 const Quiz = require('../models/Quiz');
 const Question = require('../models/Question');
-const { handleError } = require('../utils/error');
-const { validateRequiredFields, populateOneCategory, populateCategories, redisCache, setCachedData, getCachedData } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { validateRequiredFields, populateOneCategory, populateCategories, redisCache, setCachedData, getCachedData } = require('../../utils/helpers');
 
 exports.getCategories = async (req, res) => {
     try {

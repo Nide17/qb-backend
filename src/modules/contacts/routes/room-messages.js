@@ -1,6 +1,6 @@
 const express = require('express');
 const { getRoomMessages, getOneRoomMessage, getRoomMessageByRoom, createRoomMessage, updateRoomMessage, deleteRoomMessage } = require('../controllers/room-messages');
-const { auth } = require('../middlewares/auth');
+const { auth } = require('../../middlewares/auth');
 
 const router = express.Router();
 

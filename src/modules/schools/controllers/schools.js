@@ -1,8 +1,8 @@
 const School = require('../models/School');
 const Level = require('../models/Level');
 const Faculty = require('../models/Faculty');
-const { handleError } = require('../utils/error');
-const { validateRequiredFields } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { validateRequiredFields } = require('../../utils/helpers');
 
 exports.getSchools = async (req, res) => {
     try {

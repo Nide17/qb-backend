@@ -1,7 +1,7 @@
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
-const { handleError } = require('../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../../utils/helpers');
 
 const findChapters = async (query, limit = 0) => {
 

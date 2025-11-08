@@ -1,9 +1,9 @@
 const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
 const Question = require('../models/Question');
-const { handleError } = require('../utils/error');
-const { getFromService, populateOneUser, populateBatchedQuizzes, setCachedData, getCachedData } = require('../utils/helpers');
-const { sendEmail } = require('../utils/emails/sendEmail');
+const { handleError } = require('../../utils/error');
+const { getFromService, populateOneUser, populateBatchedQuizzes, setCachedData, getCachedData } = require('../../utils/helpers');
+const { sendEmail } = require('../../utils/emails/sendEmail');
 const { isValidObjectId } = require('mongoose');
 
 exports.getQuizzes = async (req, res) => {
@@ -24,7 +24,7 @@ exports.getQuizzes = async (req, res) => {
             if (cached) {
                 return res.status(200).json(cached);
             }
-            
+
             let limitedQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
                 .populate('category questions')

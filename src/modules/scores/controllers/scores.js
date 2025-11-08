@@ -1,7 +1,7 @@
 const axios = require('axios');
 const Score = require('../models/Score');
-const { handleError } = require('../utils/error');
-const { getFromService, getCachedData, setCachedData, cache, populateOneScore, populateBatchedScores } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { getFromService, getCachedData, setCachedData, cache, populateOneScore, populateBatchedScores } = require('../../utils/helpers');
 
 exports.getScores = async (req, res) => {
 

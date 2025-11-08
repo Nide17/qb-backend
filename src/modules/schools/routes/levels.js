@@ -1,6 +1,6 @@
 const express = require('express');
 const { getLevels, getLevelsBySchool, getOneLevel, createLevel, updateLevel, deleteLevel } = require('../controllers/levels');
-const { authRole } = require('../middlewares/auth');
+const { authRole } = require('../../middlewares/auth');
 
 const router = express.Router();
 

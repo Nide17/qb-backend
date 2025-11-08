@@ -1,7 +1,7 @@
 const os = require('os');
 const process = require('process');
-const { handleError } = require('../utils/error');
-const { getCachedData, setCachedData, getFromService, redisCache, deleteCacheKey } = require('../utils/helpers');
+const { handleError } = require('../../utils/error');
+const { getCachedData, setCachedData, getFromService, redisCache, deleteCacheKey } = require('../../utils/helpers');
 
 // Enhanced system monitoring
 exports.getSystemMetrics = async (req, res) => {

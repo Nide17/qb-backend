@@ -1,6 +1,6 @@
 const Advert = require('../models/Advert.js');
-const { handleError } = require('../utils/error.js');
-const { deleteImageFromS3, validateRequiredFields } = require('../utils/helpers.js');
+const { handleError } = require('../../utils/error.js');
+const { deleteImageFromS3, validateRequiredFields } = require('../../utils/helpers.js');
 
 exports.getAdverts = async (req, res) => {
     try {

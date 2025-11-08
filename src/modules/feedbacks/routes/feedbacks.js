@@ -1,6 +1,6 @@
 const express = require('express');
 const { getFeedbacks, getOneFeedback, createFeedback, updateFeedback, deleteFeedback } = require('../controllers/feedbacks');
-const { auth } = require('../middlewares/auth');
+const { auth } = require('../../middlewares/auth');
 
 const router = express.Router();
 
