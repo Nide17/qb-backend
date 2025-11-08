@@ -1,0 +1,35 @@
+{
+  "name": "qb_backend",
+  "version": "1.0.0",
+  "description": "Quiz Blog Backend Monolithic Server",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "author": "Niyomwungeri Parmenide Ishimwe",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.927.0",
+    "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "handlebars": "^4.7.8",
+    "ioredis": "^5.8.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.3",
+    "multer": "^2.0.2",
+    "multer-s3": "^3.0.1",
+    "nodemailer": "^7.0.10",
+    "slugify": "^1.6.6",
+    "socket.io": "^4.8.1",
+    "twilio": "^5.10.4"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.10"
+  }
+}
