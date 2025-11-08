@@ -5,7 +5,7 @@ const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
-let keysToClear = [];
+const keysToClear = new Set();
 exports.getCourseCategories = async (req, res) => {
 
     try {
@@ -16,7 +16,7 @@ exports.getCourseCategories = async (req, res) => {
         const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
         if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 204 };
 
-        await setCachedData(cacheKey, courseCategories) && keysToClear.push(cacheKey);
+        await setCachedData(cacheKey, courseCategories) && keysToClear.add(cacheKey);
         res.status(200).json(courseCategories);
     } catch (err) {
         handleError(res, err);

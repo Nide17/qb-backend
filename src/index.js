@@ -54,8 +54,8 @@ app.use('/api/notes', require('./modules/courses/routes/notes'));
 // app.use('/api/chat-rooms', require('./modules/contacts/routes/chat-rooms'));
 // app.use('/api/room-messages', require('./modules/contacts/routes/room-messages'));
 
-// // Feedbacks
-// app.use('/api/feedbacks', require('./modules/feedbacks/routes/feedbacks'));
+// Feedbacks
+app.use('/api/feedbacks', require('./modules/feedbacks/routes/feedbacks'));
 
 // // Comments
 // app.use('/api/quizzes-comments', require('./modules/comments/routes/quizzes-comments'));

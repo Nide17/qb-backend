@@ -5,7 +5,7 @@ const { handleError } = require('../../../utils/error');
 const { populateBatchedUsers } = require('../../users/helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
-let keysToClear = [];
+const keysToClear = new Set();
 const findCourses = async (query, limit = 0) => {
 
     let coursesQuery = Chapter.find(query).sort({ createdAt: -1 })
@@ -40,7 +40,7 @@ exports.getCourses = async (req, res) => {
         if (cached) return res.status(200).json(cached);
 
         const courses = await findCourses({}, 0);
-        await setCachedData(cacheKey, courses) && keysToClear.push(cacheKey);
+        await setCachedData(cacheKey, courses) && keysToClear.add(cacheKey);
         res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);
@@ -56,7 +56,7 @@ exports.getCoursesByCategory = async (req, res) => {
 
         const courses = await findCourses({ courseCategory: req.params.id }, 0);
 
-        await setCachedData(cacheKey, courses) && keysToClear.push(cacheKey);
+        await setCachedData(cacheKey, courses) && keysToClear.add(cacheKey);
         res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);

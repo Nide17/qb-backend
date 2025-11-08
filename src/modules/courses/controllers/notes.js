@@ -3,7 +3,7 @@ const { handleError } = require('../../../utils/error');
 const { getBatchedUsers } = require('../../users/helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
-let keysToClear = [];
+const keysToClear = new Set();
 const expandNotes = async (notes) => {
 
     if (!notes) throw { status: 404, message: 'No notes found!' };
@@ -39,7 +39,7 @@ const findNotes = async (query, limit = 0, key) => {
         .limit(limit);
 
     notes = await expandNotes(notes) || notes;
-    setCachedData(cacheKey, notes) && keysToClear.push(cacheKey);
+    setCachedData(cacheKey, notes) && keysToClear.add(cacheKey);
     return notes;
 };
 

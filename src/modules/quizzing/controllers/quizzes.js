@@ -44,7 +44,7 @@ exports.getQuizzes = async (req, res) => {
                 quizzes: expandedQuizzes || limitedQuizzes,
             };
 
-            await setCachedData(cacheKey, result) && keysToClear.push(cacheKey);
+            await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
             res.status(200).json(result);
         }
         // PAGINATED
@@ -85,7 +85,7 @@ exports.getQuizzes = async (req, res) => {
                 totalQuizzes,
                 quizzes: expandedQuizzes || paginatedQuizzes,
             };
-            await setCachedData(cacheKey, result) && keysToClear.push(cacheKey);
+            await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
             res.status(200).json(result);
 
         }
@@ -105,7 +105,7 @@ exports.getQuizzes = async (req, res) => {
             const expandedQuizzes = await populateBatchedQuizzes(allQuizzes);
             allQuizzes = expandedQuizzes || allQuizzes;
 
-            await setCachedData(cacheKey, allQuizzes) && keysToClear.push(cacheKey);
+            await setCachedData(cacheKey, allQuizzes) && keysToClear.add(cacheKey);
             res.status(200).json(allQuizzes);
         }
     } catch (err) {
@@ -146,7 +146,7 @@ exports.getQuizzesByCategory = async (req, res) => {
         const expandedQuizzes = await populateBatchedQuizzes(quizzes);
         quizzes = expandedQuizzes || quizzes;
 
-        await setCachedData(cacheKey, quizzes) && keysToClear.push(cacheKey);
+        await setCachedData(cacheKey, quizzes) && keysToClear.add(cacheKey);
         res.status(200).json(quizzes);
     } catch (err) {
         handleError(res, err);
@@ -169,26 +169,7 @@ exports.getQuizzesByNotes = async (req, res) => {
         const expandedQuizzes = await populateBatchedQuizzes(quizzes);
         quizzes = expandedQuizzes || quizzes;
 
-        await setCachedData(cacheKey, quizzes) && keysToClear.push(cacheKey);
-        res.status(200).json(quizzes);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-exports.getBatchedQuizzes = async (req, res) => {
-    try {
-        const ids = req.body.quizzesIDs;
-        if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            throw { message: 'No quiz IDs provided!', status: 400 };
-        }
-
-        const quizzes = await Quiz.find({ _id: { $in: ids } })
-            .populate('category questions');
-        if (!quizzes.length) {
-            throw { message: 'No quizzes found!', status: 204 };
-        }
-
+        await setCachedData(cacheKey, quizzes) && keysToClear.add(cacheKey);
         res.status(200).json(quizzes);
     } catch (err) {
         handleError(res, err);

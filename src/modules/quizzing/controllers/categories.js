@@ -18,7 +18,7 @@ exports.getCategories = async (req, res) => {
         const expandedCategories = await populateCategories(categories);
         categories = expandedCategories || categories;
 
-        await setCachedData(cacheKey, categories) && keysToClear.push(cacheKey);
+        await setCachedData(cacheKey, categories) && keysToClear.add(cacheKey);
         res.status(200).json(categories);
     } catch (err) {
         handleError(res, err);
