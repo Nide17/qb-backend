@@ -40,7 +40,7 @@ exports.getChapters = async (req, res) => {
         if (cached) return res.status(200).json(cached);
         const chapters = await findChapters({}, 0);
 
-        await setCachedData(cacheKey, chapters) && keysToClear.push(cacheKey);
+        await setCachedData(cacheKey, chapters) && keysToClear.add(cacheKey);
         res.status(200).json(chapters);
     } catch (err) {
         handleError(res, err);
@@ -56,7 +56,7 @@ exports.getChaptersByCourse = async (req, res) => {
 
         const notes = await findChapters({ course: req.params.id }, 0);
 
-        await setCachedData(cacheKey, notes) && keysToClear.push(cacheKey);
+        await setCachedData(cacheKey, notes) && keysToClear.add(cacheKey);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);

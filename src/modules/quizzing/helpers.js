@@ -82,34 +82,20 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
     }
 };
 
-// Populate array of quizzes
-const populateBatchedQuizzes = async (quizzes) => {
-
-    if (!quizzes || quizzes.length === 0) return quizzes;
+// Populate array of quizzesIds
+const getBatchedQuizzes = async (quizzesIds) => {
 
     try {
-        // Convert to plain objects to avoid mongoose issues
-        const plainQuizzes = quizzes.map(quiz => quiz.toObject ? quiz.toObject() : quiz);
+        if (!quizzesIds || !Array.isArray(quizzesIds) || quizzesIds.length === 0) return new Map();
 
-        // Extract unique user IDs for better efficiency
-        const usersIDs = [...new Set(plainQuizzes.map(q => q.created_by?.toString()))];
+        const quizzes = await Quiz.find({ _id: { $in: quizzesIds } }).populate('category', 'title').select('title');
+        if (!quizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
 
-        // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await getBatchedUsers(usersIDs);
-
-        // Map plainQuizzes to expanded objects
-        const expandedPlainQuizzes = plainQuizzes.map(qz => {
-            const expandedQz = { ...qz };
-            if (qz.created_by) {
-                expandedQz.created_by = batchedUsers.get(qz.created_by.toString());
-            }
-            return expandedQz;
-        });
-
-        return expandedPlainQuizzes || plainQuizzes;
+        const quizzesMap = new Map();
+        quizzes.forEach(q => quizzesMap.set(q._id.toString(), q));
+        return quizzesMap;
     } catch (err) {
-        console.error(err.message);
-        return {}
+        return new Map();
     }
 };
 
@@ -131,7 +117,7 @@ const getBatchedQuestions = async (questionsIds) => {
 module.exports = {
     populateOneCategory,
     updateQuizQuestions,
-    populateBatchedQuizzes,
     populateCategories,
     getBatchedQuestions,
+    getBatchedQuizzes,
 };

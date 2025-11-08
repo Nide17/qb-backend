@@ -67,6 +67,7 @@ const sendSubscriptionEmail = (subscriber) => {
     );
 };
 
+
 const getBatchedUsers = async (usersIDs) => {
 
     try {
