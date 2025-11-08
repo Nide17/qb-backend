@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You for Contacting Us - Quiz-Blog</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #157A6E, #1e8e85);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="60" height="60" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="a" patternUnits="userSpaceOnUse" width="60" height="60"><circle cx="30" cy="30" r="2" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100%" height="100%" fill="url(%23a)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 2;
+            animation: bounce 1.5s ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 60%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            80% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 2;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 20px;
+            color: #157A6E;
+            font-weight: 600;
+            margin-bottom: 25px;
+        }
+
+        .thank-you-card {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border: 1px solid #c3e6cb;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .thank-you-card::before {
+            content: '💌';
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 40px;
+            opacity: 0.3;
+        }
+
+        .thank-you-message {
+            font-size: 18px;
+            color: #155724;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .thank-you-description {
+            font-size: 16px;
+            color: #155724;
+            line-height: 1.6;
+        }
+
+        .response-timeline {
+            background-color: #f8f9fa;
+            border-left: 4px solid #157A6E;
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+
+        .timeline-title {
+            color: #157A6E;
+            font-weight: 700;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            transition: transform 0.2s ease;
+        }
+
+        .timeline-item:hover {
+            transform: translateX(5px);
+        }
+
+        .timeline-icon {
+            font-size: 24px;
+            margin-right: 15px;
+            flex-shrink: 0;
+            color: #157A6E;
+        }
+
+        .timeline-text {
+            color: #555;
+            font-weight: 500;
+            line-height: 1.5;
+        }
+
+        .info-section {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border: 1px solid #bbdefb;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .info-title {
+            color: #0277bd;
+            font-weight: 700;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .info-text {
+            color: #01579b;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .cta-section {
+            background: linear-gradient(135deg, #157A6E, #1e8e85);
+            color: white;
+            padding: 30px;
+            margin: 30px 0;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .cta-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .cta-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .cta-button:hover {
+            background: white;
+            color: #157A6E;
+            transform: translateY(-2px);
+        }
+
+        .footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .company-info {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .company-name {
+            color: #157A6E;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .company-tagline {
+            color: #666;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .company-location {
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .social-links {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .social-link {
+            color: #1f3fcf;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 0 8px;
+            transition: color 0.3s ease;
+        }
+
+        .social-link:hover {
+            color: #157A6E;
+            text-decoration: underline;
+        }
+
+        .separator {
+            margin: 0 4px;
+            color: #999;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .footer {
+                padding: 25px 20px;
+            }
+
+            .header-icon {
+                font-size: 50px;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .timeline-item {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .timeline-icon {
+                margin-right: 0;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon">📬</div>
+            <h1>Thank You!</h1>
+            <p>We've received your message</p>
+        </div>
+
+        <div class="content">
+            <div class="greeting">
+                Hi {{name}},
+            </div>
+
+            <div class="thank-you-card">
+                <div class="thank-you-message">🎉 Message Received Successfully!</div>
+                <div class="thank-you-description">
+                    Thank you for reaching out to Quiz-Blog! We appreciate you taking the time to contact us.
+                </div>
+            </div>
+
+            <div class="response-timeline">
+                <div class="timeline-title">📋 What happens next?</div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon">✅</div>
+                    <div class="timeline-text">
+                        <strong>Message Received:</strong> Your inquiry has been logged and assigned a reference number
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon">👥</div>
+                    <div class="timeline-text">
+                        <strong>Team Review:</strong> Our support team will review your message within 24 hours
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon">📧</div>
+                    <div class="timeline-text">
+                        <strong>Response:</strong> We'll respond to your request, question, or suggestion as soon as possible
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <div class="info-title">💡 While you wait...</div>
+                <div class="info-text">
+                    Feel free to explore our platform! Check out our latest quizzes, read our blog articles, 
+                    or browse through our study materials to enhance your learning experience.
+                </div>
+            </div>
+
+            <div class="cta-section">
+                <div class="cta-title">🚀 Continue Learning</div>
+                <div class="cta-buttons">
+                    <a href="https://www.quizblog.rw" class="cta-button">🏠 Homepage</a>
+                    <a href="https://www.quizblog.rw/blog" class="cta-button">📖 Blog</a>
+                    <a href="https://www.quizblog.rw/about" class="cta-button">ℹ️ About Us</a>
+                </div>
+            </div>
+
+            <p style="color: #157A6E; font-weight: 600; font-size: 18px; text-align: center; margin-top: 30px;">
+                We value your feedback and look forward to assisting you! 🌟
+            </p>
+        </div>
+
+        <div class="footer">
+            <div class="company-info">
+                <div class="company-name">Quiz-Blog Rwanda</div>
+                <div class="company-tagline">Quizzing & Blogging</div>
+                <div class="company-location">📍 Kigali | Rwamagana, Rwanda</div>
+            </div>
+
+            <div class="social-links">
+                <a href="https://www.linkedin.com/company/quiz-blog/" target="_blank" rel="noopener noreferrer" class="social-link">LinkedIn</a>
+                <span class="separator">|</span>
+                <a href="https://www.facebook.com/QuizblogRw/" target="_blank" rel="noopener noreferrer" class="social-link">Facebook</a>
+                <span class="separator">|</span>
+                <a href="https://twitter.com/QuizblogRw" target="_blank" rel="noopener noreferrer" class="social-link">Twitter</a>
+                <span class="separator">|</span>
+                <a href="https://www.instagram.com/quizblogrw/" target="_blank" rel="noopener noreferrer" class="social-link">Instagram</a>
+                <span class="separator">|</span>
+                <a href="https://www.quizblog.rw/" target="_blank" rel="noopener noreferrer" class="social-link">Website</a>
+                <span class="separator">|</span>
+                <a href="https://api.whatsapp.com/send?phone=250780579067" target="_blank" rel="noopener noreferrer" class="social-link">📱 WhatsApp</a>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

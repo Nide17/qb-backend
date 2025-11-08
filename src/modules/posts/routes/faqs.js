@@ -1,6 +1,6 @@
 const express = require('express');
 const { getFaqs, getOneFaq, createFaq, getCreatedBy, updateFaq, addFaqVidLink, deleteFaq, deleteFaqVideo } = require('../controllers/faqs');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 

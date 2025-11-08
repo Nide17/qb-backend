@@ -1,7 +1,7 @@
 const axios = require('axios');
 const Download = require('../models/Download');
-const { populateBatchedDownloads, validateRequiredFields, getCachedData, setCachedData } = require('../../utils/helpers');
-const { handleError } = require('../../utils/error');
+const { populateBatchedDownloads, validateRequiredFields, getCachedData, setCachedData } = require('../helpers');
+const { handleError } = require('../../../utils/error');
 
 exports.getDownloads = async (req, res) => {
 
@@ -193,9 +193,7 @@ exports.getTop10Notes = async (req, res) => {
         // Check cache first
         const cached = await getCachedData(cacheKey);
 
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         // Get top notes aggregation
         const topNotesData = await Download.aggregate([

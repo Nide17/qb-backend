@@ -1,8 +1,8 @@
 const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
 const Question = require('../models/Question');
-const { handleError } = require('../../utils/error');
-const { getFromService, populateOneUser, populateBatchedQuizzes, setCachedData, getCachedData } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { getFromService, populateOneUser, populateBatchedQuizzes, setCachedData, getCachedData } = require('../helpers');
 const { sendEmail } = require('../../utils/emails/sendEmail');
 const { isValidObjectId } = require('mongoose');
 
@@ -143,9 +143,7 @@ exports.getQuizzesByCategory = async (req, res) => {
 
         const cacheKey = `category_quizzes_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let quizzes = await Quiz.find({ category: req.params.id })
             .populate('category questions');
@@ -168,9 +166,7 @@ exports.getQuizzesByNotes = async (req, res) => {
 
         const cacheKey = `notes_quizzes_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         const categories = await Category.find({ category: req.params.id });
         let quizzes = await Quiz.find({ category: { $in: categories } }).populate('category questions');

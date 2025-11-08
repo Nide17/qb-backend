@@ -1,5 +1,5 @@
 const os = require('os');
-const { getFromService } = require('./helpers');
+const { getFromService } = require('../helpers');
 
 /**
  * Health Monitoring and Metrics Collection

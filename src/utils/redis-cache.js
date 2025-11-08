@@ -10,26 +10,19 @@ class RedisCacheManager {
     }
 
     async connect() {
+        if (this.isConnected) {
+            return true;
+        }
         try {
-            this.redis = new Redis({
-                host: process.env.REDIS_HOST || 'localhost',
-                port: process.env.REDIS_PORT || 6379,
-                password: process.env.REDIS_PASSWORD,
-                retryDelayOnFailover: 0,
-                maxRetriesPerRequest: 0,
-                lazyConnect: true,
-                connectTimeout: 20000,
-                commandTimeout: 20000,
-                enableOfflineQueue: false,
-                maxLoadingTimeout: 20000,
-            });
+            this.redis = new Redis(process.env.REDIS_UR);
 
             this.redis.on('connect', () => {
-                console.log('✅ Redis connected successfully: Host:', process.env.REDIS_HOST);
+                console.log('✅ Redis connected successfully');
                 this.isConnected = true;
             });
 
-            this.redis.on('error', () => {
+            this.redis.on('error', (err) => {
+                console.log("❌ Failed to connect to redis. Error:", err.message);
                 this.isConnected = false;
             });
 
@@ -52,7 +45,7 @@ class RedisCacheManager {
                     await this.redis.quit();
                     console.log('✅ Redis disconnected gracefully');
                 } else {
-                    console.log('⚠️ Redis not connected or already closing');
+                    console.log('⚠️ Redis: ', this.redis.status);
                     this.redis.disconnect(); // force close without sending commands
                 }
             } catch (err) {
@@ -222,18 +215,9 @@ class RedisCacheManager {
         }
     }
 
-    // Smart cache invalidation for related data
-    async invalidateRelated(key) {
-        const patterns = [
-            `*${key}*`,
-            'quiz_*',
-            'user_*',
-            'category_*',
-            'search_*'
-        ];
-
-        for (const pattern of patterns) {
-            await this.invalidatePattern(pattern);
+    async invalidateKeysCache(keys) {
+        for (const key of keys) {
+            await this.del(key);
         }
     }
 }

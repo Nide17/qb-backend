@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../db/dbManager');
+const { getConnection } = require('../../../utils/db-manager');
 const conn = getConnection('scores', process.env.SCORES_URI);
 
 // The alternative to the export model pattern is the export schema pattern.

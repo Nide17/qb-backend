@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../db/dbManager');
+const { getConnection } = require('../../../utils/db-manager');
 const conn = getConnection('feedbacks', process.env.FEEDBACKS_URI);
 
 const FeedbackSchema = new Schema({

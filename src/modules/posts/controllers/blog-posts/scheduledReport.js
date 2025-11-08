@@ -2,7 +2,7 @@ const { sendHtmlEmail } = require('../../utils/sendEmail');
 // const twilioSID = process.env.TWILIO_ACCOUNT_SID
 // const twilioToken = process.env.TWILIO_AUTH_TOKEN
 // const client = require('twilio')(twilioSID, twilioToken)
-const { getFromService } = require('../../utils/helpers');
+const { getFromService } = require('../helpers');
 
 // BlogPostsView Model
 const BlogPostsView = require('../../models/blog-posts/BlogPostsView');

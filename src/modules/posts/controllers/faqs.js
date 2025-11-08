@@ -1,6 +1,6 @@
 const Faq = require('../models/Faq');
-const { handleError } = require('../../utils/error');
-const { validateRequiredFields } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { validateRequiredFields } = require('../helpers');
 
 const handleFindByIdAndUpdate = async (id, update) => {
     try {

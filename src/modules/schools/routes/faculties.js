@@ -1,6 +1,6 @@
 const express = require('express');
 const { getFaculties, getFacultiesByLevel, getOneFaculty, createFaculty, updateFaculty, deleteFaculty } = require('../controllers/faculties');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 

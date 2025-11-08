@@ -1,6 +1,6 @@
 const multer = require('multer');
 const multerS3 = require('multer-s3');
-const { s3Config } = require('../../utils/helpers');
+const { s3Config } = require('../helpers');
 
 // File Filter for multer to check if the file is an image
 const fileFilter = (req, file, callback) => {

@@ -1,6 +1,6 @@
 const PostCategory = require('../../models/blog-posts/PostCategory');
-const { handleError } = require('../../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields } = require('../helpers');
 
 // Refactored code to use reusable utilities and align with patterns from other services.
 exports.getPostCategories = async (req, res) => {

@@ -1,6 +1,6 @@
 const express = require('express');
 const { getImageUploads, getImageUploadsByOwner, getOneImageUpload, createImageUpload, updateImageUpload, deleteImageUpload } = require('../../controllers/blog-posts/image-uploads');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 const { imgUpload } = require('../../middlewares/imgUpload');
 
 const router = express.Router();

@@ -1,6 +1,6 @@
 const Faculty = require('../models/Faculty');
-const { handleError } = require('../../utils/error');
-const { validateRequiredFields } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { validateRequiredFields } = require('../helpers');
 
 exports.getFaculties = async (req, res) => {
 

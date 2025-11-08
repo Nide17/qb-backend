@@ -1,6 +1,6 @@
 const express = require('express');
 const { getQuestions, getBatchedQuestions, getOneQuestion, createQuestion, updateQuestion, deleteQuestion } = require('../controllers/questions');
-const { authRole } = require('../../middlewares/auth');
+const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
 

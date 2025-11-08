@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 // Initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../db/dbManager');
+const { getConnection } = require('../../../utils/db-manager');
 const conn = getConnection('posts', process.env.POSTS_URI);
 
 // ImageUpload Schema

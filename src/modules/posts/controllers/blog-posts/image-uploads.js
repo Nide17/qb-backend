@@ -1,6 +1,6 @@
 const ImageUpload = require('../../models/blog-posts/ImageUpload');
-const { handleError } = require('../../utils/error');
-const { populateOneUser, populateBatchedUsers, validateRequiredFields, deleteImageFromS3 } = require('../../utils/helpers');
+const { handleError } = require('../../../utils/error');
+const { populateOneUser, populateBatchedUsers, validateRequiredFields, deleteImageFromS3 } = require('../helpers');
 
 exports.getImageUploads = async (req, res) => {
     try {

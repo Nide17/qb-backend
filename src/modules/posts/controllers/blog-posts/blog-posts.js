@@ -8,9 +8,7 @@ exports.getBlogPosts = async (req, res) => {
 
         const cacheKey = 'blogPosts';
         const cached = await getCachedData(cacheKey);
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         let blogPosts = await BlogPost.find().sort({ createdAt: -1 })
             .populate('postCategory', 'title');
@@ -71,9 +69,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
 
         const cacheKey = `blogPostsByCategory-${id}`;
         const cached = await getCachedData(cacheKey);
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
 
         if (!id) {
             throw { 'message': 'Category id not provided', 'status': 400 };
@@ -116,9 +112,7 @@ exports.getCreatedBy = async (req, res) => {
 
         const cacheKey = `blogPostsByCreator-${req.params.id}`;
         const cached = await getCachedData(cacheKey);
-        if (cached) {
-            return res.status(200).json(cached);
-        }
+        if (cached) return res.status(200).json(cached);
         const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
         if (!blogPosts) throw { 'message': 'No blogPosts found!', 'status': 404 };
 
