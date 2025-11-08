@@ -4,10 +4,7 @@ const connections = {};
 
 function getConnection(name, uri) {
     if (!connections[name]) {
-        connections[name] = mongoose.createConnection(uri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
+        connections[name] = mongoose.createConnection(uri);
     }
     return connections[name];
 }

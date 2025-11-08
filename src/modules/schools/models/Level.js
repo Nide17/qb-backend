@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('schools', process.env.SCHOOLS_URI);
+
 //create a schema object
 const LevelSchema = new Schema({
     title: {
@@ -16,4 +19,4 @@ const LevelSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Level', LevelSchema);
+module.exports = conn.model('Level', LevelSchema);

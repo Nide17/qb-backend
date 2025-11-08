@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('feedbacks', process.env.FEEDBACKS_URI);
+
 const FeedbackSchema = new Schema({
   rating: {
     type: Number,
@@ -24,4 +27,4 @@ const FeedbackSchema = new Schema({
   }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Feedback', FeedbackSchema);
+module.exports = conn.model('Feedback', FeedbackSchema);

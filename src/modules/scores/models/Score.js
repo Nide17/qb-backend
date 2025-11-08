@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('scores', process.env.SCORES_URI);
+
 // The alternative to the export model pattern is the export schema pattern.
 const ScoreSchema = new Schema({
     id: {
@@ -80,5 +83,4 @@ const ScoreSchema = new Schema({
 });
 
 //create a model
-const Score = mongoose.model('Score', ScoreSchema);
-module.exports = Score;
+module.exports = conn.model('Score', ScoreSchema);

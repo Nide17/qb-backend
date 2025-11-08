@@ -1,7 +1,10 @@
 // Bring in Mongo
 const mongoose = require('mongoose');
-const slugify = require('slugify');//initialize Mongo schema
+const slugify = require('slugify');
 const Schema = mongoose.Schema;
+
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('quizzing', process.env.QUIZZING_URI);
 
 //create a schema object
 const CategorySchema = new Schema({
@@ -48,4 +51,4 @@ CategorySchema.pre('validate', function (next) {
   next();
 });
 
-module.exports = mongoose.model('Category', CategorySchema);
+module.exports = conn.model('Category', CategorySchema);

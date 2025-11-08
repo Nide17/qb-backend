@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('comments', process.env.COMMENTS_URI);
+
 //create a schema object
 const QuizCommentSchema = new Schema({
     comment: {
@@ -18,4 +21,4 @@ const QuizCommentSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('QuizComment', QuizCommentSchema);
+module.exports = conn.model('QuizComment', QuizCommentSchema);

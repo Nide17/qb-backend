@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('contacts', process.env.CONTACTS_URI);
+
 //create a schema object
 const ContactSchema = new Schema({
     contact_name: {
@@ -46,4 +49,4 @@ const ContactSchema = new Schema({
     }
 });
 
-module.exports = mongoose.model('Contact', ContactSchema);
+module.exports = conn.model('Contact', ContactSchema);

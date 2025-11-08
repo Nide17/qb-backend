@@ -4,6 +4,9 @@ const slugify = require('slugify');
 
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('posts', process.env.POSTS_URI);
+
 //BlogPost Schema
 const BlogPostSchema = new Schema({
     title: {
@@ -43,4 +46,4 @@ BlogPostSchema.pre('validate', function (next) {
     next();
 });
 
-module.exports = mongoose.model('BlogPost', BlogPostSchema);
+module.exports = conn.model('BlogPost', BlogPostSchema);

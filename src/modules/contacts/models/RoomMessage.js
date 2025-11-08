@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('contacts', process.env.CONTACTS_URI);
+
 //create a schema object
 const RoomMessageSchema = new Schema({
     sender: {
@@ -22,4 +25,4 @@ const RoomMessageSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('RoomMessage', RoomMessageSchema);
+module.exports = conn.model('RoomMessage', RoomMessageSchema);

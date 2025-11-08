@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('comments', process.env.COMMENTS_URI);
+
 //create a schema object
 const QuestionCommentSchema = new Schema({
     comment: {
@@ -26,4 +29,4 @@ const QuestionCommentSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('QuestionComment', QuestionCommentSchema);
+module.exports = conn.model('QuestionComment', QuestionCommentSchema);

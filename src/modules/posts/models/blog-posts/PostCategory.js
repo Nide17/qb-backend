@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('posts', process.env.POSTS_URI);
+
 //create a schema object
 const PostCategorySchema = new Schema({
     title: {
@@ -20,4 +23,4 @@ const PostCategorySchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('PostCategory', PostCategorySchema);
+module.exports = conn.model('PostCategory', PostCategorySchema);

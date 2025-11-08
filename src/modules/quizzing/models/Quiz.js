@@ -5,6 +5,9 @@ const slugify = require('slugify');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('quizzing', process.env.QUIZZING_URI);
+
 //create a schema object
 const QuizSchema = new Schema({
   title: {
@@ -72,4 +75,4 @@ QuizSchema.pre('validate', function (next) {
   next();
 });
 
-module.exports = mongoose.model('Quiz', QuizSchema);
+module.exports = conn.model('Quiz', QuizSchema);

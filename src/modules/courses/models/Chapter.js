@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 //initialize Mongo schema
 const Schema = mongoose.Schema;
 
+const { getConnection } = require('../../db/dbManager');
+const conn = getConnection('courses', process.env.COURSES_URI);
+
 //create a schema object
 const ChapterSchema = new Schema({
     title: {
@@ -31,4 +34,4 @@ const ChapterSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Chapter', ChapterSchema);
+module.exports = conn.model('Chapter', ChapterSchema);
