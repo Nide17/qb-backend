@@ -1,49 +1,37 @@
 const RoomMessage = require('../models/RoomMessage');
+const User = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
-const { getFromService, validateRequiredFields, notifyAdmins, validateRoomMessageData } = require('../helpers');
+const { notifyAdmins, validateRoomMessageData } = require('../helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+const keysToClear = new Set();
 exports.getRoomMessages = async (req, res) => {
     try {
+        const cacheKey = 'room_messages_all';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         let roomMessages = await RoomMessage.find().sort({ createdAt: -1 });
 
         // Helper function to safely fetch user data
         const fetchUser = async (userId, context) => {
             try {
                 if (!userId) return null;
-                const response = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
-                return response;
+                const user = await User.findById(userId).select('name email -_id');
+                return user;
             } catch (error) {
                 console.warn(`Failed to fetch ${context} user ${userId}:`, error.message);
                 return null;
             }
         };
 
-        // Use Promise.allSettled for resilient concurrent fetching
-        const userPromises = roomMessages.flatMap(roomMessage => [
-            {
-                message: roomMessage,
-                type: 'sender',
-                promise: fetchUser(roomMessage.sender, 'sender')
-            },
-            {
-                message: roomMessage,
-                type: 'receiver',
-                promise: fetchUser(roomMessage.receiver, 'receiver')
-            }
-        ]);
+        // Refactored concurrent fetching with error handling
+        await Promise.all(roomMessages.map(async (roomMessage) => {
+            roomMessage.sender = await fetchUser(roomMessage.sender, 'sender');
+            roomMessage.receiver = await fetchUser(roomMessage.receiver, 'receiver');
+        }));
 
-        const userResults = await Promise.allSettled(userPromises.map(item => item.promise));
-
-        // Apply results back to messages
-        let resultIndex = 0;
-        for (const roomMessage of roomMessages) {
-            const senderResult = userResults[resultIndex++];
-            const receiverResult = userResults[resultIndex++];
-
-            roomMessage.sender = senderResult.status === 'fulfilled' ? senderResult.value : null;
-            roomMessage.receiver = receiverResult.status === 'fulfilled' ? receiverResult.value : null;
-        }
-
+        await setCachedData(cacheKey, roomMessages) && keysToClear.add(cacheKey);
         res.status(200).json(roomMessages);
     } catch (err) {
         handleError(res, err);
@@ -95,7 +83,7 @@ exports.createRoomMessage = async (req, res) => {
         // Notify admins about the new room message
         await notifyAdmins(newRoomMessage);
 
-        res.status(200).json({
+        const result = {
             _id: savedMessage._id,
             sender: savedMessage.sender,
             receiver: savedMessage.receiver,
@@ -103,21 +91,9 @@ exports.createRoomMessage = async (req, res) => {
             room: savedMessage.room,
             createdAt: savedMessage.createdAt,
             senderName,
-        });
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-exports.deleteRoomMessage = async (req, res) => {
-    try {
-        const roomMessage = await RoomMessage.findById(req.params.id);
-        if (!roomMessage) return;
-
-        const deletedMessage = await RoomMessage.findByIdAndDelete(req.params.id);
-        if (!deletedMessage) throw { message: 'Something went wrong during deletion!', status: 500 };
-
-        res.status(200).json(roomMessage);
+        };
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
     }
@@ -132,6 +108,21 @@ exports.updateRoomMessage = async (req, res) => {
         if (!updatedRoomMessage) throw { message: 'Something went wrong during update!', status: 500 };
 
         res.status(200).json(updatedRoomMessage);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+exports.deleteRoomMessage = async (req, res) => {
+    try {
+        const roomMessage = await RoomMessage.findById(req.params.id);
+        if (!roomMessage) return;
+
+        const deletedMessage = await RoomMessage.findByIdAndDelete(req.params.id);
+        if (!deletedMessage) throw { message: 'Something went wrong during deletion!', status: 500 };
+
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(roomMessage);
     } catch (err) {
         handleError(res, err);
     }

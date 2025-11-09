@@ -5,7 +5,7 @@ const { auth, authRole } = require('../../../middlewares/auth');
 const router = express.Router();
 
 // GET routes
-router.get('/', auth, getContacts);
+router.get('/', getContacts);
 router.get('/sender/:id', auth, getContactsBySender);
 router.get('/:id', auth, getOneContact);
 

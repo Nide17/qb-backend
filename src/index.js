@@ -48,11 +48,11 @@ app.use('/api/notes', require('./modules/courses/routes/notes'));
 // // Downloads
 // app.use('/api/downloads', require('./modules/downloads/routes/downloads'));
 
-// // Contacts
-// app.use('/api/contacts', require('./modules/contacts/routes/contacts'));
-// app.use('/api/broadcasts', require('./modules/contacts/routes/broadcasts'));
-// app.use('/api/chat-rooms', require('./modules/contacts/routes/chat-rooms'));
-// app.use('/api/room-messages', require('./modules/contacts/routes/room-messages'));
+// Contacts
+app.use('/api/contacts', require('./modules/contacts/routes/contacts'));
+app.use('/api/broadcasts', require('./modules/contacts/routes/broadcasts'));
+app.use('/api/chat-rooms', require('./modules/contacts/routes/chat-rooms'));
+app.use('/api/room-messages', require('./modules/contacts/routes/room-messages'));
 
 // Feedbacks
 app.use('/api/feedbacks', require('./modules/feedbacks/routes/feedbacks'));

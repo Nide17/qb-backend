@@ -1,12 +1,19 @@
 const ChatRoom = require('../models/ChatRoom');
 const RoomMessage = require('../models/RoomMessage');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields, notifyAdmins, populateUsersInChatRooms } = require('../helpers');
+const { notifyAdmins, expandRoomsUsers } = require('../helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+const keysToClear = new Set();
 exports.getChatRooms = async (req, res) => {
     try {
+        const cacheKey = 'chat_rooms_all';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         let chatRooms = await ChatRoom.find().sort({ createdAt: -1 });
-        chatRooms = await populateUsersInChatRooms(chatRooms);
+        chatRooms = await expandRoomsUsers(chatRooms);
+        await setCachedData(cacheKey, chatRooms) && keysToClear.add(cacheKey);
         res.status(200).json(chatRooms);
     } catch (err) {
         handleError(res, err);
@@ -38,12 +45,8 @@ exports.createChatRoom = async (req, res) => {
 
         // Notify admins about the new chat room
         await notifyAdmins(savedRoom);
-
-        res.status(200).json({
-            _id: savedRoom._id,
-            name: savedRoom.name,
-            users: savedRoom.users
-        });
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedRoom);
     } catch (err) {
         handleError(res, err);
     }
@@ -56,7 +59,7 @@ exports.createOpenChatRoom = async (req, res) => {
         let chatroom = await ChatRoom.findOne({ name });
 
         if (chatroom) {
-            chatroom = await populateUsersInChatRooms([chatroom]);
+            chatroom = await expandRoomsUsers([chatroom]);
             return res.status(200).json(chatroom[0]);
         }
 
@@ -76,11 +79,11 @@ exports.createOpenChatRoom = async (req, res) => {
         if (!savedRoom) throw { status: 500, message: 'Something went wrong during creation!' };
 
         let createdChatroom = await ChatRoom.findById(savedRoom._id);
-        createdChatroom = await populateUsersInChatRooms([createdChatroom]);
+        createdChatroom = await expandRoomsUsers([createdChatroom]);
 
         // Notify admins about the new open chat room
         await notifyAdmins(createdChatroom[0]);
-
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(createdChatroom[0]);
     } catch (err) {
         handleError(res, err);
@@ -101,6 +104,9 @@ exports.deleteChatRoom = async (req, res) => {
         await RoomMessage.deleteMany({ room: req.params.id });
 
         const deletedChatRoom = await ChatRoom.findByIdAndDelete(req.params.id);
+        if (!deletedChatRoom) throw { message: 'Something went wrong during deletion!', status: 500 };
+
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(deletedChatRoom);
     } catch (err) {
         handleError(res, err);
