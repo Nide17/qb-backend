@@ -1,5 +1,6 @@
 const Advert = require('../models/Advert.js');
-const { handleError } = require('../../../utils/error.js');
+const { handleError } = require('../../../utils/error');
+const { deleteImageFromS3, validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
 const keysToClear = new Set();
 exports.getAdverts = async (req, res) => {

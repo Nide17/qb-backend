@@ -24,7 +24,7 @@ exports.getQuizzes = async (req, res) => {
 
             const cacheKey = `limited_quizzes_${limit}_${skip}`;
             const cached = await getCachedData(cacheKey);
-            if (cached) return res.status(200).json(cached);
+            // if (cached) return res.status(200).json(cached);
 
             let limitedQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
@@ -36,18 +36,9 @@ exports.getQuizzes = async (req, res) => {
 
             const quizzesIDs = limitedQuizzes.map(q => q._id);
             const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-            limitedQuizzes = limitedQuizzes.map(q => quizzesMap.get(q._id.toString()) || q);
-
-            const result = {
-                totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
-                currentPage: pageNo,
-                pageSize: PAGE_SIZE,
-                totalQuizzes,
-                quizzes: limitedQuizzes,
-            };
-
-            await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
-            res.status(200).json(result);
+            limitedQuizzes = limitedQuizzes.map(q => quizzesMap.get(q._id.toString()) || q)
+            await setCachedData(cacheKey, limitedQuizzes) && keysToClear.add(cacheKey);
+            res.status(200).json(limitedQuizzes);
         }
         // PAGINATED
         else if (pageNo && pageNo > 0) {

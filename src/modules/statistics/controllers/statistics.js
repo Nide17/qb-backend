@@ -302,7 +302,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
             { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
             { $sort: { totalQuizzes: -1 } },
             { $limit: 10 }
-        ]).lean();
+        ]).exec();
 
         if (topUsers.length > 0) {
             const usersIDs = topUsers.map(u => u._id.toString());
@@ -330,7 +330,7 @@ exports.getTop10Quizzes = async (req, res) => {
             { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
             { $sort: { totalTaken: -1 } },
             { $limit: 10 }
-        ]).lean();
+        ]).exec();
 
         if (topQuizzesData.length > 0) {
             const quizzesIDs = topQuizzesData.map(q => q._id.toString());
@@ -357,7 +357,7 @@ exports.getTop10Downloaders = async (req, res) => {
             { $group: { _id: '$downloaded_by', totalDownloads: { $sum: 1 } } },
             { $sort: { totalDownloads: -1 } },
             { $limit: 10 }
-        ]);
+        ]).exec();
 
         if (topDownloaders.length > 0) {
 

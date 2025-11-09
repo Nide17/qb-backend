@@ -24,7 +24,7 @@ const getDailyReport = async () => {
             { $lookup: { from: 'blogposts', localField: '_id', foreignField: '_id', as: 'blogPost' } },
             { $unwind: '$blogPost' },
             { $project: { _id: 0, blogPost: '$blogPost.title', countries: 1, count: 1 } }
-        ]);
+        ]).exec();
 
         return processReportData(result);
     } catch (err) {
