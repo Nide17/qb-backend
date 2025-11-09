@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const slugify = require('slugify');
 
 const Schema = mongoose.Schema;
-
-const { getConnection } = require('../../../utils/db-manager');
+const { getConnection } = require('../../../../utils/db-manager');
 const conn = getConnection('posts', process.env.POSTS_URI);
 
 //BlogPost Schema

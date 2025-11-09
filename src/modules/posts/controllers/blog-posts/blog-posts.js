@@ -1,11 +1,13 @@
+const { handleError } = require('../../../../utils/error.js');
+const { deleteImageFromS3, validateRequiredFields, setCachedData, getCachedData } = require('../../../../utils/global-helpers.js');
+const { getBatchedUsers } = require('../../../users/helpers.js');
+const User = require('../../../users/models/User.js');
 const BlogPost = require('../../models/blog-posts/BlogPost.js');
-const { handleError } = require('../../utils/error.js');
-const { deleteImageFromS3, populateOneUser, populateBatchedUsers, validateRequiredFields, setCachedData, getCachedData } = require('../../utils/helpers.js');
 
+const keysToClear = new Set();
 exports.getBlogPosts = async (req, res) => {
 
     try {
-
         const cacheKey = 'blogPosts';
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
@@ -13,15 +15,13 @@ exports.getBlogPosts = async (req, res) => {
         let blogPosts = await BlogPost.find().sort({ createdAt: -1 })
             .populate('postCategory', 'title');
 
-        if (!blogPosts || blogPosts.length === 0) {
-            throw { 'message': 'No blog posts found', 'status': 204 };
-        }
+        if (!blogPosts || blogPosts.length === 0) throw { 'message': 'No blog posts found', 'status': 404 };
 
         // Extract unique user IDs for better efficiency
         const usersIDs = [...new Set(blogPosts.map(ch => ch.creator?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(usersIDs);
+        const batchedUsers = await getBatchedUsers(usersIDs);
 
         // Map blogPosts to expanded objects
         const expandedBlogPosts = blogPosts.map(bp => {
@@ -31,7 +31,7 @@ exports.getBlogPosts = async (req, res) => {
         });
         blogPosts = expandedBlogPosts || blogPosts;
 
-        await setCachedData(cacheKey, blogPosts);
+        await setCachedData(cacheKey, blogPosts) && keysToClear.add(cacheKey);
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
@@ -53,7 +53,7 @@ exports.getOneBlogPost = async (req, res) => {
 
         // Populate creator data for the blog post (keep full post object, only replace creator)
         const blogPostObj = blogPost.toObject ? blogPost.toObject() : blogPost;
-        const creator = await populateOneUser(blogPostObj.creator);
+        const creator = await User.findById(blogPostObj.creator).select('-password -__v -createdAt -updatedAt');
         blogPostObj.creator = creator || { _id: blogPostObj.creator, name: 'Unknown User' };
 
         res.status(200).json(blogPostObj);
@@ -86,7 +86,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
         const usersIDs = [...new Set(blogPosts.map(b => b.creator?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(usersIDs);
+        const batchedUsers = await getBatchedUsers(usersIDs);
 
         // Map blogPosts to expanded objects
         const expandedBlogPosts = blogPosts.map(bp => {
@@ -96,7 +96,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
         });
 
         blogPosts = expandedBlogPosts || blogPosts;
-        await setCachedData(cacheKey, blogPosts);
+        await setCachedData(cacheKey, blogPosts) && keysToClear.add(cacheKey);
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
@@ -106,17 +106,13 @@ exports.getBlogPostsByCategory = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
 
-        if (!req.params.id) {
-            throw { 'message': 'User id not provided', 'status': 400 };
-        }
-
+        if (!req.params.id) throw { 'message': 'User id not provided', 'status': 400 };
         const cacheKey = `blogPostsByCreator-${req.params.id}`;
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
         const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
         if (!blogPosts) throw { 'message': 'No blogPosts found!', 'status': 404 };
-
-        await setCachedData(cacheKey, blogPosts);
+        await setCachedData(cacheKey, blogPosts) && keysToClear.add(cacheKey);
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
@@ -147,21 +143,10 @@ exports.createBlogPost = async (req, res) => {
         });
 
         const savedBlogPost = await newBlogPost.save();
+        if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
 
-        if (!savedBlogPost) {
-            throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
-        }
-
-        res.status(200).json({
-            _id: savedBlogPost._id,
-            title: savedBlogPost.title,
-            post_image: savedBlogPost.post_image,
-            markdown: savedBlogPost.markdown,
-            postCategory: savedBlogPost.postCategory,
-            creator: savedBlogPost.creator,
-            bgColor: savedBlogPost.bgColor,
-            slug: savedBlogPost.slug
-        });
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedBlogPost);
 
     } catch (err) {
         handleError(res, err);
@@ -172,8 +157,8 @@ exports.updateBlogPost = async (req, res) => {
     try {
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
-
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);
@@ -186,6 +171,7 @@ exports.updateBlogPostStatus = async (req, res) => {
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);
@@ -202,6 +188,7 @@ exports.deleteBlogPost = async (req, res) => {
         const removedBlogPost = await blogPost.deleteOne();
 
         if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);
@@ -214,6 +201,8 @@ exports.deleteBlogPostImage = async (req, res) => {
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { new: true });
+        await deleteImageFromS3(blogPost.post_image);
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);

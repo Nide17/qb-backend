@@ -1,11 +1,16 @@
 const Advert = require('../models/Advert.js');
-const { handleError } = require('../../utils/error.js');
-const { deleteImageFromS3, validateRequiredFields } = require('../../utils/helpers.js');
+const { handleError } = require('../../../utils/error.js');
 
+const keysToClear = new Set();
 exports.getAdverts = async (req, res) => {
     try {
+        const cacheKey = `all_adverts`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         const adverts = await Advert.find().sort({ createdAt: -1 }).select('-__v -updatedAt');
-        if (!adverts) throw { 'message': 'No adverts found!', 'status': 204 };
+        if (!adverts) throw { 'message': 'No adverts found!', 'status': 404 };
+        // Set cache
+        await setCachedData(cacheKey, adverts, 600) && keysToClear.add(cacheKey);
         res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
@@ -15,7 +20,6 @@ exports.getAdverts = async (req, res) => {
 exports.getOneAdvert = async (req, res) => {
     try {
         const advert = await Advert.findById(req.params.id);
-
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
         res.status(200).json(advert);
     } catch (err) {
@@ -25,8 +29,13 @@ exports.getOneAdvert = async (req, res) => {
 
 exports.getActiveAdverts = async (req, res) => {
     try {
-        const adverts = await Advert.find({ status: 'Active' }).sort({ createdAt: -1 });
+        const cacheKey = `active_adverts`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+        const adverts = await Advert.find({ status: 'Active' }).sort({ createdAt: -1 }).select('-__v -updatedAt');
         if (!adverts) throw { 'message': 'No active adverts found!', 'status': 404 };
+        // Set cache
+        await setCachedData(cacheKey, adverts, 600) && keysToClear.add(cacheKey);
         res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
@@ -35,8 +44,13 @@ exports.getActiveAdverts = async (req, res) => {
 
 exports.getCreatedBy = async (req, res) => {
     try {
+        const cacheKey = `adverts_by_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         const adverts = await Advert.find({ owner: req.params.id }).sort({ createdAt: -1 });
         if (!adverts) throw { 'message': 'No adverts found!', 'status': 404 };
+        // Set cache
+        await setCachedData(cacheKey, adverts, 600) && keysToClear.add(cacheKey);
         res.status(200).json(adverts);
     } catch (err) {
         handleError(res, err);
@@ -72,16 +86,8 @@ exports.createAdvert = async (req, res) => {
         const savedAdvert = await newAdvert.save();
         if (!savedAdvert) throw { message: 'Something went wrong during creation!', status: 500 };
 
-        res.status(200).json({
-            _id: savedAdvert._id,
-            caption: savedAdvert.caption,
-            owner: savedAdvert.owner,
-            phone: savedAdvert.phone,
-            email: savedAdvert.email,
-            link: savedAdvert.link,
-            advert_image: savedAdvert.advert_image,
-            createdAt: savedAdvert.createdAt
-        });
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedAdvert);
     } catch (err) {
         handleError(res, err);
     }
@@ -93,6 +99,7 @@ exports.updateAdvert = async (req, res) => {
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedAdvert);
     } catch (err) {
         handleError(res, err);
@@ -105,6 +112,7 @@ exports.updateAdvertStatus = async (req, res) => {
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedAdvert);
     } catch (err) {
         handleError(res, err);
@@ -119,7 +127,7 @@ exports.deleteAdvert = async (req, res) => {
         advert.advert_image && await deleteImageFromS3(advert.advert_image);
         const removedAdvert = await advert.deleteOne();
         if (removedAdvert.deletedCount === 0) throw { message: 'Something went wrong during deletion!', status: 500 };
-
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(advert);
     } catch (err) {
         handleError(res, err);
@@ -132,6 +140,8 @@ exports.deleteAdvertImage = async (req, res) => {
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { new: true });
+        await deleteImageFromS3(advert.advert_image);
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedAdvert);
     } catch (err) {
         handleError(res, err);

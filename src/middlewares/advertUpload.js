@@ -1,6 +1,6 @@
 const multer = require('multer');
 const multerS3 = require('multer-s3');
-const { s3Config } = require('../modules/posts/utils/helpers');
+const { s3Config } = require('../utils/global-helpers');
 
 // Uploading image to aws
 const multerS3Config = multerS3({

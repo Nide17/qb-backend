@@ -1,6 +1,6 @@
 const express = require('express');
 const { getBlogPosts, getOneBlogPost, getBlogPostsByCategory, createBlogPost, updateBlogPost, deleteBlogPost } = require('../../controllers/blog-posts/blog-posts');
-const { authRole } = require('../../../middlewares/auth.js');
+const { authRole } = require('../../../../middlewares/auth');
 const { blogPostUpload } = require('../../../../middlewares/blogPostUpload');
 
 const router = express.Router();
