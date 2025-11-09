@@ -51,7 +51,7 @@ exports.getCommentsByQuiz = async (req, res) => {
         const cachedData = await getCachedData(cacheKey);
         if (cachedData) return res.status(200).json(cachedData);
 
-        let quizComments = await QuizComment.find({ quiz: req.params.id }).sort({ createdAt: -1 });
+        let quizComments = await QuizComment.find({ quiz: req.params.id }).sort({ createdAt: -1 }).lean();
         const expandedComments = await expandComments(quizComments);
         quizComments = expandedComments ? expandedComments : quizComments;
 

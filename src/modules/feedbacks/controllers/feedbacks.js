@@ -24,7 +24,7 @@ exports.getFeedbacks = async (req, res) => {
 
         // Get feedbacks
         let feedbacks = await Feedback.find({}, {}, query).sort({ createdAt: -1 }).lean();
-        if (!feedbacks || feedbacks.length === 0) throw { 'message': 'No feedbacks found!', 'status': 204 };
+        if (!feedbacks || feedbacks.length === 0) throw { 'message': 'No feedbacks found!', 'status': 404 };
 
         // Expand feedback details
         const expandedFeedbacks = await expandFeedbacks(feedbacks);

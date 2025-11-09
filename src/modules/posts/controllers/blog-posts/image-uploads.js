@@ -1,6 +1,6 @@
 const ImageUpload = require('../../models/blog-posts/ImageUpload');
 const User = require('../../../users/models/User');
-const { getBatchedUsers } = require('../../../users/helpers');
+const { getBatchedUsersMap } = require('../../../users/helpers');
 const { deleteImageFromS3, redisCache, getCachedData, setCachedData } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
 
@@ -10,20 +10,19 @@ exports.getImageUploads = async (req, res) => {
         const cacheKey = `all_image_uploads`;
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
-        let imageUploads = await ImageUpload.find().sort({ createdAt: -1 });
-        if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 204 };
+        let imageUploads = await ImageUpload.find().sort({ createdAt: -1 }).lean();
+        if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
-        // Extract unique user IDs for better efficiency
+        // Extract unique IDs
         const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
 
-        // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await getBatchedUsers(usersIDs);
+        // Get users details as a Map
+        const usersMap = await getBatchedUsersMap(usersIDs);
 
         // Map imageUploads to expanded objects
         const expandedImageUploads = imageUploads.map(img => {
-            const imgObj = img.toObject();
-            const owner = batchedUsers.get(img.owner?.toString()) || img.owner;
-            return { ...imgObj, owner };
+            const owner = usersMap.get(img.owner?.toString()) || img.owner;
+            return { ...img, owner };
         });
 
         const result = expandedImageUploads || imageUploads;
@@ -38,12 +37,12 @@ exports.getImageUploads = async (req, res) => {
 
 exports.getOneImageUpload = async (req, res) => {
     try {
-        let imageUpload = await ImageUpload.findById(req.params.id);
+        let imageUpload = await ImageUpload.findById(req.params.id).lean();
         if (!imageUpload) throw { status: 404, message: 'Image upload not found!' };
 
-        // Populate user
-        imageUpload = imageUpload.toObject ? imageUpload.toObject() : imageUpload;
-        imageUpload.owner = await User.findById(imageUpload.owner).select('-password -__v -createdAt -updatedAt');
+        if (imageUpload.owner) {
+            imageUpload.owner = await User.findById(imageUpload.owner).select('-password -__v -createdAt -updatedAt');
+        }
         res.status(200).json(imageUpload);
     } catch (err) {
         handleError(res, err);
@@ -52,24 +51,23 @@ exports.getOneImageUpload = async (req, res) => {
 
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
-
         const cacheKey = `image_uploads_by_${req.params.id}`;
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
-        let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 });
+
+        let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 }).lean();
         if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
-        // Extract unique user IDs for better efficiency
+        // Extract unique IDs
         const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
 
-        // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(usersIDs);
+        // Get users details as a Map
+        const usersMap = await getBatchedUsersMap(usersIDs);
 
         // Map imageUploads to expanded objects
         const expandedImageUploads = imageUploads.map(img => {
-            const imgObj = img.toObject();
-            const owner = batchedUsers.get(img.owner?.toString()) || img.owner;
-            return { ...imgObj, owner };
+            const owner = usersMap.get(img.owner?.toString()) || img.owner;
+            return { ...img, owner };
         });
         const result = expandedImageUploads || imageUploads;
 

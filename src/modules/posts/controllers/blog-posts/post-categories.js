@@ -1,7 +1,7 @@
 const PostCategory = require('../../models/blog-posts/PostCategory');
-const { getBatchedUsers } = require('../../../users/helpers');
+const { getBatchedUsersMap } = require('../../../users/helpers');
 const { handleError } = require('../../../../utils/error');
-const { deleteImageFromS3, validateRequiredFields, setCachedData, getCachedData } = require('../../../../utils/global-helpers');
+const { validateRequiredFields, setCachedData, getCachedData } = require('../../../../utils/global-helpers');
 const User = require('../../../users/models/User');
 
 const keysToClear = new Set();
@@ -11,20 +11,22 @@ exports.getPostCategories = async (req, res) => {
         const cacheKey = 'all_post_categories';
         const cached = await getCachedData(cacheKey);
         if (cached) keysToClear.add(cacheKey);
-        const postCategories = await PostCategory.find().sort({ createdAt: -1 });
+        const postCategories = await PostCategory.find().sort({ createdAt: -1 }).lean();
         if (!postCategories || postCategories.length === 0) throw { 'status': 404, 'message': 'No postCategories found!' };
 
-        // Extract unique user IDs for better efficiency
+        // Extract unique IDs
         const usersIDs = [...new Set(postCategories.map(ch => ch.creator?.toString()))];
 
-        // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await getBatchedUsers(usersIDs);
+        // Get users details as a Map
+        const usersMap = await getBatchedUsersMap(usersIDs);
 
         // Map postCategories to expanded objects
         const expandedPostCategories = postCategories.map(pc => {
-            const pcObj = pc.toObject();
-            const creator = batchedUsers.get(pc.creator?.toString()) || pc.creator;
-            return { ...pcObj, creator };
+            const expandedPostCategory = { ...pc };
+            if (pc.creator) {
+                expandedPostCategory.creator = usersMap.get(pc.creator.toString());
+            }
+            return expandedPostCategory;
         });
         const result = expandedPostCategories || postCategories;
 
@@ -39,12 +41,12 @@ exports.getPostCategories = async (req, res) => {
 exports.getOnePostCategory = async (req, res) => {
 
     try {
-        let postCategory = await PostCategory.findById(req.params.id);
+        let postCategory = await PostCategory.findById(req.params.id).lean();
         if (!postCategory) throw { status: 404, message: 'Image upload not found!' };
 
-        // Populate user
-        postCategory = postCategory.toObject ? postCategory.toObject() : postCategory;
-        postCategory.creator = await User.findById(postCategory.creator).select('-password -__v -createdAt -updatedAt');
+        if (postCategory.creator) {
+            postCategory.creator = await User.findById(postCategory.creator).select('-password -__v -createdAt -updatedAt');
+        }
         res.status(200).json(postCategory);
     } catch (err) {
         handleError(res, err);

@@ -11,7 +11,7 @@ exports.getSubscribedUsers = async (req, res) => {
         if (cached) return res.status(200).json(cached);
 
         const subscribedUsers = await SubscribedUser.find().sort({ createdAt: -1 });
-        if (!subscribedUsers) throw { 'message': 'No subscribed users found!', 'status': 204 };
+        if (!subscribedUsers) throw { 'message': 'No subscribed users found!', 'status': 404 };
         await setCachedData(cacheKey, subscribedUsers) && keysToClear.add(cacheKey);
         res.status(200).json(subscribedUsers);
     } catch (err) {

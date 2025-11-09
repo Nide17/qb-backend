@@ -1,39 +1,32 @@
-const { getBatchedUsers } = require('../users/helpers');
-const { getBatchedScores } = require('../scores/helpers');
-const { getBatchedQuizzes } = require('../quizzing/helpers');
+const { getBatchedUsersMap } = require('../users/helpers');
+const { getBatchedScoresMap } = require('../scores/helpers');
+const { getBatchedQuizzesMap } = require('../quizzing/helpers');
 
 const expandFeedbacks = async (feedbacks) => {
 
     if (!feedbacks || feedbacks.length === 0) return null;
 
     try {
-        // Convert to plain objects to avoid mongoose issues
-        const plainFeedbacks = feedbacks.map(feedback => feedback.toObject ? feedback.toObject() : feedback);
-
-        // Extract unique scores IDs for better efficiency
-        const scoresIDs = [...new Set(plainFeedbacks.map(fb => fb.score?.toString()).filter(Boolean))];
-
-        // Extract unique user IDs for better efficiency
-        const usersIDs = [...new Set(plainFeedbacks.map(fb => fb.user?.toString()).filter(Boolean))];
-
-        // Extract unique quiz IDs for better efficiency
-        const quizzesIDs = [...new Set(plainFeedbacks.map(fb => fb.quiz?.toString()).filter(Boolean))];
+        // Extract unique IDs
+        const scoresIDs = [...new Set(feedbacks.map(fb => fb.score?.toString()).filter(Boolean))];
+        const usersIDs = [...new Set(feedbacks.map(fb => fb.user?.toString()).filter(Boolean))];
+        const quizzesIDs = [...new Set(feedbacks.map(fb => fb.quiz?.toString()).filter(Boolean))];
 
         // Populating
-        const batchedScores = await getBatchedScores(scoresIDs);
-        const batchedUsers = await getBatchedUsers(usersIDs);
-        const batchedQuizzes = await getBatchedQuizzes(quizzesIDs);
+        const scoresMap = await getBatchedScoresMap(scoresIDs);
+        const usersMap = await getBatchedUsersMap(usersIDs);
+        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
 
-        // Map plainFeedbacks to expanded objects
-        const expandedPlainFeedbacks = plainFeedbacks.map(feedback => {
+        // Map feedbacks to expanded objects
+        const expandedFeedbacks = feedbacks.map(feedback => {
             const expandedFeedback = { ...feedback };
-            if (feedback.quiz) expandedFeedback.quiz = batchedQuizzes.get(feedback.quiz.toString());
-            if (feedback.score) expandedFeedback.score = batchedScores.get(feedback.score.toString());
-            if (feedback.user) expandedFeedback.user = batchedUsers.get(feedback.user.toString());
+            if (feedback.quiz) expandedFeedback.quiz = quizzesMap.get(feedback.quiz.toString());
+            if (feedback.score) expandedFeedback.score = scoresMap.get(feedback.score.toString());
+            if (feedback.user) expandedFeedback.user = usersMap.get(feedback.user.toString());
             return expandedFeedback;
         });
 
-        return expandedPlainFeedbacks || plainFeedbacks;
+        return expandedFeedbacks || feedbacks;
     } catch (err) {
         console.error(err.message);
         return feedbacks;

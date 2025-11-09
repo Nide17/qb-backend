@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('./models/User');
-const Faculty = require('../schools/models/Faculty');
 const { sendEmail } = require('../../utils/emails/sendEmail');
 
 // Helper functions
@@ -28,29 +27,6 @@ const hashPassword = async (password) => {
     return hash;
 };
 
-// Expand user details
-const populateOneSchool = async (user) => {
-
-    if (!user) return null;
-
-    try {
-        let userObj = user.toObject ? user.toObject() : user;
-
-        if (user.school && user.level && user.faculty) {
-            const faculty = await Faculty.findById(user.faculty);
-
-            if (faculty) {
-                userObj.faculty = { _id: faculty?._id, title: faculty?.title };
-                userObj.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
-                userObj.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
-            }
-        }
-        return userObj;
-    } catch (error) {
-        return userObj;
-    }
-};
-
 // Helper function to send subscription email
 const sendSubscriptionEmail = (subscriber) => {
     const clientURL = process.env.NODE_ENV === 'production' ?
@@ -68,7 +44,7 @@ const sendSubscriptionEmail = (subscriber) => {
 };
 
 
-const getBatchedUsers = async (usersIDs) => {
+const getBatchedUsersMap = async (usersIDs) => {
 
     try {
         if (!usersIDs || !Array.isArray(usersIDs) || usersIDs.length === 0) return new Map();
@@ -89,11 +65,10 @@ const getBatchedUsers = async (usersIDs) => {
 };
 
 module.exports = {
-    populateOneSchool,
     generateToken,
     updateUserToken,
     sendOtpEmail,
     hashPassword,
     sendSubscriptionEmail,
-    getBatchedUsers,
+    getBatchedUsersMap,
 };

@@ -1,10 +1,11 @@
-const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
-const { getBatchedQuizzes } = require('../../quizzing/helpers');
+const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
 const User = require('../../users/models/User');
 const Quiz = require('../../quizzing/models/Quiz');
 const { expandScores } = require('../helpers');
 const Score = require('../models/Score');
 const { handleError } = require('../../../utils/error');
+const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { getBatchedUsersMap } = require('../../users/helpers');
 
 const keysToClear = new Set();
 exports.getScores = async (req, res) => {
@@ -24,14 +25,14 @@ exports.getScores = async (req, res) => {
 
         const cacheKey = `scores_${query.limit}_${query.skip}`;
         const cached = await getCachedData(cacheKey);
-        // if (cached) return res.status(200).json(cached);
+        if (cached) return res.status(200).json(cached);
 
         // Always use pagination to prevent memory exhaustion
         let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
         if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores found' };
 
         // Expand scores
-        const expandedScores = await expandScores(scores);
+        const expandedScores = await expandScores(scores) || scores;
         const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
 
         await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
@@ -54,8 +55,7 @@ exports.getScoresByTaker = async (req, res) => {
         if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
 
         // Expand scores
-        const expandedScores = await expandScores(scores);
-        const result = expandedScores || scores;
+        const result = await expandScores(scores) || scores;
         await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
         res.status(200).json(result);
     } catch (err) {
@@ -81,7 +81,7 @@ exports.getScoresForQuizCreator = async (req, res) => {
         if (!scores || scores.length === 0) throw { status: 404, message: '404' };
 
         // Expand scores
-        const expandedScores = await expandScores(scores);
+        const expandedScores = await expandScores(scores) || scores;
         const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
 
         await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
@@ -125,8 +125,7 @@ exports.getQuizRanking = async (req, res) => {
         if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores to display' };
 
         // Expand scores
-        const expandedScores = await expandScores(scores);
-        const result = expandedScores || scores;
+        const result = await expandScores(scores) || scores;
         await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
         res.status(200).json(result);
     } catch (err) {
@@ -154,14 +153,12 @@ exports.getPopularQuizzes = async (req, res) => {
             { $group: { _id: '$quiz', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $limit: 3 }
-        ]).lean();
+        ]).exec();
 
         if (topQuizzes.length > 0) {
             const quizzesIDs = topQuizzes.map(q => q._id);
-            const quizzesMap = await getBatchedQuizzes(quizzesIDs);
-            popularQuizzes = topQuizzes.map(tq => {
-                return quizzesMap.get(tq._id.toString()) || {};
-            });
+            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+            popularQuizzes = topQuizzes.map(tq => quizzesMap.get(tq._id.toString()) || {});
         }
         await setCachedData(cacheKey, popularQuizzes) && keysToClear.add(cacheKey);
         res.status(200).json(popularQuizzes);
@@ -287,68 +284,6 @@ exports.deleteScore = async (req, res) => {
         // Clear relevant cache entries
         await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(score);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-
-// STATISTICS CONTROLLERS
-exports.getTop10QuizzingUsers = async (req, res) => {
-
-    try {
-        const cacheKey = 'top_10_quizzing_users';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
-
-        let topUsers = await Score.aggregate([
-            { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
-            { $sort: { totalQuizzes: -1 } },
-            { $limit: 10 }
-        ]).lean();
-
-        if (topUsers.length > 0) {
-
-            const usersIDs = topUsers.map(u => u._id.toString());
-            const usersMap = await getBatchedUsers(usersIDs);
-
-            topUsers = topUsers.map(usr => {
-                return usersMap?.get(usr?._id.toString()) || {}
-            });
-        }
-        await setCachedData(cacheKey, topUsers) && keysToClear.add(cacheKey);
-        res.status(200).json(topUsers);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-// Get top quizzes by activity (by number of times taken in scores) - for statistics service
-exports.getTop10Quizzes = async (req, res) => {
-    try {
-        // Check cache first
-        const cacheKey = 'top_10_quizzes';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
-
-        // Get top quizzes
-        let topQuizzes = [];
-
-        const topQuizzesData = await Score.aggregate([
-            { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
-            { $sort: { totalTaken: -1 } },
-            { $limit: 10 }
-        ]).lean();
-
-        if (topQuizzesData.length > 0) {
-            const quizzesIDs = topQuizzesData.map(q => q._id.toString());
-            const quizzesMap = await getBatchedQuizzes(quizzesIDs);
-            topQuizzes = topQuizzesData.map(qz => {
-                return quizzesMap?.get(qz?._id.toString()) || {};
-            });
-        }
-        await setCachedData(cacheKey, topQuizzes) && keysToClear.add(cacheKey);
-        res.status(200).json(topQuizzes);
     } catch (err) {
         handleError(res, err);
     }

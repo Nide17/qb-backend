@@ -4,10 +4,11 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
 const User = require('../models/User');
+const Faculty = require('../../schools/models/Faculty');
 const PswdResetToken = require('../models/PswdResetToken');
 const { handleError } = require('../../../utils/error');
 const { deleteImageFromS3, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
-const { populateOneSchool, hashPassword, updateUserToken } = require('../helpers');
+const { hashPassword, updateUserToken } = require('../helpers');
 
 const keysToClear = new Set();
 // Get all users
@@ -21,7 +22,7 @@ exports.getUsers = async (req, res) => {
         const limit = req.query.limit ? parseInt(req.query.limit) : 0;
         const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
         let users = await User.find(filter ? { [filter]: { $exists: true } } : {}).limit(limit).sort({ register_date: -1 }).select('name email role register_date' + (filter ? ` ${filter}` : ''));
-        if (!users.length) throw { 'message': 'No users found!', 'status': 204 };
+        if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
 
         // Set cache
         await setCachedData(cacheKey, users, 60 * 60) && keysToClear.add(cacheKey);
@@ -76,13 +77,23 @@ exports.getAdminsCreators = async (req, res) => {
 exports.getOneUser = async (req, res) => {
 
     try {
-        let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
+        let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
         if (!user) throw { 'message': 'User not found!', 'status': 404 };
 
         // Expand user school details
-        const expandeduser = await populateOneSchool(user);
-        res.status(200).json(expandeduser || user);
-
+        if (user.school && user.level && user.faculty) {
+            const faculty = await Faculty
+                .findById(user.faculty)
+                .populate('level school', 'title')
+                .select('title level school')
+                .lean();
+            if (faculty) {
+                user.faculty = { _id: faculty?._id, title: faculty?.title };
+                user.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+                user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+            }
+        }
+        res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
     }
@@ -98,61 +109,25 @@ exports.loadUser = async (req, res) => {
         if (cached) return res.status(200).json(cached);
 
         // If no cache, get user from database
-        let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
+        let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
+        if (!user) throw { 'message': 'No active session!', 'status': 404 };
 
-        if (!user) throw { 'message': 'No active session!', 'status': 204 };
-        const expandeduser = await populateOneSchool(user) || user;
-
-        // Set cache
-        await setCachedData(cacheKey, expandeduser, 300) && keysToClear.add(cacheKey);
-        return res.status(200).json(expandeduser);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-// Get daily user registration statistics
-exports.getDailyUserRegistration = async (req, res) => {
-    try {
-
-        const cacheKey = `daily-user-registration`;
-
-        // Check cache first
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
-
-        const usersStats = await User.aggregate([
-            {
-                $project: {
-                    register_date_CAT: {
-                        $dateToString: {
-                            format: '%Y-%m-%d',
-                            date: { $add: ['$register_date', 2 * 60 * 60 * 1000] }
-                        }
-                    }
-                }
-            },
-            {
-                $group: {
-                    _id: '$register_date_CAT',
-                    users: { $sum: 1 }
-                }
-            },
-            {
-                $sort: { _id: 1 }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    date: '$_id',
-                    users: 1
-                }
+        // Expand user school details
+        if (user.school && user.level && user.faculty) {
+            const faculty = await Faculty
+                .findById(user.faculty)
+                .populate('level school', 'title')
+                .select('title level school')
+                .lean();
+            if (faculty) {
+                user.faculty = { _id: faculty?._id, title: faculty?.title };
+                user.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+                user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
             }
-        ]).exec();
-
+        }
         // Set cache
-        await setCachedData(cacheKey, usersStats) && keysToClear.add(cacheKey);
-        res.status(200).json(usersStats);
+        await setCachedData(cacheKey, user, 60 * 15) && keysToClear.add(cacheKey);
+        res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
     }
@@ -282,9 +257,7 @@ exports.verifyOTP = async (req, res) => {
         if (otp !== usr.otp) throw { 'status': 400, 'message': 'Invalid OTP provided.' };
 
         await User.findOneAndUpdate({ email }, { verified: true });
-
         const updatedUser = await updateUserToken(usr);
-
         if (!updatedUser) throw { status: 500, message: 'Could not verify user, try again!' };
 
         res.status(200).json({
@@ -294,7 +267,8 @@ exports.verifyOTP = async (req, res) => {
                 name: updatedUser.name,
                 email: updatedUser.email,
                 role: updatedUser.role
-            }});
+            }
+        });
     } catch (err) {
         handleError(res, err, 500);
     }
@@ -343,14 +317,10 @@ exports.sendNewPassword = async (req, res) => {
     try {
         const { userId, token, password } = req.body;
         let passwordResetToken = await PswdResetToken.findOne({ userId });
-        if (!passwordResetToken) {
-            throw { 'status': 400, 'message': 'Invalid or expired link, try resetting again!' };
-        }
+        if (!passwordResetToken) throw { 'status': 400, 'message': 'Invalid or expired link, try resetting again!' };
 
         const isValid = await bcrypt.compare(token, passwordResetToken.token);
-        if (!isValid) {
-            throw { 'status': 400, 'message': 'Invalid link, try resetting again!' };
-        }
+        if (!isValid) throw { 'status': 400, 'message': 'Invalid link, try resetting again!' };
 
         const hash = await hashPassword(password);
         await User.updateOne({ _id: userId }, { $set: { password: hash } }, { new: true });
@@ -374,17 +344,28 @@ exports.sendNewPassword = async (req, res) => {
 exports.updateProfileImage = async (req, res) => {
     try {
         if (!req.file) throw { 'status': 400, 'message': 'Profile image is required!' };
-
         const img_file = req.file;
+
         const user = await User.findOne({ _id: req.params.id });
         if (!user) throw { 'status': 404, 'message': 'Failed! user not exists!' };
         user.image && await deleteImageFromS3(user.image);
-
-        let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true });
+        let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true }).lean();
 
         // Expand user school details
-        const expandeduser = await populateOneSchool(updatedUserProfile);
-        res.status(200).json(expandeduser || updatedUserProfile);
+        if (updatedUserProfile.school && updatedUserProfile.level && updatedUserProfile.faculty) {
+            const faculty = await Faculty
+                .findById(updatedUserProfile.faculty)
+                .populate('level school', 'title')
+                .select('title level school')
+                .lean();
+            if (faculty) {
+                updatedUserProfile.faculty = { _id: faculty?._id, title: faculty?.title };
+                updatedUserProfile.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+                updatedUserProfile.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+            }
+        }
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(updatedUserProfile);
     } catch (err) {
         handleError(res, err);
     }
@@ -393,13 +374,25 @@ exports.updateProfileImage = async (req, res) => {
 // Update profile
 exports.updateProfile = async (req, res) => {
     try {
-        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true });
+        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true }).lean();
+        if (!user) throw { 'status': 404, 'message': 'User not found!' };
 
         // Expand user school details
-        const expandeduser = await populateOneSchool(user);
-        res.status(200).json(expandeduser || user);
+        if (user.school && user.level && user.faculty) {
+            const faculty = await Faculty
+                .findById(user.faculty)
+                .populate('level school', 'title')
+                .select('title level school')
+                .lean();
+            if (faculty) {
+                user.faculty = { _id: faculty?._id, title: faculty?.title };
+                user.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+                user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+            }
+        }
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(user);
     } catch (err) {
-
         handleError(res, err);
     }
 };
@@ -407,10 +400,10 @@ exports.updateProfile = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
     try {
-        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true });
-
+        let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true }).lean();
         if (!user) throw { 'status': 404, 'message': 'User not found!' };
 
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);

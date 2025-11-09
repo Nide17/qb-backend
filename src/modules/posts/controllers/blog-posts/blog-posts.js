@@ -1,8 +1,8 @@
-const { handleError } = require('../../../../utils/error.js');
-const { deleteImageFromS3, validateRequiredFields, setCachedData, getCachedData } = require('../../../../utils/global-helpers.js');
-const { getBatchedUsers } = require('../../../users/helpers.js');
 const User = require('../../../users/models/User.js');
 const BlogPost = require('../../models/blog-posts/BlogPost.js');
+const { handleError } = require('../../../../utils/error.js');
+const { deleteImageFromS3, validateRequiredFields, setCachedData, getCachedData } = require('../../../../utils/global-helpers.js');
+const { getBatchedUsersMap } = require('../../../users/helpers.js');
 
 const keysToClear = new Set();
 exports.getBlogPosts = async (req, res) => {
@@ -12,22 +12,19 @@ exports.getBlogPosts = async (req, res) => {
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
 
-        let blogPosts = await BlogPost.find().sort({ createdAt: -1 })
-            .populate('postCategory', 'title');
-
+        let blogPosts = await BlogPost.find().sort({ createdAt: -1 }).populate('postCategory', 'title').lean();
         if (!blogPosts || blogPosts.length === 0) throw { 'message': 'No blog posts found', 'status': 404 };
 
-        // Extract unique user IDs for better efficiency
+        // Extract unique IDs
         const usersIDs = [...new Set(blogPosts.map(ch => ch.creator?.toString()))];
 
-        // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await getBatchedUsers(usersIDs);
+        // Get users details as a Map
+        const usersMap = await getBatchedUsersMap(usersIDs);
 
         // Map blogPosts to expanded objects
         const expandedBlogPosts = blogPosts.map(bp => {
-            const bpObj = bp.toObject();
-            const creator = batchedUsers.get(bp.creator?.toString()) || bp.creator;
-            return { ...bpObj, creator };
+            const creator = usersMap.get(bp.creator?.toString()) || bp.creator;
+            return { ...bp, creator };
         });
         blogPosts = expandedBlogPosts || blogPosts;
 
@@ -44,19 +41,16 @@ exports.getOneBlogPost = async (req, res) => {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
 
-        let blogPost = await BlogPost.findOne(query)
-            .populate('postCategory', 'title');
+        let blogPost = await BlogPost
+            .findOne(query)
+            .populate('postCategory', 'title')
+            .lean();
 
-        if (!blogPost) {
-            throw { 'message': 'Blog post not found', 'status': 404 };
-        }
+        if (!blogPost) throw { 'message': 'Blog post not found', 'status': 404 };
 
-        // Populate creator data for the blog post (keep full post object, only replace creator)
-        const blogPostObj = blogPost.toObject ? blogPost.toObject() : blogPost;
-        const creator = await User.findById(blogPostObj.creator).select('-password -__v -createdAt -updatedAt');
-        blogPostObj.creator = creator || { _id: blogPostObj.creator, name: 'Unknown User' };
+        blogPost.creator = await User.findById(blogPost.creator).select('-password -__v -createdAt -updatedAt').lean();
 
-        res.status(200).json(blogPostObj);
+        res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);
     }
@@ -76,28 +70,42 @@ exports.getBlogPostsByCategory = async (req, res) => {
         }
 
         let blogPosts = await BlogPost.find({ postCategory: id }).sort({ createdAt: -1 })
-            .populate('postCategory', 'title');
+            .populate('postCategory', 'title').lean();
 
         if (!blogPosts || blogPosts.length === 0) {
             throw { 'message': 'No blog posts found for this category', 'status': 404 };
         }
 
-        // Extract unique user IDs for better efficiency
+        // Extract unique IDs
         const usersIDs = [...new Set(blogPosts.map(b => b.creator?.toString()))];
 
-        // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await getBatchedUsers(usersIDs);
+        // Get users details as a Map
+        const usersMap = await getBatchedUsersMap(usersIDs);
 
         // Map blogPosts to expanded objects
         const expandedBlogPosts = blogPosts.map(bp => {
-            const bpObj = bp.toObject();
-            const creator = batchedUsers.get(bp.creator?.toString()) || bp.creator;
-            return { ...bpObj, creator };
+            const creator = usersMap.get(bp.creator?.toString()) || bp.creator;
+            return { ...bp, creator };
         });
-
         blogPosts = expandedBlogPosts || blogPosts;
+
         await setCachedData(cacheKey, blogPosts) && keysToClear.add(cacheKey);
         res.status(200).json(blogPosts);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+exports.deleteBlogPost = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const blogPost = await BlogPost.findById(id);
+        if (!blogPost) throw { 'message': 'Blog post not found', 'status': 404 };
+
+        await blogPost.remove();
+        await deleteImageFromS3(blogPost.post_image);
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json({ message: 'Blog post deleted successfully' });
     } catch (err) {
         handleError(res, err);
     }

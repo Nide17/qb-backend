@@ -1,6 +1,6 @@
 const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
-const { getBatchedUsers } = require('../../users/helpers');
+const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 const User = require('../../users/models/User');
 
@@ -9,17 +9,17 @@ const expandNotes = async (notes) => {
 
     if (!notes) throw { status: 404, message: 'No notes found!' };
 
-    // Extract unique user IDs for better efficiency
+    // Extract unique IDs
     const usersIDs = [...new Set(notes.map(n => n.uploaded_by?.toString()))];
 
-    // Populate all user details: a Map
-    const batchedUsers = await getBatchedUsers(usersIDs);
+    // Get users details as a Map
+    const usersMap = await getBatchedUsersMap(usersIDs);
 
     // Map notes to expanded objects
-    const expandedNotes = notes.map(notes => {
-        const notesObj = notes.toObject();
-        const uploaded_by = batchedUsers.get(notes.uploaded_by?.toString()) || notes.uploaded_by;
-        return { ...notesObj, uploaded_by };
+    const expandedNotes = notes.map(nt => {
+        const expandedNote = { ...nt };
+        if (nt.uploaded_by) expandedNote.uploaded_by = usersMap.get(nt.uploaded_by.toString());
+        return expandedNote;
     });
 
     return expandedNotes || notes;
@@ -34,7 +34,8 @@ const findNotes = async (query, limit = 0, key) => {
     let notes = await Notes.find(query).sort({ createdAt: -1 })
         .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
         .populate('course chapter courseCategory', 'title')
-        .limit(limit);
+        .limit(limit)
+        .lean();
 
     notes = await expandNotes(notes) || notes;
     setCachedData(cacheKey, notes) && keysToClear.add(cacheKey);

@@ -12,7 +12,7 @@ exports.getQuestionsComments = async (req, res) => {
         const cachedData = await getCachedData(cacheKey);
         if (cachedData) return res.status(200).json(cachedData);
 
-        let questionComments = await QuestionComment.find().sort({ createdAt: -1 });
+        let questionComments = await QuestionComment.find().sort({ createdAt: -1 }).lean();
         const expandedComments = await expandComments(questionComments);
         questionComments = expandedComments ? expandedComments : questionComments;
 
@@ -35,10 +35,10 @@ exports.getPaginatedComments = async (req, res) => {
             .limit(limit * 1)
             .skip((page - 1) * limit)
             .sort({ createdAt: -1 })
-            .exec();
+            .lean();
 
         const count = await QuestionComment.countDocuments();
-        const expandedComments = await expandComments(paginatedQuestionsComments);
+        const expandedComments = await expandComments(paginatedQuestionsComments)
 
         const result = {
             paginatedQuestionsComments: expandedComments,
@@ -60,7 +60,7 @@ exports.getPendingComments = async (req, res) => {
         const cachedData = await getCachedData(cacheKey);
         if (cachedData) return res.status(200).json(cachedData);
 
-        const questionComments = await QuestionComment.find({ status: 'Pending' }).sort({ createdAt: -1 });
+        const questionComments = await QuestionComment.find({ status: 'Pending' }).sort({ createdAt: -1 }).lean();
         const expandedComments = await expandComments(questionComments);
         await setCachedData(cacheKey, expandedComments) && keysToClear.add(cacheKey);
         res.status(200).json(expandedComments);
@@ -76,7 +76,7 @@ exports.getCommentsByQuestion = async (req, res) => {
         const cachedData = await getCachedData(cacheKey);
         if (cachedData) return res.status(200).json(cachedData);
 
-        const questionComments = await QuestionComment.find({ question: req.params.id }).sort({ createdAt: -1 });
+        const questionComments = await QuestionComment.find({ question: req.params.id }).sort({ createdAt: -1 }).lean();
         const expandedComments = await expandComments(questionComments);
         await setCachedData(cacheKey, expandedComments) && keysToClear.add(cacheKey);
         res.status(200).json(expandedComments);
@@ -111,7 +111,7 @@ exports.getCommentsByQuiz = async (req, res) => {
         const cachedData = await getCachedData(cacheKey);
         if (cachedData) return res.status(200).json(cachedData);
 
-        const questionComments = await QuestionComment.find({ quiz: req.params.id }).sort({ createdAt: -1 });
+        const questionComments = await QuestionComment.find({ quiz: req.params.id }).sort({ createdAt: -1 }).lean();
         const expandedComments = await expandComments(questionComments);
         await setCachedData(cacheKey, expandedComments) && keysToClear.add(cacheKey);
         res.status(200).json(expandedComments);

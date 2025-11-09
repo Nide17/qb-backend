@@ -1,5 +1,5 @@
 const express = require('express');
-const { get50NewUsers, getAllUsers, getUsersWithImage, getUsersWithSchool, getUsersWithLevel, getUsersWithFaculty, getUsersWithInterests, getUsersWithAbout, getTop10QuizzingUsers, getTop10Downloaders, getTop10Quizzes, getTop10Notes, getDailyUserRegistration, getDashboardStats, updateDashboardStats, getLiveAnalytics, clearStatsCache, getSystemMetrics } = require('../controllers/statistics');
+const { get50NewUsers, getAllUsers, getUsersWithImage, getUsersWithSchool, getUsersWithLevel, getUsersWithFaculty, getUsersWithInterests, getUsersWithAbout, getTop10QuizzingUsers, getTop10Downloaders, getTop10Quizzes, getTop10Notes, getDailyUserRegistration, getDashboardStats, updateDashboardStats, getLiveAnalytics, getSystemMetrics } = require('../controllers/statistics');
 const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
@@ -22,7 +22,6 @@ router.get('/daily-user-registration', authRole(['Admin', 'SuperAdmin']), getDai
 router.get('/dashboard-stats', getDashboardStats);
 router.post('/update-dashboard-stats', authRole(['Admin', 'SuperAdmin']), updateDashboardStats);
 router.get('/live-analytics', authRole(['Admin', 'SuperAdmin']), getLiveAnalytics);
-router.delete('/clear-cache', authRole(['SuperAdmin']), clearStatsCache);
 
 // System endpoints
 router.get('/system-metrics', authRole(['Admin', 'SuperAdmin']), getSystemMetrics);

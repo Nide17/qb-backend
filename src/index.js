@@ -61,8 +61,8 @@ app.use('/api/feedbacks', require('./modules/feedbacks/routes/feedbacks'));
 app.use('/api/quizzes-comments', require('./modules/comments/routes/quizzes-comments'));
 app.use('/api/questions-comments', require('./modules/comments/routes/questions-comments'));
 
-// // Statistics
-// app.use('/api/statistics', require('./modules/statistics/routes/statistics'));
+// Statistics
+app.use('/api/statistics', require('./modules/statistics/routes/statistics'));
 
 // Enhanced Health Check with Status and Metrics
 app.get('/api/health', async (req, res) => {

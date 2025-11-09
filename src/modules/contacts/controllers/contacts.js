@@ -23,7 +23,7 @@ exports.getContacts = async (req, res) => {
             const cached = await getCachedData(cacheKey);
             if (cached) return res.status(200).json(cached);
 
-            contacts = await Contact.find({}, {}, query).sort({ contact_date: -1 });
+            contacts = await Contact.find({}, {}, query).sort({ contact_date: -1 }).lean();
             const result = { contacts, totalPages: Math.ceil(totalPages / PAGE_SIZE), currentPage: pageNo };
             await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
             return res.status(200).json(result);
