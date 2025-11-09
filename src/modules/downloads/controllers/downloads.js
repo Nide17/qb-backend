@@ -1,8 +1,11 @@
-const axios = require('axios');
-const Download = require('../models/Download');
-const { populateBatchedDownloads, validateRequiredFields, getCachedData, setCachedData } = require('../helpers');
 const { handleError } = require('../../../utils/error');
+const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const Download = require('../models/Download');
+const { expandDownloads } = require('../helpers');
+const User = require('../../users/models/User');
+const Notes = require('../../courses/models/Notes');
 
+const keysToClear = new Set();
 exports.getDownloads = async (req, res) => {
 
     try {
@@ -15,24 +18,29 @@ exports.getDownloads = async (req, res) => {
         query.limit = PAGE_SIZE;
         query.skip = PAGE_SIZE * (pageNo - 1);
 
-        let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();
-
-        if (!downloads || downloads.length === 0) {
-            throw { 'message': 'No downloads found!', 'status': 204 };
-        }
-
+        // Return stats only if requested
         if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads);
 
-        // Expand downloads
-        const expandedDownloads = await populateBatchedDownloads(downloads);
+        const cacheKey = `downloads_${query.limit}_${query.skip}`;
+        const cached = await getCachedData(cacheKey);
+        // if (cached) return res.status(200).json(cached);
 
-        res.status(200).json({
+        // Always use pagination to prevent memory exhaustion
+        let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();
+        if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found!', 'status': 204 };
+
+        // Expand downloads
+        const expandedDownloads = await expandDownloads(downloads);
+        const result = {
             totalPages: Math.ceil(totalDownloads / PAGE_SIZE),
             page: pageNo,
             pageSize: PAGE_SIZE,
             totalDownloads,
             downloads: expandedDownloads || downloads
-        });
+        }
+
+        await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+        res.status(200).json(result);
     } catch (err) {
         console.log('Error getting downloads:', err.message);
         handleError(res, err);
@@ -42,12 +50,25 @@ exports.getDownloads = async (req, res) => {
 exports.getOneDownload = async (req, res) => {
     try {
         let download = await Download.findById(req.params.id).lean();
-        if (!download) {
-            throw { 'message': 'Download not found!', 'status': 404 };
-        }
+        if (!download) throw { 'message': 'Download not found!', 'status': 404 };
 
-        const expandedDownload = await populateOneDownload(download);
-        res.status(200).json(expandedDownload || download);
+        if (download?.downloaded_by) {
+            const user = await User.findById(download.downloaded_by).select('_id name email');
+            download.downloaded_by = user || { _id: download.downloaded_by, name: 'Unknown User' };
+        }
+        if (download?.notes) {
+            const note = await Notes
+            .findById(download.notes)
+            .populate('course', '_id title')
+            .populate('courseCategory', '_id title')
+            .select('_id title')
+            .lean();
+            download.notes = { _id: note._id || download.notes, title: note.title || 'Unknown Note' };
+            download.chapter = note ? note.chapter : null;
+            download.course = note ? note.course : null;
+            download.courseCategory = note ? note.courseCategory : null;
+        }
+        res.status(200).json(download);
     } catch (err) {
         console.log('Error getting download:', err.message);
         handleError(res, err);
@@ -56,15 +77,20 @@ exports.getOneDownload = async (req, res) => {
 
 exports.getNotesDownloader = async (req, res) => {
     try {
-        let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
 
-        if (!downloads || downloads.length === 0) {
-            throw { 'message': 'No downloads found for this user', 'status': 404 };
-        }
+        const cacheKey = `notes_downloaders_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
+        let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
+        if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found for this user', 'status': 404 };
 
         // Expand downloads
-        const expandedDownloads = await populateBatchedDownloads(downloads);
-        res.status(200).json(expandedDownloads || downloads);
+        const expandedDownloads = await expandDownloads(downloads);
+        downloads = expandedDownloads || downloads;
+
+        await setCachedData(cacheKey, downloads) && keysToClear.add(cacheKey);
+        res.status(200).json(downloads);
     } catch (err) {
         console.log('Error getting downloads by user:', err.message);
         handleError(res, err);
@@ -73,17 +99,20 @@ exports.getNotesDownloader = async (req, res) => {
 
 exports.getCreatorDownloads = async (req, res) => {
     try {
+        const cacheKey = `creator_downloads_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         let downloads = await Download.find().lean();
-        if (!downloads || downloads.length === 0) {
-            throw { 'message': 'No downloads found for this course', 'status': 404 };
-        }
+        if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found for this course', 'status': 404 };
 
         // Expand downloads
-        const expandedDownloads = await populateBatchedDownloads(downloads);
+        const expandedDownloads = await expandDownloads(downloads);
         downloads = expandedDownloads || downloads;
 
         // Get downloads by creator: i.e notes.uploaded_by
         downloads = downloads.filter(download => download.notes.uploaded_by === req.params.id);
+        await setCachedData(cacheKey, downloads) && keysToClear.add(cacheKey);
         res.status(200).json(downloads);
     } catch (err) {
         console.log('Error getting downloads by course:', err.message);
@@ -125,18 +154,10 @@ exports.createDownload = async (req, res) => {
         });
 
         const savedDownload = await newDownload.save();
-        if (!savedDownload) {
-            throw { 'message': 'Something went wrong during creation!', 'status': 400 };
-        }
+        if (!savedDownload) throw { 'message': 'Something went wrong during creation!', 'status': 400 };
 
-        res.status(200).json({
-            _id: savedDownload._id,
-            notes: savedDownload.notes,
-            chapter: savedDownload.chapter,
-            course: savedDownload.course,
-            courseCategory: savedDownload.course,
-            downloaded_by: savedDownload.downloaded_by
-        });
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedDownload);
     } catch (err) {
         handleError(res, err);
     }
@@ -149,6 +170,8 @@ exports.deleteDownload = async (req, res) => {
 
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
         if (removedDownload.deletedCount === 0) throw { message: 'Something went wrong while deleting!', status: 500 };
+
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(download);
     } catch (err) {
         handleError(res, err);
@@ -158,6 +181,10 @@ exports.deleteDownload = async (req, res) => {
 // Get top users by download activity (for statistics service)
 exports.getTop10Downloaders = async (req, res) => {
     try {
+        const cacheKey = 'top_10_downloaders';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         // Get top downloaders aggregation
         let topDownloaders = await Download.aggregate([
             { $group: { _id: '$downloaded_by', totalDownloads: { $sum: 1 } } },
@@ -181,6 +208,8 @@ exports.getTop10Downloaders = async (req, res) => {
             });
         }
 
+        // Set cache
+        await setCachedData(cacheKey, topDownloaders, 600) && keysToClear.add(cacheKey);
         res.status(200).json(topDownloaders);
     } catch (err) {
         handleError(res, err);
@@ -188,11 +217,10 @@ exports.getTop10Downloaders = async (req, res) => {
 };
 
 exports.getTop10Notes = async (req, res) => {
-    const cacheKey = 'top_10_notes';
     try {
         // Check cache first
+        const cacheKey = 'top_10_notes';
         const cached = await getCachedData(cacheKey);
-
         if (cached) return res.status(200).json(cached);
 
         // Get top notes aggregation
@@ -202,12 +230,14 @@ exports.getTop10Notes = async (req, res) => {
             { $limit: 10 }
         ]).exec();
 
+
+        let topNotes = [];
         if (topNotesData.length > 0) {
 
             const notesIDs = topNotesData.map(note => note?._id?.toString());
             const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { notesIDs }, 200000);
 
-            let topNotes = topNotesData.map(nt => {
+            topNotes = topNotesData.map(nt => {
                 const note = notes?.data?.find(data => String(data._id) === String(nt._id)) || {};
                 return {
                     _id: nt._id,
@@ -217,9 +247,9 @@ exports.getTop10Notes = async (req, res) => {
                     totalDownloaded: nt.totalDownloaded
                 };
             });
-            setCachedData(cacheKey, topNotes);
         }
-
+        // Set cache
+        await setCachedData(cacheKey, topNotes, 600) && keysToClear.add(cacheKey);
         res.status(200).json(topNotes);
     } catch (err) {
         handleError(res, err);
@@ -230,6 +260,10 @@ exports.getTop10Notes = async (req, res) => {
 // Get database statistics for downloads service
 exports.getDatabaseStats = async (req, res) => {
     try {
+        const cacheKey = 'downloads_db_stats';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const db = Download.db;
         const collection = db.collection('downloads');
 
@@ -301,6 +335,7 @@ exports.getDatabaseStats = async (req, res) => {
             }
         };
 
+        await setCachedData(cacheKey, dbStats, 600) && keysToClear.add(cacheKey);
         res.status(200).json(dbStats);
     } catch (err) {
         console.log('Error getting database stats:', err.message);

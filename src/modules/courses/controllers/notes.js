@@ -2,6 +2,7 @@ const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsers } = require('../../users/helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const User = require('../../users/models/User');
 
 const keysToClear = new Set();
 const expandNotes = async (notes) => {
@@ -27,11 +28,8 @@ const expandNotes = async (notes) => {
 const findNotes = async (query, limit = 0, key) => {
 
     const cacheKey = `notes_${key}`
-    console.log(cacheKey)
     const cached = await getCachedData(cacheKey);
-    if (cached) {
-        return cached;
-    }
+    if (cached) return cached;
 
     let notes = await Notes.find(query).sort({ createdAt: -1 })
         .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
@@ -84,18 +82,13 @@ exports.getNotesByChapter = async (req, res) => {
 
 exports.getOneNotes = async (req, res) => {
     try {
-        const id = req.params.id;
-        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
-        const notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title');
+
+        if (!req.params.id) throw { 'message': 'Notes ID is required!', 'status': 400 };
+        const query = req.params.id.match(/^[0-9a-fA-F]{24}$/) ? { _id: req.params.id } : { slug: req.params.id };
+
+        let notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title').lean();
         if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
-
-        let notesObj = notes.toObject ? notes.toObject() : notes;
-        if (notes.uploaded_by) {
-            const user = await populateOneUser(notes.uploaded_by);
-            notesObj.uploaded_by = user;
-        }
-
-        notes = notesObj ? notesObj : notes;
+        if (notes.uploaded_by) notes.uploaded_by = await User.findById(notes.uploaded_by).select('name');
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);

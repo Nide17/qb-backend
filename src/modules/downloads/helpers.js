@@ -1,42 +1,10 @@
 const { getBatchedNotes } = require('../courses/helpers');
 const { getBatchedUsers } = require('../users/helpers');
 
-// Helper function to populate related entity details based on download type
-const populateOneDownload = async (download) => {
-
-    let downloadObj = download.toObject ? download.toObject() : download;
-    try {
-        let [notes, downloaded_by] = await Promise.all([
-            getFromService(`${process.env.COURSES_SERVICE_URL}/api/notes/${download.notes}`),
-            getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${download.downloaded_by}`)
-        ]);
-
-        return { ...downloadObj, notes, chapter: notes ? notes.chapter : null, course: notes ? notes.course : null, courseCategory: notes ? notes.courseCategory : null, downloaded_by };
-    } catch (err) {
-        return downloadObj; // Return original download if population fails
-    }
-};
-
-const populateBatchedUsers = async (usersIDs) => {
-
-    if (!usersIDs || usersIDs.length === 0) return usersIDs;
-
-    try {
-        const response = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, { timeout: 20000 });
-        const usersMap = new Map();
-        for (const user of response.data || []) {
-            usersMap.set(user._id.toString(), user);
-        }
-        return usersMap;
-    } catch (err) {
-        return new Map();
-    }
-};
-
 // Populate array of downloads
-const populateBatchedDownloads = async (downloads) => {
+const expandDownloads = async (downloads) => {
 
-    if (!downloads || downloads.length === 0) return downloads;
+    if (!downloads) throw { status: 404, message: 'No downloads found!' };
 
     try {
         // Convert to plain objects to avoid mongoose issues
@@ -92,7 +60,4 @@ const populateBatchedDownloads = async (downloads) => {
     }
 };
 
-module.exports = {
-    populateOneDownload,
-    populateBatchedDownloads,
-};
+module.exports = { expandDownloads };
