@@ -187,7 +187,7 @@ exports.getMonthlyUser = async (req, res) => {
             { $group: { _id: '$taken_by', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $limit: 1 }
-        ]).lean();
+        ]).exec();
 
         if (monthlyUser.length > 0) {
             const user = await User.findById(monthlyUser[0]._id).select('name image');

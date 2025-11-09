@@ -26,7 +26,7 @@ const getBatchedQuizzesMap = async (quizzesIds) => {
     try {
         if (!quizzesIds || !Array.isArray(quizzesIds) || quizzesIds.length === 0) return new Map();
 
-        const quizzes = await Quiz.find({ _id: { $in: quizzesIds } }).populate('category', 'title').select('title');
+        const quizzes = await Quiz.find({ _id: { $in: quizzesIds } }).populate('category questions', 'title questionText').select('title slug');
         if (!quizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
 
         const quizzesMap = new Map();
