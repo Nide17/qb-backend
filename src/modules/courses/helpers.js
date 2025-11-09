@@ -19,12 +19,11 @@ const getBatchedCourseCategories = async (courseCategoriesIDs) => {
     }
 }
 
-getBatchedNotes = async (req, res) => {
+getBatchedNotes = async (notesIDs) => {
 
     try {
         if (!notesIDs || !Array.isArray(notesIDs) || notesIDs.length === 0) return new Map();
-
-        const notes = await Notes.find({ _id: { $in: notesIDs } }).populate('chapter course courseCategory', 'title');
+        let notes = await Notes.find({ _id: { $in: notesIDs } }).populate('chapter course courseCategory', 'title');
         if (!notes.length) throw { 'message': 'No notes found!', 'status': 204 };
 
         const notesMap = new Map();

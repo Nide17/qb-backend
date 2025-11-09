@@ -45,8 +45,8 @@ app.use('/api/notes', require('./modules/courses/routes/notes'));
 // // Scores
 // app.use('/api/scores', require('./modules/scores/routes/scores'));
 
-// // Downloads
-// app.use('/api/downloads', require('./modules/downloads/routes/downloads'));
+// Downloads
+app.use('/api/downloads', require('./modules/downloads/routes/downloads'));
 
 // Contacts
 app.use('/api/contacts', require('./modules/contacts/routes/contacts'));
