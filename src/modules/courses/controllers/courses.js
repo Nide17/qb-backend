@@ -15,7 +15,7 @@ const findCourses = async (query, limit = 0) => {
     if (limit > 0) coursesQuery = coursesQuery.limit(limit);
 
     const courses = await coursesQuery;
-    if (!courses) throw { status: 204, message: 'No courses found!' };
+    if (!courses) throw { 'status': 404, message: 'No courses found!' };
 
     // Extract unique user IDs for better efficiency
     const usersIDs = [...new Set(courses.map(c => c?.created_by?.toString()))];

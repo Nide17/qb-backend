@@ -1,71 +1,51 @@
-const Score = require("./models/Score");
+const { getBatchedQuizzes } = require('../quizzing/helpers');
+const { getBatchedUsers } = require('../users/helpers');
 
-// Simple expansion function for users
-const populateOneUser = async (userId) => {
+// Populate array of scores
+const expandScores = async (scores) => {
 
-    if (!userId) return null;
-
-    try {
-        const usr = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/${userId}`);
-
-        return usr ? {
-            _id: usr._id,
-            name: usr.name
-        } : { _id: userId, name: 'Unknown User' };
-    } catch (err) {
-        return { _id: userId, name: 'Unknown User' };
-    }
-};
-// Expand score 
-const populateOneScore = async (score) => {
-
-    if (!score) return null;
-    let scoreObj = score.toObject ? score.toObject() : score;
+    if (!scores) throw { status: 404, message: 'No scores provided!' };
 
     try {
-        if (score.quiz) {
-            const quizData = await getFromService(`${process.env.QUIZZING_SERVICE_URL}/api/quizzes/${score.quiz}`);
-            if (quizData) {
-                scoreObj.quiz = quizData;
-                scoreObj.category = quizData.category;
+        // Extract unique note IDs for better efficiency
+        const quizzesIDs = [...new Set(scores.map(d => d.quiz?.toString()))];
+
+        // Extract unique user IDs for better efficiency
+        const usersIDs = [...new Set(scores.map(d => d.taken_by?.toString()))];
+
+        // Populating
+        const quizzesMap = await getBatchedQuizzes(quizzesIDs);
+        const usersMap = await getBatchedUsers(usersIDs);
+
+        // Map scores to expanded objects
+        const expandedScores = scores.map(score => {
+            const expandedScore = { ...score };
+
+            if (score.quiz) {
+                let batchedQuiz = quizzesMap.get(score.quiz.toString());
+
+                if (batchedQuiz) {
+                    expandedScore.quiz = {
+                        _id: batchedQuiz._id,
+                        title: batchedQuiz.title,
+                    };
+                    expandedScore.category = {
+                        _id: batchedQuiz.category._id,
+                        title: batchedQuiz.category.title
+                    }
+                }
             }
-        }
 
-        if (score.taken_by) {
-            const userData = await populateOneUser(score.taken_by);
-            if (userData) {
-                scoreObj.taken_by = userData;
+            if (score.taken_by) {
+                expandedScore.taken_by = usersMap.get(score.taken_by.toString());
             }
-        }
-
-        return scoreObj;
-    } catch (error) {
-        return scoreObj;
-    }
-};
-
-const getBatchedScores = async (scoresIDs) => {
-
-    if (!scoresIDs || scoresIDs.length === 0) return new Map();
-
-    try {
-        const scores = await Score.find({ _id: { $in: scoresIDs } });
-        const scoresMap = new Map();
-        for (const score of scores || []) {
-            scoresMap.set(score._id.toString(), {
-                _id: score?._id,
-                id: score?.id,
-                marks: score?.marks,
-                out_of: score?.out_of
-            });
-        }
-        return scoresMap;
+            return expandedScore;
+        });
+        return expandedScores || scores;
     } catch (err) {
-        return new Map();
+        console.error(err.message);
+        return {}
     }
 };
 
-module.exports = {
-    populateOneScore,
-    getBatchedScores,
-};
+module.exports = { expandScores };

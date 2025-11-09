@@ -12,7 +12,7 @@ exports.getPostCategories = async (req, res) => {
         const cached = await getCachedData(cacheKey);
         if (cached) keysToClear.add(cacheKey);
         const postCategories = await PostCategory.find().sort({ createdAt: -1 });
-        if (!postCategories || postCategories.length === 0) throw { 'status': 204, 'message': 'No postCategories found!' };
+        if (!postCategories || postCategories.length === 0) throw { 'status': 404, 'message': 'No postCategories found!' };
 
         // Extract unique user IDs for better efficiency
         const usersIDs = [...new Set(postCategories.map(ch => ch.creator?.toString()))];

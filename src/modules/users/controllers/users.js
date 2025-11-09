@@ -55,7 +55,6 @@ exports.getLatestUsers = async (req, res) => {
 // Get Admin and Creators users
 exports.getAdminsCreators = async (req, res) => {
     try {
-
         const cacheKey = `admins-creators`;
 
         // Check cache first

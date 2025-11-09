@@ -23,7 +23,7 @@ exports.getDownloads = async (req, res) => {
 
         const cacheKey = `downloads_${query.limit}_${query.skip}`;
         const cached = await getCachedData(cacheKey);
-        // if (cached) return res.status(200).json(cached);
+        if (cached) return res.status(200).json(cached);
 
         // Always use pagination to prevent memory exhaustion
         let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();

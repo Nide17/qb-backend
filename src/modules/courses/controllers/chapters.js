@@ -15,7 +15,7 @@ const findChapters = async (query, limit = 0) => {
     if (limit > 0) chaptersQuery = chaptersQuery.limit(limit);
 
     const chapters = await chaptersQuery;
-    if (!chapters) throw { status: 204, message: 'No chapters found!' };
+    if (!chapters) throw { 'status': 404, message: 'No chapters found!' };
 
     // Extract unique user IDs for better efficiency
     const usersIDs = [...new Set(chapters.map(c => c.created_by?.toString()))];

@@ -2,7 +2,6 @@ const Quiz = require('./models/Quiz');
 const Question = require('./models/Question');
 const User = require('../users/models/User');
 const CourseCategory = require('../courses/models/CourseCategory');
-const { getBatchedUsers } = require('../users/helpers');
 const { getBatchedCourseCategories } = require('../courses/helpers');
 
 // Simple population function for category
