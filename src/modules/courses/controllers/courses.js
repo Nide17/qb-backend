@@ -2,32 +2,33 @@ const Course = require('../models/Course');
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
-const { populateBatchedUsers } = require('../../users/helpers');
+const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const User = require('../../users/models/User');
 
 const keysToClear = new Set();
 const findCourses = async (query, limit = 0) => {
 
     let coursesQuery = Chapter.find(query).sort({ createdAt: -1 })
         .select('title description courseCategory created_by createdAt')
-        .populate('courseCategory', 'title');
+        .populate('courseCategory', 'title')
+        .lean();
 
     if (limit > 0) coursesQuery = coursesQuery.limit(limit);
 
     const courses = await coursesQuery;
     if (!courses) throw { 'status': 404, message: 'No courses found!' };
 
-    // Extract unique user IDs for better efficiency
+    // Extract unique IDs
     const usersIDs = [...new Set(courses.map(c => c?.created_by?.toString()))];
 
-    // Populate all user details: a Map
-    const batchedUsers = await populateBatchedUsers(usersIDs);
+    // Get users details as a Map
+    const usersMap = await getBatchedUsersMap(usersIDs);
 
     // Map courses to expanded objects
     const expandedCourses = courses.map(chapter => {
-        const chapterObj = chapter.toObject();
-        const created_by = batchedUsers.get(chapter?.created_by?.toString()) || chapter?.created_by;
-        return { ...chapterObj, created_by };
+        const created_by = usersMap.get(chapter?.created_by?.toString()) || chapter?.created_by;
+        return { ...chapter, created_by };
     });
 
     return expandedCourses || courses;
@@ -66,16 +67,14 @@ exports.getCoursesByCategory = async (req, res) => {
 exports.getOneCourse = async (req, res) => {
 
     if (!req.params.id) throw { 'message': 'Course ID is required!', 'status': 400 };
-    console.log("req.params.id: ", req.params.id)
 
     try {
-        let course = await Course.findById(req.params.id).populate('courseCategory', 'title description courseCategory created_by');
+        let course = await Course.findById(req.params.id).populate('courseCategory', 'title description courseCategory created_by').lean();
+        if (!course) throw { 'message': 'Course not found!', 'status': 404 };
 
-        console.log("course: ", course)
-
-        // Populate creator
-        let created_by = await populateOneUser(course?.created_by) || course?.created_by;
-        course = { ...course?.toObject(), created_by };
+        if (course.created_by) {
+            course.created_by = await User.findById(course.created_by).select('name email');
+        }
 
         res.status(200).json(course);
     } catch (err) {

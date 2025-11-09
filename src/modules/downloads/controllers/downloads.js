@@ -4,6 +4,8 @@ const Download = require('../models/Download');
 const { expandDownloads } = require('../helpers');
 const User = require('../../users/models/User');
 const Notes = require('../../courses/models/Notes');
+const { getBatchedUsersMap } = require('../../users/helpers');
+const { getBatchedNotesMap } = require('../../courses/helpers');
 
 const keysToClear = new Set();
 exports.getDownloads = async (req, res) => {
@@ -27,7 +29,7 @@ exports.getDownloads = async (req, res) => {
 
         // Always use pagination to prevent memory exhaustion
         let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();
-        if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found!', 'status': 204 };
+        if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found!', 'status': 404 };
 
         // Expand downloads
         const expandedDownloads = await expandDownloads(downloads);
@@ -58,11 +60,11 @@ exports.getOneDownload = async (req, res) => {
         }
         if (download?.notes) {
             const note = await Notes
-            .findById(download.notes)
-            .populate('course', '_id title')
-            .populate('courseCategory', '_id title')
-            .select('_id title')
-            .lean();
+                .findById(download.notes)
+                .populate('course', '_id title')
+                .populate('courseCategory', '_id title')
+                .select('_id title')
+                .lean();
             download.notes = { _id: note._id || download.notes, title: note.title || 'Unknown Note' };
             download.chapter = note ? note.chapter : null;
             download.course = note ? note.course : null;
@@ -177,85 +179,6 @@ exports.deleteDownload = async (req, res) => {
         handleError(res, err);
     }
 };
-
-// Get top users by download activity (for statistics service)
-exports.getTop10Downloaders = async (req, res) => {
-    try {
-        const cacheKey = 'top_10_downloaders';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
-
-        // Get top downloaders aggregation
-        let topDownloaders = await Download.aggregate([
-            { $group: { _id: '$downloaded_by', totalDownloads: { $sum: 1 } } },
-            { $sort: { totalDownloads: -1 } },
-            { $limit: 10 }
-        ]);
-
-        if (topDownloaders.length > 0) {
-
-            const usersIDs = topDownloaders.map(u => u?._id?.toString());
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, 200000);
-
-            topDownloaders = topDownloaders.map(usr => {
-                const user = users?.data?.find(u => u._id === usr?._id?.toString()) || {};
-                return {
-                    _id: usr._id,
-                    name: user.name || 'Unknown User',
-                    email: user.email || '',
-                    totalDownloads: usr.totalDownloads
-                };
-            });
-        }
-
-        // Set cache
-        await setCachedData(cacheKey, topDownloaders, 600) && keysToClear.add(cacheKey);
-        res.status(200).json(topDownloaders);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-exports.getTop10Notes = async (req, res) => {
-    try {
-        // Check cache first
-        const cacheKey = 'top_10_notes';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
-
-        // Get top notes aggregation
-        const topNotesData = await Download.aggregate([
-            { $group: { _id: '$notes', totalDownloaded: { $sum: 1 } } },
-            { $sort: { totalDownloaded: -1 } },
-            { $limit: 10 }
-        ]).exec();
-
-
-        let topNotes = [];
-        if (topNotesData.length > 0) {
-
-            const notesIDs = topNotesData.map(note => note?._id?.toString());
-            const notes = await axios.post(`${process.env.COURSES_SERVICE_URL}/api/notes/batch`, { notesIDs }, 200000);
-
-            topNotes = topNotesData.map(nt => {
-                const note = notes?.data?.find(data => String(data._id) === String(nt._id)) || {};
-                return {
-                    _id: nt._id,
-                    title: note.title || 'Unknown Note',
-                    courseCategory: note.courseCategory || 'Uncategorized',
-                    slug: note.slug || '',
-                    totalDownloaded: nt.totalDownloaded
-                };
-            });
-        }
-        // Set cache
-        await setCachedData(cacheKey, topNotes, 600) && keysToClear.add(cacheKey);
-        res.status(200).json(topNotes);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
 
 // Get database statistics for downloads service
 exports.getDatabaseStats = async (req, res) => {

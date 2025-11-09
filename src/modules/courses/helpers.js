@@ -19,12 +19,12 @@ const getBatchedCourseCategories = async (courseCategoriesIDs) => {
     }
 }
 
-getBatchedNotes = async (notesIDs) => {
+getBatchedNotesMap = async (notesIDs) => {
 
     try {
         if (!notesIDs || !Array.isArray(notesIDs) || notesIDs.length === 0) return new Map();
         let notes = await Notes.find({ _id: { $in: notesIDs } }).populate('chapter course courseCategory', 'title');
-        if (!notes.length) throw { 'message': 'No notes found!', 'status': 204 };
+        if (!notes.length) throw { 'message': 'No notes found!', 'status': 404 };
 
         const notesMap = new Map();
         for (const note of notes || []) {
@@ -38,5 +38,5 @@ getBatchedNotes = async (notesIDs) => {
 
 module.exports = {
     getBatchedCourseCategories,
-    getBatchedNotes,
+    getBatchedNotesMap,
 };

@@ -14,7 +14,7 @@ exports.getCourseCategories = async (req, res) => {
         if (cached) return res.status(200).json(cached);
 
         const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
-        if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 204 };
+        if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 404 };
 
         await setCachedData(cacheKey, courseCategories) && keysToClear.add(cacheKey);
         res.status(200).json(courseCategories);

@@ -1,5 +1,5 @@
 const User = require('../users/models/User');
-const { getBatchedUsers } = require('../users/helpers');
+const { getBatchedUsersMap } = require('../users/helpers');
 const { sendEmail } = require('../../utils/emails/sendEmail');
 const { getCachedData, setCachedData } = require('../../utils/global-helpers');
 
@@ -75,11 +75,7 @@ const expandRoomsUsers = async (chatRooms) => {
 
     try {
         if (usersIDs.length > 0) {
-            const users = await getBatchedUsers(usersIDs);
-            const usersMap = users?.data?.reduce((acc, user) => {
-                acc[user._id] = user;
-                return acc;
-            }, {});
+            const usersMap = await getBatchedUsersMap(usersIDs);
             chatRooms.forEach(room => {
                 room.users = room.users.map(userId => usersMap[userId]);
             });
@@ -88,7 +84,6 @@ const expandRoomsUsers = async (chatRooms) => {
                 room.users = [];
             });
         }
-
         return chatRooms;
     } catch (error) {
         return chatRooms;

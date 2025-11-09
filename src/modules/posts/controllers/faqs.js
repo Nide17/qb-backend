@@ -8,8 +8,8 @@ const handleFindByIdAndUpdate = async (id, update) => {
         const faq = await Faq.findById(id);
         if (!faq) throw { status: 404, message: 'Faq not found!' };
 
-        const updatedFaq = await Faq.findByIdAndUpdate(id, update, { new: true });
-        return updatedFaq ? (updatedFaq.toObject ? updatedFaq.toObject() : updatedFaq) : null;
+        const updatedFaq = await Faq.updateOne({ _id: id }, update, { new: true });
+        return updatedFaq;
     } catch (err) {
         throw err;
     }

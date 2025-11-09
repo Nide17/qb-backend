@@ -2,32 +2,35 @@ const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
 const User = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
-const { getBatchedUsers } = require('../../users/helpers');
+const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
 let keysToClear = []
 const findChapters = async (query, limit = 0) => {
 
-    let chaptersQuery = Chapter.find(query).sort({ createdAt: -1 })
+    let chaptersQuery = Chapter
+    .find(query)
+    .sort({ createdAt: -1 })
         .select('title description course courseCategory created_by createdAt')
-        .populate('course courseCategory', 'title');
+        .populate('course courseCategory', 'title')
+        .lean();
 
     if (limit > 0) chaptersQuery = chaptersQuery.limit(limit);
 
     const chapters = await chaptersQuery;
     if (!chapters) throw { 'status': 404, message: 'No chapters found!' };
 
-    // Extract unique user IDs for better efficiency
+    // Extract unique IDs
     const usersIDs = [...new Set(chapters.map(c => c.created_by?.toString()))];
-
-    // Populate all user details: a Map
-    const batchedUsers = await getBatchedUsers(usersIDs);
+    const usersMap = await getBatchedUsersMap(usersIDs);
 
     // Map chapters to expanded objects
-    const expandedChapters = chapters.map(chapter => {
-        const chapterObj = chapter.toObject();
-        const created_by = batchedUsers.get(chapter.created_by?.toString()) || chapter.created_by;
-        return { ...chapterObj, created_by };
+    const expandedChapters = chapters.map(c => {
+        const expandedChapter = { ...c };
+        if (c.created_by) {
+            expandedChapter.created_by = usersMap.get(c.created_by.toString());
+        }
+        return expandedChapter;
     });
 
     return expandedChapters || chapters;
@@ -65,12 +68,12 @@ exports.getChaptersByCourse = async (req, res) => {
 
 exports.getOneChapter = async (req, res) => {
     try {
-        let chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by');
+        let chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by').lean();
         if (!chapter) throw { 'message': 'Chapter not found!', 'status': 404 };
 
-        // Populate user
-        chapter = chapter.toObject ? chapter.toObject() : chapter;
-        chapter.created_by = await User.findById(chapter.created_by).select('name email');
+        if (chapter.created_by) {
+            chapter.created_by = await User.findById(chapter.created_by).select('name email');
+        }
         res.status(200).json(chapter);
     } catch (err) {
         handleError(res, err);

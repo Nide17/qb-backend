@@ -13,7 +13,7 @@ exports.getQuestions = async (req, res) => {
         if (cached) return res.status(200).json(cached);
 
         const questions = await Question.find().sort({ creation_date: -1 }).populate('category quiz');
-        if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 204 };
+        if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 404 };
 
         await setCachedData(cacheKey, questions) && keysToClear.add(cacheKey);
         res.status(200).json(questions);

@@ -1,8 +1,8 @@
 const Category = require('../models/Category');
 const Quiz = require('../models/Quiz');
 const Question = require('../models/Question');
+const CourseCategory = require('../../courses/models/CourseCategory');
 const { handleError } = require('../../../utils/error');
-const { populateOneCategory, populateCategories } = require('../helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
 let keysToClear = []
@@ -13,10 +13,9 @@ exports.getCategories = async (req, res) => {
         if (cachedCategories) return res.status(200).json(cachedCategories);
 
         let categories = await Category.find().sort({ creation_date: -1 }).select('_id title description quizes courseCategory').populate('quizes', '_id title slug');
-        if (!categories) throw { 'message': 'No categories found!', 'status': 204 };
+        if (!categories) throw { 'message': 'No categories found!', 'status': 404 };
 
-        const expandedCategories = await populateCategories(categories);
-        categories = expandedCategories || categories;
+        if (categories)
 
         await setCachedData(cacheKey, categories) && keysToClear.add(cacheKey);
         res.status(200).json(categories);
@@ -29,10 +28,17 @@ exports.getOneCategory = async (req, res) => {
     try {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
-        let category = await Category.findOne(query).populate('quizes', '_id title questions slug');
+
+        let category = await Category.findOne(query).populate('quizes', '_id title questions slug').lean();
         if (!category) throw { 'message': 'Unexistent category!', 'status': 404 };
 
-        category = await populateOneCategory(category);
+        if (category.courseCategory) {
+            category.courseCategory = await CourseCategory.findById(category.courseCategory).select('title description');
+        }
+
+        if (category.created_by) {
+            category.created_by = await User.findById(category.created_by).select('name email');
+        }
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);
@@ -49,16 +55,11 @@ exports.createCategory = async (req, res) => {
 
         // Check for duplicate title
         const existingCategory = await Category.findOne({ title: req.body.title });
-        if (existingCategory) {
-            throw { 'message': 'Failed! Category with that title already exists!', 'status': 400 };
-        }
+        if (existingCategory) throw { 'message': 'Failed! Category with that title already exists!', 'status': 400 };
 
         const newCategory = new Category(req.body);
         let savedCategory = await newCategory.save();
-
         if (!savedCategory) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
-
-        savedCategory = await populateOneCategory(savedCategory);
 
         // Clear cache for categories
         await redisCache.invalidateKeysCache(keysToClear);
@@ -71,9 +72,10 @@ exports.createCategory = async (req, res) => {
 exports.updateCategory = async (req, res) => {
     try {
         let updatedCategory = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!updatedCategory) throw { 'message': 'Category does not exist!', 'status': 404 };
 
-        updatedCategory = await populateOneCategory(updatedCategory);
-
+        // Clear cache for categories
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedCategory);
     } catch (err) {
         handleError(res, err);

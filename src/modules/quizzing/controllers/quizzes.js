@@ -4,8 +4,9 @@ const Question = require('../models/Question');
 const User = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
-const { populateBatchedQuizzes } = require('../helpers');
+const { getBatchedQuizzesMap } = require('../helpers');
 const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const SubscribedUser = require('../../users/models/SubscribedUser');
 
 let keysToClear = []
 exports.getQuizzes = async (req, res) => {
@@ -31,17 +32,18 @@ exports.getQuizzes = async (req, res) => {
                 .limit(limit)
                 .skip(skip);
 
-            if (!limitedQuizzes.length) {
-                throw { 'message': 'No quizzes found!', 'status': 204 };
-            }
+            if (!limitedQuizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
 
-            const expandedQuizzes = await populateBatchedQuizzes(limitedQuizzes);
+            const quizzesIDs = limitedQuizzes.map(q => q._id);
+            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+            limitedQuizzes = limitedQuizzes.map(q => quizzesMap.get(q._id.toString()) || q);
+
             const result = {
                 totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
                 currentPage: pageNo,
                 pageSize: PAGE_SIZE,
                 totalQuizzes,
-                quizzes: expandedQuizzes || limitedQuizzes,
+                quizzes: limitedQuizzes,
             };
 
             await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
@@ -65,25 +67,20 @@ exports.getQuizzes = async (req, res) => {
             // Always use pagination to prevent memory exhaustion
             let paginatedQuizzes = await Quiz.find({}, {}, query).populate('category questions').sort({ creation_date: -1 }).lean();
 
-            if (!paginatedQuizzes || paginatedQuizzes.length === 0) {
-                throw { message: 'No quizzes found', status: 204 };
-            }
+            if (!paginatedQuizzes || paginatedQuizzes.length === 0) throw { message: 'No quizzes found', status: 204 };
+            if (req.query?.filter === 'stats') return res.status(200).json(totalQuizzes);
+            if (!paginatedQuizzes.length) throw { message: 'No quizzes found!', status: 204 };
 
-            if (req.query?.filter === 'stats') {
-                return res.status(200).json(totalQuizzes);
-            }
+            const quizzesIDs = paginatedQuizzes.map(q => q._id);
+            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+            paginatedQuizzes = paginatedQuizzes.map(q => quizzesMap.get(q._id.toString()) || q);
 
-            if (!paginatedQuizzes.length) {
-                throw { message: 'No quizzes found!', status: 204 };
-            }
-
-            const expandedQuizzes = await populateBatchedQuizzes(paginatedQuizzes);
             const result = {
                 totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
                 currentPage: pageNo,
                 pageSize: PAGE_SIZE,
                 totalQuizzes,
-                quizzes: expandedQuizzes || paginatedQuizzes,
+                quizzes: paginatedQuizzes,
             };
             await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
             res.status(200).json(result);
@@ -94,16 +91,16 @@ exports.getQuizzes = async (req, res) => {
             const cacheKey = 'all_quizzes';
             const cached = await getCachedData(cacheKey);
             if (cached) return res.status(200).json(cached);
+
             let allQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
                 .populate('category questions');
 
-            if (!allQuizzes.length) {
-                throw { message: 'No quizzes found!', status: 204 };
-            }
+            if (!allQuizzes.length) throw { message: 'No quizzes found!', status: 204 };
 
-            const expandedQuizzes = await populateBatchedQuizzes(allQuizzes);
-            allQuizzes = expandedQuizzes || allQuizzes;
+            const quizzesIDs = allQuizzes.map(q => q._id);
+            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+            allQuizzes = allQuizzes.map(q => quizzesMap.get(q._id.toString()) || q);
 
             await setCachedData(cacheKey, allQuizzes) && keysToClear.add(cacheKey);
             res.status(200).json(allQuizzes);
@@ -119,12 +116,13 @@ exports.getOneQuiz = async (req, res) => {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
 
-        const quiz = await Quiz.findOne(query).populate('category questions');
+        const quiz = await Quiz.findOne(query).populate('category questions').lean();
         if (!quiz) throw { status: 404, message: `Quiz with id ${id} not found` };
 
         // Expand user data using simple direct calls
-        const expandedUser = await User.findById(quiz.created_by).select('-password -__v -verified -otp -otpExpires -register_date -last_login');
+        const expandedUser = await User.findById(quiz.created_by).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
         const expandedQuiz = { ...quiz, ...expandedUser };
+
         res.status(200).json(expandedQuiz || quiz);
     } catch (err) {
         handleError(res, err);
@@ -139,12 +137,11 @@ exports.getQuizzesByCategory = async (req, res) => {
 
         let quizzes = await Quiz.find({ category: req.params.id })
             .populate('category questions');
-        if (!quizzes.length) {
-            throw { message: 'No quizzes found', status: 204 };
-        }
+        if (!quizzes.length) throw { message: 'No quizzes found', status: 204 };
 
-        const expandedQuizzes = await populateBatchedQuizzes(quizzes);
-        quizzes = expandedQuizzes || quizzes;
+        const quizzesIDs = quizzes.map(q => q._id);
+        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+        quizzes = quizzes.map(q => quizzesMap.get(q._id.toString()) || q);
 
         await setCachedData(cacheKey, quizzes) && keysToClear.add(cacheKey);
         res.status(200).json(quizzes);
@@ -162,12 +159,11 @@ exports.getQuizzesByNotes = async (req, res) => {
 
         const categories = await Category.find({ category: req.params.id });
         let quizzes = await Quiz.find({ category: { $in: categories } }).populate('category questions');
-        if (!quizzes.length) {
-            throw { message: 'No quizzes found!', status: 204 };
-        }
+        if (!quizzes.length) throw { message: 'No quizzes found!', status: 204 };
 
-        const expandedQuizzes = await populateBatchedQuizzes(quizzes);
-        quizzes = expandedQuizzes || quizzes;
+        const quizzesIDs = quizzes.map(q => q._id);
+        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+        quizzes = quizzes.map(q => quizzesMap.get(q._id.toString()) || q);
 
         await setCachedData(cacheKey, quizzes) && keysToClear.add(cacheKey);
         res.status(200).json(quizzes);
@@ -207,11 +203,16 @@ exports.createQuiz = async (req, res) => {
 
 exports.notifying = async (req, res) => {
     try {
-        const { slug, title, category, created_by } = req.body;
-
         let subscribers = [];
-        const { data } = await getFromService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
-        subscribers = data;
+        const cacheKey = 'subscribed_users';
+        const cached = await getCachedData(cacheKey);
+        if (cached) subscribers = cached;
+        else {
+            subscribers = await SubscribedUser.find({});
+            await setCachedData(cacheKey, subscribers) && keysToClear.add(cacheKey);
+        }
+
+        const { slug, title, category, created_by } = req.body;
         const clientURL = req.headers.origin;
 
         subscribers.forEach(sub => {
@@ -242,7 +243,11 @@ exports.updateQuiz = async (req, res) => {
         if (!quiz) throw { message: 'Quiz not found!', status: 404 };
 
         // If updating quiz
-        const updatedQuiz = await Quiz.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedQuiz = await Quiz.updateOne(
+            { _id: req.params.id },
+            { $set: req.body },
+            { new: true }
+        );
 
         // If moving quiz from one category to another
         if (req.body?.oldCategoryID) {
@@ -258,6 +263,8 @@ exports.updateQuiz = async (req, res) => {
                 });
         }
 
+        // Clear cache for keys
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedQuiz);
     } catch (err) {
         handleError(res, err);
@@ -272,6 +279,8 @@ exports.addVidLink = async (req, res) => {
         quiz.video_links.push(req.body);
         await quiz.save();
 
+        // Clear cache for keys
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(quiz);
     } catch (err) {
         handleError(res, err);
@@ -308,6 +317,8 @@ exports.deleteVideo = async (req, res) => {
         quiz.video_links.id(req.body.vId).remove();
         await quiz.save();
 
+        // Clear cache for keys
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(quiz);
     } catch (err) {
         handleError(res, err);
@@ -317,6 +328,10 @@ exports.deleteVideo = async (req, res) => {
 // Get database statistics
 exports.getDatabaseStats = async (req, res) => {
     try {
+
+        const cacheKey = 'quizzes_db_stats';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         const db = Quiz.db;
 
         // Get stats for quizzes collection using simpler approach
@@ -395,6 +410,7 @@ exports.getDatabaseStats = async (req, res) => {
             }
         };
 
+        await setCachedData(cacheKey, dbStats) && keysToClear.add(cacheKey);
         res.status(200).json(dbStats);
     } catch (err) {
         handleError(res, err);

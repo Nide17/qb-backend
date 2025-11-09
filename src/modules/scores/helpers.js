@@ -1,37 +1,76 @@
-const { getBatchedQuizzes } = require('../quizzing/helpers');
-const { getBatchedUsers } = require('../users/helpers');
+const { getBatchedQuizzesMap } = require('../quizzing/helpers');
+const { getBatchedUsersMap } = require('../users/helpers');
+const Score = require('./models/Score');
 
-// Populate array of scores
+const getBatchedScoresMap = async (scoresIDs) => {
+
+    if (!scoresIDs) throw { status: 404, message: 'No scores provided!' };
+
+    try {
+        const scores = await Score.find({ _id: { $in: scoresIDs } });
+        if (!scores.length) throw { 'message': 'No scores found!', 'status': 404 };
+
+        // Extract unique IDs
+        const quizzesIDs = [...new Set(scores.map(s => s.quiz?.toString()))];
+        const usersIDs = [...new Set(scores.map(s => s.taken_by?.toString()))];
+
+        // Populating
+        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+        const usersMap = await getBatchedUsersMap(usersIDs);
+        const scoresMap = new Map();
+
+        scores.forEach(score => {
+            const expandedScore = { ...score };
+
+            if (score.quiz) {
+                let quiz = quizzesMap.get(score.quiz.toString());
+
+                if (quiz) {
+                    expandedScore.quiz = quiz;
+                    expandedScore.category = quiz?.category
+                }
+            }
+
+            if (score.taken_by) {
+                expandedScore.taken_by = usersMap.get(score.taken_by.toString());
+            }
+            scoresMap.set(score._id.toString(), expandedScore);
+        });
+        return scoresMap;
+    } catch (err) {
+        return new Map();
+    }
+};
+
+// Expand array of scores
 const expandScores = async (scores) => {
 
     if (!scores) throw { status: 404, message: 'No scores provided!' };
 
     try {
-        // Extract unique note IDs for better efficiency
+        // Extract unique IDs
         const quizzesIDs = [...new Set(scores.map(d => d.quiz?.toString()))];
-
-        // Extract unique user IDs for better efficiency
         const usersIDs = [...new Set(scores.map(d => d.taken_by?.toString()))];
 
-        // Populating
-        const quizzesMap = await getBatchedQuizzes(quizzesIDs);
-        const usersMap = await getBatchedUsers(usersIDs);
+        // Get mappings
+        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+        const usersMap = await getBatchedUsersMap(usersIDs);
 
         // Map scores to expanded objects
         const expandedScores = scores.map(score => {
             const expandedScore = { ...score };
 
             if (score.quiz) {
-                let batchedQuiz = quizzesMap.get(score.quiz.toString());
+                let quiz = quizzesMap.get(score.quiz.toString());
 
-                if (batchedQuiz) {
+                if (quiz) {
                     expandedScore.quiz = {
-                        _id: batchedQuiz._id,
-                        title: batchedQuiz.title,
+                        _id: quiz._id,
+                        title: quiz.title,
                     };
                     expandedScore.category = {
-                        _id: batchedQuiz.category._id,
-                        title: batchedQuiz.category.title
+                        _id: quiz.category._id,
+                        title: quiz.category.title
                     }
                 }
             }
@@ -48,4 +87,4 @@ const expandScores = async (scores) => {
     }
 };
 
-module.exports = { expandScores };
+module.exports = { getBatchedScoresMap, expandScores, };

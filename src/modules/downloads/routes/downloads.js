@@ -8,8 +8,6 @@ const router = express.Router();
 router.get('/', getDownloads);
 router.get('/downloaded-by/:id', auth, getNotesDownloader);
 router.get('/creator/:id', auth, getCreatorDownloads);
-router.get('/top-10-downloaders', auth, getTop10Downloaders);
-router.get('/top-10-notes', auth, getTop10Notes);
 router.get('/:id', getOneDownload);
 
 // POST routes
