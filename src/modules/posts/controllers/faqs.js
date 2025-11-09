@@ -1,7 +1,8 @@
 const Faq = require('../models/Faq');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields } = require('../helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+const keysToClear = new Set();
 const handleFindByIdAndUpdate = async (id, update) => {
     try {
         const faq = await Faq.findById(id);
@@ -16,8 +17,13 @@ const handleFindByIdAndUpdate = async (id, update) => {
 
 exports.getFaqs = async (req, res) => {
     try {
+        const cacheKey = `all_faqs`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         let faqs = await Faq.find().sort({ createdAt: -1 });
         if (!faqs) throw { status: 204, message: 'No faqs found!' };
+        // Set cache
+        await setCachedData(cacheKey, faqs, 600) && keysToClear.add(cacheKey);
         res.status(200).json(faqs);
     } catch (err) {
         handleError(res, err);
@@ -60,13 +66,8 @@ exports.createFaq = async (req, res) => {
         const savedFaq = await newFaq.save();
         if (!savedFaq) throw { status: 503, message: 'Something went wrong during creation!' };
 
-        res.status(200).json({
-            _id: savedFaq._id,
-            title: savedFaq.title,
-            created_by: savedFaq.created_by,
-            answer: savedFaq.answer,
-            createdAt: savedFaq.createdAt
-        });
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedFaq);
     } catch (err) {
         handleError(res, err);
     }
@@ -97,7 +98,7 @@ exports.deleteFaq = async (req, res) => {
 
         const removedFaq = await faq.deleteOne();
         if (removedFaq.deletedCount === 0) throw { status: 503, message: 'Something went wrong while deleting!' };
-
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(faq);
     } catch (err) {
         handleError(res, err);

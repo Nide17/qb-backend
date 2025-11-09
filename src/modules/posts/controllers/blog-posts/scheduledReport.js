@@ -1,11 +1,11 @@
-const { sendHtmlEmail } = require('../../utils/sendEmail');
 // const twilioSID = process.env.TWILIO_ACCOUNT_SID
 // const twilioToken = process.env.TWILIO_AUTH_TOKEN
 // const client = require('twilio')(twilioSID, twilioToken)
-const { getFromService } = require('../helpers');
 
 // BlogPostsView Model
 const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
+const User = require('../../../users/models/User');
+const { sendHtmlEmail } = require('../../../../utils/emails/sendEmail');
 
 // const _from = 'whatsapp:+14155238886'; // Twilio WhatsApp Sandbox number
 // const _numbers = ['whatsapp:+250786791577', 'whatsapp:+250738140795'];
@@ -108,7 +108,7 @@ const fetchAdminEmails = async () => {
 
     while (attempts < maxAttempts) {
         try {
-            const adminEmails = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+            const adminEmails = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
 
             if (adminEmails && adminEmails.length > 0) {
                 return adminEmails;

@@ -1,13 +1,21 @@
 const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
 const scheduledReportMessage = require('./scheduledReport');
-const { handleError } = require('../../../utils/error');
-const { populateOneUser, populateBatchedUsers, deleteImageFromS3 } = require('../helpers');
+const { getBatchedUsers } = require('../../../users/helpers');
+const { deleteImageFromS3, redisCache, getCachedData, setCachedData } = require('../../../../utils/global-helpers');
+const { handleError } = require('../../../../utils/error');
+
+const keysToClear = new Set();
 
 // SCHEDULED REPORT MESSAGE
 scheduledReportMessage();
 
 exports.getBlogPostsViews = async (req, res) => {
     try {
+        const cacheKey = `all_blog_posts_views`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
+        // Extract unique user IDs for better efficiency
         let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
         if (!blogPostsViews) throw { 'message': 'No blog Posts Views found!', 'status': 204 };
 
@@ -15,7 +23,7 @@ exports.getBlogPostsViews = async (req, res) => {
         const usersIDs = [...new Set(blogPostsViews.map(bv => bv.viewer?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(usersIDs);
+        const batchedUsers = await getBatchedUsers(usersIDs);
 
         // Map blogPostsViews to expanded objects
         const expandedBlogPostsViews = blogPostsViews.map(bpv => {
@@ -23,8 +31,11 @@ exports.getBlogPostsViews = async (req, res) => {
             const viewer = batchedUsers.get(bpv.viewer?.toString()) || bpv.viewer;
             return { ...bpvObj, viewer };
         });
+        const result = expandedBlogPostsViews || blogPostsViews;
 
-        return res.status(200).json(expandedBlogPostsViews || blogPostsViews);
+        // Set cache
+        await setCachedData(cacheKey, result, 600) && keysToClear.add(cacheKey);
+        res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
     }
@@ -48,6 +59,9 @@ exports.getOneBlogPostsView = async (req, res) => {
 
 exports.getRecentTenViews = async (req, res) => {
     try {
+        const cacheKey = `recent_ten_blog_posts_views`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         let recentTenViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).limit(10).select('-__v');
         if (!recentTenViews) throw { 'message': '10 blog posts views not found!', 'status': 404 };
 
@@ -55,7 +69,7 @@ exports.getRecentTenViews = async (req, res) => {
         const usersIDs = [...new Set(recentTenViews.map(ch => ch.viewer?.toString()))];
 
         // Populate all user details in batch (assumed returns a map-like object or record)
-        const batchedUsers = await populateBatchedUsers(usersIDs);
+        const batchedUsers = await getBatchedUsers(usersIDs);
 
         // Map recentTenViews to expanded objects
         const expandedRecentTenViews = recentTenViews.map(bpv => {
@@ -63,8 +77,11 @@ exports.getRecentTenViews = async (req, res) => {
             const viewer = batchedUsers.get(bpv.viewer?.toString()) || bpv.viewer;
             return { ...bpvObj, viewer };
         });
+        const result = expandedRecentTenViews || recentTenViews;
 
-        return res.status(200).json(expandedRecentTenViews || recentTenViews);
+        // Set cache
+        await setCachedData(cacheKey, result, 600) && keysToClear.add(cacheKey);
+        res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
     }
@@ -72,25 +89,14 @@ exports.getRecentTenViews = async (req, res) => {
 
 exports.createBlogPostsView = async (req, res) => {
     const { blogPost, viewer, device, country } = req.body;
-
-    if (!blogPost) {
-        throw { 'message': 'Blog post does not exist.', 'status': 400 };
-    }
+    if (!blogPost) throw { 'message': 'Blog post does not exist.', 'status': 400 };
 
     try {
         const newBlogPostView = new BlogPostsView({ blogPost, viewer, device, country });
         const savedBlogPost = await newBlogPostView.save();
-
         if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! File size should not exceed 1MB', 'status': 503 };
-
-        res.status(200).json({
-            _id: savedBlogPost._id,
-            blogPost: savedBlogPost.blogPost,
-            viewer: savedBlogPost.viewer,
-            device: savedBlogPost.device,
-            country: savedBlogPost.country
-        });
-
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedBlogPost);
     } catch (err) {
         handleError(res, err);
     }
@@ -100,8 +106,8 @@ exports.updateBlogPostsView = async (req, res) => {
     try {
         let blogPostsView = await BlogPostsView.findById(req.params.id);
         if (!blogPostsView) throw { 'message': 'BlogPostsView not found!', 'status': 404 };
-
         const updatedBlogPostsView = await BlogPostsView.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedBlogPostsView);
     } catch (err) {
         handleError(res, err);
@@ -114,9 +120,8 @@ exports.deleteBlogPostsView = async (req, res) => {
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
         blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne();
-
         if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
-
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);

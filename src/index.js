@@ -23,13 +23,13 @@ app.use('/api/categories', require('./modules/quizzing/routes/categories'));
 app.use('/api/quizzes', require('./modules/quizzing/routes/quizzes'));
 app.use('/api/questions', require('./modules/quizzing/routes/questions'));
 
-// // Posts
-// app.use('/api/adverts', require('./modules/posts/routes/adverts'));
-// app.use('/api/faqs', require('./modules/posts/routes/faqs'));
-// app.use('/api/blog-posts', require('./modules/posts/routes/blog-posts'));
-// app.use('/api/post-categories', require('./modules/posts/routes/post-categories'));
-// app.use('/api/image-uploads', require('./modules/posts/routes/image-uploads'));
-// app.use('/api/blog-posts-views', require('./modules/posts/routes/blog-posts-views'));
+// Posts
+app.use('/api/adverts', require('./modules/posts/routes/adverts'));
+app.use('/api/faqs', require('./modules/posts/routes/faqs'));
+app.use('/api/blog-posts', require('./modules/posts/routes/blog-posts/blog-posts'));
+app.use('/api/post-categories', require('./modules/posts/routes/blog-posts/post-categories'));
+app.use('/api/image-uploads', require('./modules/posts/routes/blog-posts/image-uploads'));
+app.use('/api/blog-posts-views', require('./modules/posts/routes/blog-posts/blog-posts-views'));
 
 // Schools
 app.use('/api/schools', require('./modules/schools/routes/schools'));
