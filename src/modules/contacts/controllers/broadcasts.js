@@ -1,10 +1,18 @@
 const Broadcast = require('../models/Broadcast');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields, notifyAdmins, sendEmails, getFromService } = require('../helpers');
+const { notifyAdmins, sendEmails } = require('../helpers');
+const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const SubscribedUser = require('../../users/models/SubscribedUser');
+const User = require('../../users/models/User');
 
+const keysToClear = new Set();
 exports.getBroadcasts = async (req, res) => {
     try {
+        const cacheKey = 'broadcasts_all';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         const broadcasts = await Broadcast.find().sort({ createdAt: -1 });
+        await setCachedData(cacheKey, broadcasts) && keysToClear.add(cacheKey);
         res.status(200).json(broadcasts);
     } catch (err) {
         handleError(res, err);
@@ -37,22 +45,18 @@ exports.createBroadcast = async (req, res) => {
         const savedBroadcast = await newBroadcast.save();
         if (!savedBroadcast) throw { 'status': 503, 'message': 'Something went wrong during creation!' };
 
-        const subscribers = await getFromService(`${process.env.USERS_SERVICE_URL}/api/subscribed-users`);
-        const allUsers = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users`);
+        // Use cached data to get subscribers and all users
+        const subscribers = await getCachedData('subscribed_users') || await SubscribedUser.find().select('email name -_id');
+        const allUsers = await getCachedData('all_users') || await User.find().select('email name -_id');
 
+        // Send emails to subscribers and all users
         sendEmails(subscribers, title, message, clientURL);
         sendEmails(allUsers, title, message, clientURL);
 
         // Notify admins using the generalized utility function
         await notifyAdmins(newBroadcast);
-
-        res.status(200).json({
-            _id: savedBroadcast._id,
-            title: savedBroadcast.title,
-            sent_by: savedBroadcast.sent_by,
-            message: savedBroadcast.message,
-            createdAt: savedBroadcast.createdAt
-        });
+        await redisCache.invalidateKeysCache(keysToClear);
+        res.status(200).json(savedBroadcast);
     } catch (err) {
         handleError(res, err);
     }
@@ -76,6 +80,7 @@ exports.deleteBroadcast = async (req, res) => {
         if (!broadcast) return;
 
         const removedBroadcast = await Broadcast.findByIdAndDelete(req.params.id);
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(removedBroadcast);
     } catch (err) {
         handleError(res, err);

@@ -4,7 +4,9 @@ const { convertFromRaw } = require('draft-js');
 const { stateToHTML } = require('draft-js-export-html');
 const { handleError } = require('../../../utils/error');
 const { notifyAdmins } = require('../helpers');
+const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
+const keysToClear = new Set();
 exports.getContacts = async (req, res) => {
 
     try {
@@ -14,16 +16,24 @@ exports.getContacts = async (req, res) => {
         const pageNo = parseInt(req.query.pageNo || '0');
         const query = { limit: PAGE_SIZE, skip: PAGE_SIZE * (pageNo - 1) };
 
-        const contacts = pageNo > 0 ?
-            await Contact.find({}, {}, query).sort({ contact_date: -1 }) :
-            await Contact.find().sort({ contact_date: -1 });
+        let contacts = 0;
 
         if (pageNo > 0) {
-            return res.status(200).json({
-                totalPages: Math.ceil(totalPages / PAGE_SIZE),
-                contacts
-            });
-        } else {
+            const cacheKey = `contacts_${query.limit}_${query.skip}`;
+            const cached = await getCachedData(cacheKey);
+            if (cached) return res.status(200).json(cached);
+
+            contacts = await Contact.find({}, {}, query).sort({ contact_date: -1 });
+            const result = { contacts, totalPages: Math.ceil(totalPages / PAGE_SIZE), currentPage: pageNo };
+            await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+            return res.status(200).json(result);
+        }
+        else {
+            const cacheKey = `contacts_all`;
+            const cached = await getCachedData(cacheKey);
+            if (cached) return res.status(200).json(cached);
+            contacts = await Contact.find().sort({ contact_date: -1 });
+            await setCachedData(cacheKey, contacts) && keysToClear.add(cacheKey);
             return res.status(200).json(contacts);
         }
     } catch (err) {
@@ -33,7 +43,11 @@ exports.getContacts = async (req, res) => {
 
 exports.getContactsBySender = async (req, res) => {
     try {
+        const cacheKey = `contacts_sent_by_${req.params.id}`;
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
         const contacts = await Contact.find({ sent_by: req.params.id });
+        await setCachedData(cacheKey, contacts) && keysToClear.add(cacheKey);
         res.status(200).json(contacts);
     } catch (err) {
         handleError(res, err);
@@ -65,7 +79,7 @@ exports.createContact = async (req, res) => {
         );
         // Notify admins
         await notifyAdmins(newContact);
-
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(newContact);
     } catch (err) {
         handleError(res, err);
@@ -111,6 +125,8 @@ exports.updateContact = async (req, res) => {
 exports.deleteContact = async (req, res) => {
     try {
         const contact = await Contact.findByIdAndDelete(req.params.id);
+        if (!contact) throw { message: 'Contact not found!', status: 404 };
+        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(contact);
     } catch (err) {
         handleError(res, err);
@@ -120,6 +136,10 @@ exports.deleteContact = async (req, res) => {
 // Get database statistics
 exports.getDatabaseStats = async (req, res) => {
     try {
+        const cacheKey = 'contacts_db_stats';
+        const cached = await getCachedData(cacheKey);
+        if (cached) return res.status(200).json(cached);
+
         const db = Contact.db;
 
         // Get stats for contacts collection using document sampling approach
@@ -171,6 +191,7 @@ exports.getDatabaseStats = async (req, res) => {
             }
         };
 
+        await setCachedData(cacheKey, dbStats) && keysToClear.add(cacheKey);
         res.status(200).json(dbStats);
     } catch (err) {
         handleError(res, err);

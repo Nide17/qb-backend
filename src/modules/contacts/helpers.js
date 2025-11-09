@@ -1,5 +1,9 @@
-const { sendEmail } = require('../../../utils/emails/sendEmail');
+const User = require('../users/models/User');
+const { getBatchedUsers } = require('../users/helpers');
+const { sendEmail } = require('../../utils/emails/sendEmail');
+const { getCachedData, setCachedData } = require('../../utils/global-helpers');
 
+const keysToClear = new Set();
 // Helper function to send emails
 const sendEmails = (recipients, title, message, clientURL) => {
     recipients.forEach((recipient, index) => {
@@ -22,21 +26,22 @@ const notifyAdmins = async (newContact) => {
     try {
         const fetchAdminEmails = async () => {
             try {
-                const adminEmails = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
+                const cacheKey = `admins-emails`;
+
+                // Check cache first
+                const cached = await getCachedData(cacheKey);
+                if (cached) return res.status(200).json(cached);
+
+                const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
+                if (!admins) throw { 'message': 'No admins found!', 'status': 404 };
+                const adminEmails = admins.map(admin => admin.email);
+
+                // Set cache
+                setCachedData(cacheKey, adminEmails) && keysToClear.add(cacheKey);
                 return adminEmails;
             } catch (error) {
                 console.warn('Failed to fetch admin emails:', error.message);
-                return new Promise((resolve) => {
-                    setTimeout(async () => {
-                        try {
-                            const retryAdminEmails = await getFromService(`${process.env.USERS_SERVICE_URL}/api/users/admins-emails`);
-                            resolve(retryAdminEmails);
-                        } catch (retryError) {
-                            console.warn('Retry failed to fetch admin emails:', retryError.message);
-                            resolve(null);
-                        }
-                    }, 60000);
-                });
+                return null;
             }
         };
 
@@ -63,14 +68,14 @@ const validateRoomMessageData = (data) => {
 };
 
 // Helper function to expand users in chat rooms
-const populateUsersInChatRooms = async (chatRooms) => {
+const expandRoomsUsers = async (chatRooms) => {
 
     const ids = chatRooms.map(room => room.users).flat();
     const usersIDs = [...new Set(ids)].filter(id => id);
 
     try {
         if (usersIDs.length > 0) {
-            const users = await axios.post(`${process.env.USERS_SERVICE_URL}/api/users/batch`, { usersIDs }, 200000);
+            const users = await getBatchedUsers(usersIDs);
             const usersMap = users?.data?.reduce((acc, user) => {
                 acc[user._id] = user;
                 return acc;
@@ -94,5 +99,5 @@ module.exports = {
     notifyAdmins,
     sendEmails,
     validateRoomMessageData,
-    populateUsersInChatRooms,
+    expandRoomsUsers,
 };
