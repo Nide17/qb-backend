@@ -21,7 +21,7 @@ exports.getFaqs = async (req, res) => {
         const cached = await getCachedData(cacheKey);
         if (cached) return res.status(200).json(cached);
         let faqs = await Faq.find().sort({ createdAt: -1 });
-        if (!faqs) throw { status: 204, message: 'No faqs found!' };
+        if (!faqs) throw { 'status': 404, message: 'No faqs found!' };
         // Set cache
         await setCachedData(cacheKey, faqs, 600) && keysToClear.add(cacheKey);
         res.status(200).json(faqs);
