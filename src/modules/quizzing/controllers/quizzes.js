@@ -12,9 +12,8 @@ let keysToClear = []
 exports.getQuizzes = async (req, res) => {
 
     try {
-        var pageNo = parseInt(req.query.pageNo);
-        const totalQuizzes = await Quiz.countDocuments({});
 
+        var pageNo = parseInt(req.query.pageNo);
         // If limit & skip are defined
         let limit = parseInt(req.query.limit);
         let skip = parseInt(req.query.skip) || 0;
@@ -24,7 +23,7 @@ exports.getQuizzes = async (req, res) => {
 
             const cacheKey = `limited_quizzes_${limit}_${skip}`;
             const cached = await getCachedData(cacheKey);
-            // if (cached) return res.status(200).json(cached);
+            if (cached) return res.status(200).json(cached);
 
             let limitedQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
@@ -33,16 +32,13 @@ exports.getQuizzes = async (req, res) => {
                 .skip(skip);
 
             if (!limitedQuizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
-
-            const quizzesIDs = limitedQuizzes.map(q => q._id);
-            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-            limitedQuizzes = limitedQuizzes.map(q => quizzesMap.get(q._id.toString()) || q)
             await setCachedData(cacheKey, limitedQuizzes) && keysToClear.add(cacheKey);
             res.status(200).json(limitedQuizzes);
         }
         // PAGINATED
         else if (pageNo && pageNo > 0) {
 
+            const totalQuizzes = await Quiz.countDocuments({});
             const cacheKey = `paginated_quizzes_${pageNo}`;
             const cached = await getCachedData(cacheKey);
             if (cached) return res.status(200).json(cached);
@@ -62,16 +58,12 @@ exports.getQuizzes = async (req, res) => {
             if (req.query?.filter === 'stats') return res.status(200).json(totalQuizzes);
             if (!paginatedQuizzes.length) throw { message: 'No quizzes found!', status: 204 };
 
-            const quizzesIDs = paginatedQuizzes.map(q => q._id);
-            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-            paginatedQuizzes = paginatedQuizzes.map(q => quizzesMap.get(q._id.toString()) || q);
-
             const result = {
                 totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
                 currentPage: pageNo,
                 pageSize: PAGE_SIZE,
                 totalQuizzes,
-                quizzes: paginatedQuizzes,
+                paginatedQuizzes,
             };
             await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
             res.status(200).json(result);
@@ -88,11 +80,6 @@ exports.getQuizzes = async (req, res) => {
                 .populate('category questions');
 
             if (!allQuizzes.length) throw { message: 'No quizzes found!', status: 204 };
-
-            const quizzesIDs = allQuizzes.map(q => q._id);
-            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-            allQuizzes = allQuizzes.map(q => quizzesMap.get(q._id.toString()) || q);
-
             await setCachedData(cacheKey, allQuizzes) && keysToClear.add(cacheKey);
             res.status(200).json(allQuizzes);
         }
@@ -176,11 +163,11 @@ exports.createQuiz = async (req, res) => {
         if (existingQuiz) throw { message: 'Quiz already exists!', status: 400 };
 
         const newQuiz = new Quiz({ title, description, category, created_by });
-        const updatedCategory = await Category.findByIdAndUpdate(category, { $addToSet: { quizes: newQuiz._id } },
-            { new: true }
-        );
+        const updatedCategory = await Category.findByIdAndUpdate(category, { $addToSet: { quizes: newQuiz._id } }, { new: true });
 
         if (!updatedCategory) throw { message: 'Cannot update corresponding category!', status: 400 };
+
+        keysToClear.add('categories'); // Clear cache for categories to reflect new quiz count
         const savedQuiz = await newQuiz.save();
         if (!savedQuiz) throw { message: 'Something went wrong during creation!', status: 400 };
 
@@ -255,6 +242,7 @@ exports.updateQuiz = async (req, res) => {
         }
 
         // Clear cache for keys
+        keysToClear.add('categories'); // Clear cache for categories to reflect quiz count changes
         await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(updatedQuiz);
     } catch (err) {

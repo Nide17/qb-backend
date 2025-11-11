@@ -10,9 +10,9 @@ exports.getQuestions = async (req, res) => {
     try {
         const cacheKey = 'all_questions'
         const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
+        // if (cached) return res.status(200).json(cached);
 
-        const questions = await Question.find().sort({ creation_date: -1 }).populate('category quiz');
+        const questions = await Question.find().sort({ creation_date: -1 }).lean();
         if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 404 };
 
         await setCachedData(cacheKey, questions) && keysToClear.add(cacheKey);
@@ -21,7 +21,6 @@ exports.getQuestions = async (req, res) => {
         handleError(res, err);
     }
 };
-
 
 exports.getOneQuestion = async (req, res) => {
     try {

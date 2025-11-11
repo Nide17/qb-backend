@@ -153,30 +153,37 @@ exports.login = async (req, res) => {
             throw { 'status': 400, 'message': 'Account not verified yet, check your email for OTP!' };
         }
 
-        jwt.verify(user.current_token, process.env.JWT_SECRET, async (err) => {
-            if (!user.current_token || err) {
+        try {
+            jwt.verify(user.current_token, process.env.JWT_SECRET, async (err) => {
+                try {
+                    if (!user.current_token || err) {
+                        const updatedUser = await updateUserToken(user);
+                        if (!updatedUser) throw { 'status': 500, 'message': 'Could not log you in, try again later!' };
 
-                const updatedUser = await updateUserToken(user);
-                if (!updatedUser) throw { 'status': 500, 'message': 'Could not log you in, try again later!' };
+                        res.status(200).json({
+                            current_token: updatedUser.current_token,
+                            user: updatedUser
+                        });
+                    } else {
+                        if (!confirmLogin) {
+                            throw { 'status': 401, 'message': 'Already logged in, Log out & use here', 'code': 'CONFIRM_ERR' };
+                        } else {
+                            const confirmedUser = await updateUserToken(user);
+                            if (!confirmedUser) throw { 'status': 500, 'message': 'Could not log you in, try again later!' };
 
-                res.status(200).json({
-                    current_token: updatedUser.current_token,
-                    user: updatedUser
-                });
-            } else {
-                if (!confirmLogin) {
-                    throw { 'status': 401, 'message': 'Already logged in, Log out & use here', 'code': 'CONFIRM_ERR' };
-                } else {
-                    const confirmedUser = await updateUserToken(user);
-                    if (!confirmedUser) throw { 'status': 500, 'message': 'Could not log you in, try again later!' };
-
-                    res.status(200).json({
-                        current_token: confirmedUser.current_token,
-                        user: confirmedUser,
-                    });
+                            res.status(200).json({
+                                current_token: confirmedUser.current_token,
+                                user: confirmedUser,
+                            });
+                        }
+                    }
+                } catch (innerError) {
+                    handleError(res, innerError);
                 }
-            }
-        });
+            });
+        } catch (error) {
+            handleError(res, error);
+        }
     } catch (err) {
         handleError(res, err);
     }
@@ -203,7 +210,6 @@ exports.logout = async (req, res) => {
 exports.register = async (req, res) => {
 
     try {
-
         const { name, email, password } = req.body;
         const emailTest = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
         const otp = Math.floor(100000 + Math.random() * 900000).toString();

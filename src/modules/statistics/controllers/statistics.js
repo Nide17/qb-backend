@@ -1,7 +1,7 @@
 const os = require('os');
 const process = require('process');
 const { handleError } = require('../../../utils/error');
-const { getCachedData, setCachedData, deleteCacheKey } = require('../helpers');
+const { getCachedData, setCachedData, deleteCacheKey } = require('../../../utils/global-helpers');
 const User = require('../../users/models/User');
 const Quiz = require('../../quizzing/models/Quiz');
 const Download = require('../../downloads/models/Download');
