@@ -5,7 +5,6 @@ const { expandScores } = require('../helpers');
 const Score = require('../models/Score');
 const { handleError } = require('../../../utils/error');
 const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
-const { getBatchedUsersMap } = require('../../users/helpers');
 
 const keysToClear = new Set();
 exports.getScores = async (req, res) => {

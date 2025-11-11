@@ -1,6 +1,6 @@
 const handleError = (res, err, status) => {
 
-    console.log(`Handling error: ${err?.message || err}`);
+    console.log(err);
     // Handle MongoDB Cast Errors
     if (err.name === 'CastError') {
         if (err.kind === 'ObjectId') {
@@ -136,7 +136,7 @@ const handleError = (res, err, status) => {
     res.status(status ? status : err.status || 500).json({
         success: false,
         message: err?.message || 'Internal server error',
-        code: err.code || 'INTERNAL_ERROR',
+        code: err?.code || 'INTERNAL_ERROR',
         timestamp: new Date().toISOString()
     });
 };
