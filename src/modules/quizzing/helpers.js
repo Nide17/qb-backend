@@ -1,5 +1,8 @@
 const Quiz = require('./models/Quiz');
 const Question = require('./models/Question');
+const CourseCategory = require('../courses/models/CourseCategory');
+const User = require('../users/models/User');
+const { getBatchedCourseCategoriesMap } = require('../courses/helpers');
 
 const updateQuizQuestions = async (quizId, questionId, action) => {
 
@@ -72,9 +75,44 @@ const expandQuizzes = async (quizzes) => {
     }
 };
 
+expandCategories = async (categories) => {
+    try {
+        if (!categories || !Array.isArray(categories) || categories.length === 0) return [];
+
+        const courseCategoriesIDs = categories.map(c => c.courseCategory);
+        const coursesCategoriesMap = await getBatchedCourseCategoriesMap(courseCategoriesIDs);
+
+        return categories.map(c => {
+            const courseCategory = coursesCategoriesMap.get(c.courseCategory.toString());
+            return {
+                ...c._doc,
+                courseCategory: courseCategory,
+            };
+        });
+    } catch (err) {
+        return categories;
+    }
+};
+
+expandCategory = async (category) => {
+    try {
+        const courseCategory = await CourseCategory.findById(category.courseCategory).select('title');
+        const created_by = await User.findById(category.created_by).select('name email');
+        return {
+            ...category._doc,
+            courseCategory: courseCategory,
+            created_by: created_by,
+        };
+    } catch (err) {
+        return category;
+    }
+};
+
 module.exports = {
     updateQuizQuestions,
     getBatchedQuestionsMap,
     getBatchedQuizzesMap,
     expandQuizzes,
+    expandCategories,
+    expandCategory,
 };

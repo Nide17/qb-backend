@@ -1,11 +1,11 @@
 const Category = require('../models/Category');
 const Quiz = require('../models/Quiz');
 const Question = require('../models/Question');
-const CourseCategory = require('../../courses/models/CourseCategory');
 const { handleError } = require('../../../utils/error');
+const { expandCategories, expandCategory } = require('../helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
-let keysToClear = []
+const keysToClear = new Set();
 exports.getCategories = async (req, res) => {
     try {
         const cacheKey = 'categories';
@@ -15,9 +15,8 @@ exports.getCategories = async (req, res) => {
         let categories = await Category.find().sort({ creation_date: -1 }).select('_id title description quizes courseCategory').populate('quizes', '_id title slug');
         if (!categories) throw { 'message': 'No categories found!', 'status': 404 };
 
-        if (categories)
-
-        await setCachedData(cacheKey, categories) && keysToClear.add(cacheKey);
+        categories = await expandCategories(categories);
+        if (categories) await setCachedData(cacheKey, categories) && keysToClear.add(cacheKey);
         res.status(200).json(categories);
     } catch (err) {
         handleError(res, err);
@@ -32,14 +31,8 @@ exports.getOneCategory = async (req, res) => {
         let category = await Category.findOne(query).populate('quizes', '_id title questions slug').lean();
         if (!category) throw { 'message': 'Unexistent category!', 'status': 404 };
 
-        if (category.courseCategory) {
-            category.courseCategory = await CourseCategory.findById(category.courseCategory).select('title description');
-        }
-
-        if (category.created_by) {
-            category.created_by = await User.findById(category.created_by).select('name email');
-        }
-        res.status(200).json(category);
+        let expandedCategory = await expandCategory(category);
+        res.status(200).json(expandedCategory || category);
     } catch (err) {
         handleError(res, err);
     }
@@ -63,7 +56,9 @@ exports.createCategory = async (req, res) => {
 
         // Clear cache for categories
         await redisCache.invalidateKeysCache(keysToClear);
-        res.status(200).json(savedCategory);
+
+        let expandedCategory = await expandCategory(savedCategory);
+        res.status(200).json(expandedCategory || savedCategory);
     } catch (err) {
         handleError(res, err);
     }
@@ -74,9 +69,9 @@ exports.updateCategory = async (req, res) => {
         let updatedCategory = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedCategory) throw { 'message': 'Category does not exist!', 'status': 404 };
 
-        // Clear cache for categories
+        let expandedCategory = await expandCategory(updatedCategory);
         await redisCache.invalidateKeysCache(keysToClear);
-        res.status(200).json(updatedCategory);
+        res.status(200).json(expandedCategory || updatedCategory);
     } catch (err) {
         handleError(res, err);
     }

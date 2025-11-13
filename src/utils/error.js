@@ -1,8 +1,17 @@
 const handleError = (res, err, status) => {
-
     console.log(err);
-    // Handle MongoDB Cast Errors
-    if (err.name === 'CastError') {
+
+    // Handle MongoDB Errors
+    // MongoNetworkError
+    if (err.name === 'MongoNetworkError') {
+        return res.status(503).json({
+            success: false,
+            message: 'Cannot get the resource you are looking for. try again later.',
+            code: 'DB_CONNECTION_ERROR',
+            timestamp: new Date().toISOString()
+        });
+    }
+    else if (err.name === 'CastError') {
         if (err.kind === 'ObjectId') {
             return res.status(400).json({
                 success: false,

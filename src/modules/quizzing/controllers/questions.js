@@ -4,7 +4,7 @@ const { handleError } = require('../../../utils/error');
 const { updateQuizQuestions } = require('../helpers');
 const { deleteImageFromS3, validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
-let keysToClear = []
+const keysToClear = new Set();
 exports.getQuestions = async (req, res) => {
 
     try {
