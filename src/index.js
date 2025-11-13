@@ -97,6 +97,15 @@ const PORT = process.env.PORT || 5000;
 // Initialize Redis connection and start server
 async function startServer() {
     try {
+        // Set global error handler for unhandled promise rejections
+        process.on('unhandledRejection', (reason, promise) => {
+            console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+        });
+
+        // Set global error handler for uncaught exceptions
+        process.on('uncaughtException', (error) => {
+            console.error('Uncaught Exception:', error);
+        });
 
         server.listen(PORT, () => {
             console.log(`🚀 Server with Socket.io running on port ${PORT}`);

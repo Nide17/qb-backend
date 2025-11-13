@@ -5,12 +5,12 @@ const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 
-let keysToClear = []
+const keysToClear = new Set();
 const findChapters = async (query, limit = 0) => {
 
     let chaptersQuery = Chapter
-    .find(query)
-    .sort({ createdAt: -1 })
+        .find(query)
+        .sort({ createdAt: -1 })
         .select('title description course courseCategory created_by createdAt')
         .populate('course courseCategory', 'title')
         .lean();

@@ -14,7 +14,7 @@ class RedisCacheManager {
             return true;
         }
         try {
-            this.redis = new Redis(process.env.REDIS_UR);
+            this.redis = new Redis(process.env.REDIS_URL);
 
             this.redis.on('connect', () => {
                 console.log('✅ Redis connected successfully');

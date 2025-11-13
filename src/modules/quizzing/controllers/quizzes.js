@@ -8,7 +8,7 @@ const { getBatchedQuizzesMap } = require('../helpers');
 const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
 const SubscribedUser = require('../../users/models/SubscribedUser');
 
-let keysToClear = []
+const keysToClear = new Set();
 exports.getQuizzes = async (req, res) => {
 
     try {
@@ -23,7 +23,7 @@ exports.getQuizzes = async (req, res) => {
 
             const cacheKey = `limited_quizzes_${limit}_${skip}`;
             const cached = await getCachedData(cacheKey);
-            if (cached) return res.status(200).json(cached);
+            // if (cached) return res.status(200).json(cached);
 
             let limitedQuizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
@@ -94,12 +94,12 @@ exports.getOneQuiz = async (req, res) => {
         const id = req.params.id;
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
 
-        const quiz = await Quiz.findOne(query).populate('category questions').lean();
+        const quiz = await Quiz.findOne(query).populate('category questions', 'title questionText').select('-__v').lean();
         if (!quiz) throw { status: 404, message: `Quiz with id ${id} not found` };
 
         // Expand user data using simple direct calls
-        const expandedUser = await User.findById(quiz.created_by).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
-        const expandedQuiz = { ...quiz, ...expandedUser };
+        const expandedUser = await User.findById(quiz.created_by).select('name image').lean();
+        const expandedQuiz = { ...quiz, created_by: expandedUser };
 
         res.status(200).json(expandedQuiz || quiz);
     } catch (err) {

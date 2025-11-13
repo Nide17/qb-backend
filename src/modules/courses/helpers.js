@@ -1,7 +1,7 @@
 const CourseCategory = require('./models/CourseCategory');
 const Notes = require('./models/Notes');
 
-const getBatchedCourseCategories = async (courseCategoriesIDs) => {
+const getBatchedCourseCategoriesMap = async (courseCategoriesIDs) => {
 
     if (!courseCategoriesIDs || courseCategoriesIDs.length === 0) return new Map();
 
@@ -37,6 +37,6 @@ getBatchedNotesMap = async (notesIDs) => {
 };
 
 module.exports = {
-    getBatchedCourseCategories,
+    getBatchedCourseCategoriesMap,
     getBatchedNotesMap,
 };

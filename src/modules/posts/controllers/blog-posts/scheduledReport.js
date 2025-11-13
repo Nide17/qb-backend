@@ -108,7 +108,7 @@ const fetchAdminEmails = async () => {
 
     while (attempts < maxAttempts) {
         try {
-            const adminEmails = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
+            const adminEmails = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email').maxTimeMS(60000);
 
             if (adminEmails && adminEmails.length > 0) {
                 return adminEmails;
