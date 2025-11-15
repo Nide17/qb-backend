@@ -3,20 +3,21 @@ const Course = require('../models/Course');
 const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 exports.getCourseCategories = async (req, res) => {
 
     try {
         const cacheKey = 'courseCategories';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
         if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 404 };
 
-        await setCachedData(cacheKey, courseCategories) && keysToClear.add(cacheKey);
         res.status(200).json(courseCategories);
     } catch (err) {
         handleError(res, err);
@@ -52,7 +53,7 @@ exports.createCategory = async (req, res) => {
         const savedCategory = await newCategory.save();
         if (!savedCategory) throw { 'message': 'Something went wrong during creation!', 'status': 503 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedCategory);
     } catch (err) {
         handleError(res, err);
@@ -86,7 +87,7 @@ exports.deleteCategory = async (req, res) => {
         const removedCategory = await CourseCategory.deleteOne({ _id: req.params.id });
         if (removedCategory.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 503 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(category);
     } catch (err) {
         handleError(res, err);

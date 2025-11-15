@@ -1,10 +1,14 @@
 const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
 const scheduledReportMessage = require('./scheduledReport');
 const { getBatchedUsersMap } = require('../../../users/helpers');
-const { deleteImageFromS3, redisCache, getCachedData, setCachedData } = require('../../../../utils/global-helpers');
+const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 
 // SCHEDULED REPORT MESSAGE
 scheduledReportMessage();
@@ -12,8 +16,6 @@ scheduledReportMessage();
 exports.getBlogPostsViews = async (req, res) => {
     try {
         const cacheKey = `all_blog_posts_views`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Extract unique IDs
         let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
@@ -31,7 +33,6 @@ exports.getBlogPostsViews = async (req, res) => {
         const result = expandedBlogPostsViews || blogPostsViews;
 
         // Set cache
-        await setCachedData(cacheKey, result, 600) && keysToClear.add(cacheKey);
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -55,8 +56,6 @@ exports.getOneBlogPostsView = async (req, res) => {
 exports.getRecentTenViews = async (req, res) => {
     try {
         const cacheKey = `recent_ten_blog_posts_views`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
         let recentTenViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).limit(10).select('-__v').lean();
         if (!recentTenViews) throw { 'message': '10 blog posts views not found!', 'status': 404 };
 
@@ -72,7 +71,6 @@ exports.getRecentTenViews = async (req, res) => {
         const result = expandedRecentTenViews || recentTenViews;
 
         // Set cache
-        await setCachedData(cacheKey, result, 600) && keysToClear.add(cacheKey);
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -87,7 +85,7 @@ exports.createBlogPostsView = async (req, res) => {
         const newBlogPostView = new BlogPostsView({ blogPost, viewer, device, country });
         const savedBlogPost = await newBlogPostView.save();
         if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! File size should not exceed 1MB', 'status': 503 };
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedBlogPost);
     } catch (err) {
         handleError(res, err);
@@ -99,7 +97,7 @@ exports.updateBlogPostsView = async (req, res) => {
         let blogPostsView = await BlogPostsView.findById(req.params.id);
         if (!blogPostsView) throw { 'message': 'BlogPostsView not found!', 'status': 404 };
         const updatedBlogPostsView = await BlogPostsView.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(updatedBlogPostsView);
     } catch (err) {
         handleError(res, err);
@@ -113,7 +111,7 @@ exports.deleteBlogPostsView = async (req, res) => {
         blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne();
         if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);

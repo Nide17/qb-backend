@@ -1,51 +1,78 @@
-const { S3 } = require('@aws-sdk/client-s3');
-const RedisCacheManager = require('./redis-cache');
+const { S3 } = require("@aws-sdk/client-s3");
+const RedisCacheManager = require("./redis-cache");
 
-// Initialize Redis cache manager
-const redisCache = new RedisCacheManager();
+const cacheManager = new RedisCacheManager();
 
-// Enhanced cache functions with Redis
+/**
+ * Wrapper: Safely get from Redis cache
+ */
 const getCachedData = async (key) => {
     try {
-        // Try Redis first
-        if (redisCache.isConnected) {
-            const cached = await redisCache.get(key);
-            if (cached) {
-                console.log(`📦 Redis cache hit: ${key}`);
-                return cached;
+        if (cacheManager.isReady()) {
+            const cached = await cacheManager.get(key);
+            if (cached !== null) {
+                console.log(`📦 Redis HIT → "${key}"`);
             }
+            console.log(`📦 Redis MISS → "${key}"`);
         }
-
         return null;
-    } catch (error) {
-        console.error('Cache get error:\n', error?.message || error);
+    } catch (err) {
+        console.error("Redis get error:", err.message || err);
+        return null;
     }
 };
 
+/**
+ * Wrapper: Safely set Redis cache
+ */
 const setCachedData = async (key, data, ttl = 600) => {
     try {
-        // Set in Redis first
-        if (redisCache.isConnected) {
-            await redisCache.set(key, data, ttl);
-            console.log(`📦 Redis cache set: ${key} (TTL: ${ttl}s)`);
+        if (cacheManager.isReady()) {
+            await cacheManager.set(key, data, ttl);
+            console.log(`📦 Redis SET → "${key}" (TTL ${ttl}s)`);
         }
-    } catch (error) {
-        console.error('Cache set error:\n', error?.message || error);
+    } catch (err) {
+        console.error("Redis set error:", err.message || err);
     }
 };
 
+// -------------------------------------
+// AWS S3 CONFIG (AWS SDK v3 best practice)
+// -------------------------------------
+
 const s3Config = new S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    Bucket: process.env.S3_BUCKET,
-    region: process.env.AWS_REGION
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    }
 });
 
-// Helper function to validate required fields
+/**
+ * Validate required fields
+ */
 const validateRequiredFields = (fields) => {
-    for (const field of fields) {
-        if (!field.value) {
-            throw { message: `Missing required field: ${field.name}`, status: 400 };
+    for (const { name, value } of fields) {
+        if (value === undefined || value === null || value === "") {
+            const error = new Error(`Missing required field: ${name}`);
+            error.status = 400;
+            throw error;
+        }
+    }
+};
+
+// --- Cache wrapper -------------------------------------------------------------
+const cacheWrapper = {
+    async wrap(key, ttl, fetchFn) {
+        try {
+
+            const fresh = await fetchFn();
+            await setCachedData(key, fresh, ttl);
+
+            return fresh;
+        } catch (e) {
+            console.error("Cache wrap error:", e);
+            return fetchFn(); // fallback to DB
         }
     }
 };
@@ -53,7 +80,8 @@ const validateRequiredFields = (fields) => {
 module.exports = {
     getCachedData,
     setCachedData,
-    redisCache,
+    cacheWrapper,
+    cacheManager,
     s3Config,
     validateRequiredFields,
 };

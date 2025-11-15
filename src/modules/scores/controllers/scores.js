@@ -4,9 +4,13 @@ const Quiz = require('../../quizzing/models/Quiz');
 const { expandScores } = require('../helpers');
 const Score = require('../models/Score');
 const { handleError } = require('../../../utils/error');
-const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 exports.getScores = async (req, res) => {
 
     try {
@@ -23,8 +27,6 @@ exports.getScores = async (req, res) => {
         if (req.query?.filter === 'stats') return res.status(200).json(totalScores);
 
         const cacheKey = `scores_${query.limit}_${query.skip}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Always use pagination to prevent memory exhaustion
         let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
@@ -34,7 +36,7 @@ exports.getScores = async (req, res) => {
         const expandedScores = await expandScores(scores) || scores;
         const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
 
-        await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -47,15 +49,13 @@ exports.getScoresByTaker = async (req, res) => {
         if (!req.params?.id) throw { 'status': 400, 'message': 'User ID is required' };
 
         const cacheKey = `scores_user_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).lean();
         if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
 
         // Expand scores
         const result = await expandScores(scores) || scores;
-        await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -72,8 +72,6 @@ exports.getScoresForQuizCreator = async (req, res) => {
         const skip = PAGE_SIZE * (pageNo - 1);
 
         const cacheKey = `scores_quiz_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const totalScores = await Score.countDocuments({});
         let scores = await Score.find().skip(skip).limit(PAGE_SIZE).sort({ test_date: -1 }).lean();
@@ -83,7 +81,7 @@ exports.getScoresForQuizCreator = async (req, res) => {
         const expandedScores = await expandScores(scores) || scores;
         const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
 
-        await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -117,15 +115,13 @@ exports.getQuizRanking = async (req, res) => {
         if (!req.params?.id) throw { 'status': 400, 'message': 'Quiz ID is required' };
 
         const cacheKey = `ranking_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).lean();
         if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores to display' };
 
         // Expand scores
         const result = await expandScores(scores) || scores;
-        await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -136,8 +132,6 @@ exports.getPopularQuizzes = async (req, res) => {
 
     try {
         const cacheKey = 'popular_quizzes';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
@@ -159,7 +153,6 @@ exports.getPopularQuizzes = async (req, res) => {
             const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
             popularQuizzes = topQuizzes.map(tq => quizzesMap.get(tq._id.toString()) || {});
         }
-        await setCachedData(cacheKey, popularQuizzes) && keysToClear.add(cacheKey);
         res.status(200).json(popularQuizzes);
     } catch (err) {
         handleError(res, err);
@@ -170,8 +163,6 @@ exports.getMonthlyUser = async (req, res) => {
 
     try {
         const cacheKey = 'monthly_user';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let monthlyUserData = null;
         const startOfMonth = new Date();
@@ -196,7 +187,6 @@ exports.getMonthlyUser = async (req, res) => {
                 count: monthlyUser[0].count
             };
         }
-        await setCachedData(cacheKey, monthlyUserData) && keysToClear.add(cacheKey);
         res.status(200).json(monthlyUserData);
     } catch (err) {
         handleError(res, err);
@@ -263,7 +253,7 @@ exports.createScore = async (req, res) => {
                 });
             }
             res.status(200).json(savedScore);
-            await redisCache.invalidateKeysCache(keysToClear);
+
         }
     } catch (err) {
         handleError(res, err);
@@ -281,7 +271,7 @@ exports.deleteScore = async (req, res) => {
         if (removedScore.deletedCount === 0) throw { 'status': 500, 'message': 'Something went wrong while deleting!' };
 
         // Clear relevant cache entries
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(score);
     } catch (err) {
         handleError(res, err);

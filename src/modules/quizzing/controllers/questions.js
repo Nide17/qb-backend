@@ -2,21 +2,25 @@ const Question = require('../models/Question');
 const slugify = require('slugify');
 const { handleError } = require('../../../utils/error');
 const { updateQuizQuestions } = require('../helpers');
-const { deleteImageFromS3, validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { deleteImageFromS3, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 3600; // 1 hour
+const CACHE_KEYS = {
+    ALL: "qn:all",
+    ONE: (id) => `qn:${id}`,
+};
 exports.getQuestions = async (req, res) => {
 
     try {
-        const cacheKey = 'all_questions'
-        const cached = await getCachedData(cacheKey);
-        // if (cached) return res.status(200).json(cached);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const questions = await Question.find().sort({ creation_date: -1 }).lean();
+            if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 404 };
 
-        const questions = await Question.find().sort({ creation_date: -1 }).lean();
-        if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 404 };
+            return questions;
+        });
 
-        await setCachedData(cacheKey, questions) && keysToClear.add(cacheKey);
-        res.status(200).json(questions);
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -24,9 +28,15 @@ exports.getQuestions = async (req, res) => {
 
 exports.getOneQuestion = async (req, res) => {
     try {
-        const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
-        if (!question) throw { 'message': 'Question not found!', 'status': 404 };
-        res.status(200).json(question);
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
+            if (!question) throw { 'message': 'Question not found!', 'status': 404 };
+
+            return question;
+        });
+
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -81,7 +91,8 @@ exports.createQuestion = async (req, res) => {
         }
 
         // Clear cache for keys
-        await redisCache.invalidateKeysCache(keysToClear);
+        await cacheManager.invalidatePattern("qz:*");
+        await cacheManager.invalidatePattern("qn:*");
         res.status(200).json(savedQuestion);
     } catch (err) {
         handleError(res, err);
@@ -129,6 +140,11 @@ exports.updateQuestion = async (req, res) => {
                 duration,
             }, { new: true });
 
+            if (!updatedQuestion) throw { 'message': 'Something went wrong while updating!', 'status': 500 };
+
+            await cacheManager.invalidatePattern("qz:*");
+            await cacheManager.invalidatePattern("qn:*");
+
             res.status(200).json(updatedQuestion);
         }
     } catch (err) {
@@ -154,7 +170,8 @@ exports.deleteQuestion = async (req, res) => {
         if (removedQuestion.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
 
         // Clear cache for keys
-        await redisCache.invalidateKeysCache(keysToClear);
+        await cacheManager.invalidatePattern("qz:*");
+        await cacheManager.invalidatePattern("qn:*");
         res.status(200).json(question);
     } catch (err) {
         handleError(res, err);

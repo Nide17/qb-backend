@@ -1,16 +1,18 @@
 const User = require('../../../users/models/User.js');
 const BlogPost = require('../../models/blog-posts/BlogPost.js');
 const { handleError } = require('../../../../utils/error.js');
-const { deleteImageFromS3, validateRequiredFields, setCachedData, getCachedData } = require('../../../../utils/global-helpers.js');
+const { deleteImageFromS3, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers.js');
 const { getBatchedUsersMap } = require('../../../users/helpers.js');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 exports.getBlogPosts = async (req, res) => {
 
     try {
         const cacheKey = 'blogPosts';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let blogPosts = await BlogPost.find().sort({ createdAt: -1 }).populate('postCategory', 'title').lean();
         if (!blogPosts || blogPosts.length === 0) throw { 'message': 'No blog posts found', 'status': 404 };
@@ -28,7 +30,6 @@ exports.getBlogPosts = async (req, res) => {
         });
         blogPosts = expandedBlogPosts || blogPosts;
 
-        await setCachedData(cacheKey, blogPosts) && keysToClear.add(cacheKey);
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
@@ -62,8 +63,6 @@ exports.getBlogPostsByCategory = async (req, res) => {
         const id = req.params.id;
 
         const cacheKey = `blogPostsByCategory-${id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         if (!id) {
             throw { 'message': 'Category id not provided', 'status': 400 };
@@ -89,7 +88,6 @@ exports.getBlogPostsByCategory = async (req, res) => {
         });
         blogPosts = expandedBlogPosts || blogPosts;
 
-        await setCachedData(cacheKey, blogPosts) && keysToClear.add(cacheKey);
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
@@ -104,7 +102,7 @@ exports.deleteBlogPost = async (req, res) => {
 
         await blogPost.remove();
         await deleteImageFromS3(blogPost.post_image);
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json({ message: 'Blog post deleted successfully' });
     } catch (err) {
         handleError(res, err);
@@ -116,11 +114,8 @@ exports.getCreatedBy = async (req, res) => {
 
         if (!req.params.id) throw { 'message': 'User id not provided', 'status': 400 };
         const cacheKey = `blogPostsByCreator-${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
         const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
         if (!blogPosts) throw { 'message': 'No blogPosts found!', 'status': 404 };
-        await setCachedData(cacheKey, blogPosts) && keysToClear.add(cacheKey);
         res.status(200).json(blogPosts);
     } catch (err) {
         handleError(res, err);
@@ -153,7 +148,7 @@ exports.createBlogPost = async (req, res) => {
         const savedBlogPost = await newBlogPost.save();
         if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedBlogPost);
 
     } catch (err) {
@@ -166,7 +161,7 @@ exports.updateBlogPost = async (req, res) => {
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);
@@ -179,7 +174,7 @@ exports.updateBlogPostStatus = async (req, res) => {
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);
@@ -196,7 +191,7 @@ exports.deleteBlogPost = async (req, res) => {
         const removedBlogPost = await blogPost.deleteOne();
 
         if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);
@@ -210,7 +205,7 @@ exports.deleteBlogPostImage = async (req, res) => {
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { new: true });
         await deleteImageFromS3(blogPost.post_image);
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);

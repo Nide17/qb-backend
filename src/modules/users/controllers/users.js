@@ -7,17 +7,19 @@ const User = require('../models/User');
 const Faculty = require('../../schools/models/Faculty');
 const PswdResetToken = require('../models/PswdResetToken');
 const { handleError } = require('../../../utils/error');
-const { deleteImageFromS3, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const { hashPassword, updateUserToken } = require('../helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 // Get all users
 exports.getUsers = async (req, res) => {
 
     try {
         const cacheKey = `all_users`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const limit = req.query.limit ? parseInt(req.query.limit) : 0;
         const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
@@ -25,7 +27,6 @@ exports.getUsers = async (req, res) => {
         if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
 
         // Set cache
-        await setCachedData(cacheKey, users, 60 * 60) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -39,14 +40,11 @@ exports.getLatestUsers = async (req, res) => {
         const cacheKey = `latest-users`;
 
         // Check cache first
-        const cached = await getCachedData(cacheKey);
 
-        if (cached) return res.status(200).json(cached);
         let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
         if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
 
         // Set cache
-        await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -59,14 +57,11 @@ exports.getAdminsCreators = async (req, res) => {
         const cacheKey = `admins-creators`;
 
         // Check cache first
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
         if (!adminsCreators.length) throw { 'message': 'No users found!', 'status': 404 };
 
         // Set cache
-        await setCachedData(cacheKey, adminsCreators) && keysToClear.add(cacheKey);
         res.status(200).json(adminsCreators);
     } catch (err) {
         handleError(res, err);
@@ -105,8 +100,6 @@ exports.loadUser = async (req, res) => {
         const cacheKey = `user_${req?.user?._id}`;
 
         // Check cache first
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // If no cache, get user from database
         let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
@@ -126,7 +119,6 @@ exports.loadUser = async (req, res) => {
             }
         }
         // Set cache
-        await setCachedData(cacheKey, user, 60 * 15) && keysToClear.add(cacheKey);
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
@@ -199,7 +191,7 @@ exports.logout = async (req, res) => {
         );
         if (!loggedOutUser) throw { 'status': 404, 'message': 'User not found!' };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(loggedOutUser);
     } catch (err) {
         handleError(res, err);
@@ -242,7 +234,7 @@ exports.register = async (req, res) => {
         }
 
         // del cache
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedUser);
     } catch (err) {
         handleError(res, err);
@@ -370,7 +362,7 @@ exports.updateProfileImage = async (req, res) => {
                 updatedUserProfile.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
             }
         }
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(updatedUserProfile);
     } catch (err) {
         handleError(res, err);
@@ -396,7 +388,7 @@ exports.updateProfile = async (req, res) => {
                 user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
             }
         }
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
@@ -409,7 +401,7 @@ exports.updateUser = async (req, res) => {
         let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true }).lean();
         if (!user) throw { 'status': 404, 'message': 'User not found!' };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
@@ -426,7 +418,7 @@ exports.deleteUser = async (req, res) => {
         if (removedUser.deletedCount === 0) throw { 'status': 500, 'message': 'Failed to delete user!' };
 
         // del cache
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);

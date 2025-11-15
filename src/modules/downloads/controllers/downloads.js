@@ -1,5 +1,5 @@
 const { handleError } = require('../../../utils/error');
-const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const Download = require('../models/Download');
 const { expandDownloads } = require('../helpers');
 const User = require('../../users/models/User');
@@ -7,7 +7,11 @@ const Notes = require('../../courses/models/Notes');
 const { getBatchedUsersMap } = require('../../users/helpers');
 const { getBatchedNotesMap } = require('../../courses/helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 exports.getDownloads = async (req, res) => {
 
     try {
@@ -24,8 +28,6 @@ exports.getDownloads = async (req, res) => {
         if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads);
 
         const cacheKey = `downloads_${query.limit}_${query.skip}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Always use pagination to prevent memory exhaustion
         let downloads = await Download.find({}, {}, query).sort({ createdAt: -1 }).lean();
@@ -41,7 +43,7 @@ exports.getDownloads = async (req, res) => {
             downloads: expandedDownloads || downloads
         }
 
-        await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+
         res.status(200).json(result);
     } catch (err) {
         console.log('Error getting downloads:', err.message);
@@ -81,8 +83,6 @@ exports.getNotesDownloader = async (req, res) => {
     try {
 
         const cacheKey = `notes_downloaders_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
         if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found for this user', 'status': 404 };
@@ -91,7 +91,6 @@ exports.getNotesDownloader = async (req, res) => {
         const expandedDownloads = await expandDownloads(downloads);
         downloads = expandedDownloads || downloads;
 
-        await setCachedData(cacheKey, downloads) && keysToClear.add(cacheKey);
         res.status(200).json(downloads);
     } catch (err) {
         console.log('Error getting downloads by user:', err.message);
@@ -102,8 +101,6 @@ exports.getNotesDownloader = async (req, res) => {
 exports.getCreatorDownloads = async (req, res) => {
     try {
         const cacheKey = `creator_downloads_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let downloads = await Download.find().lean();
         if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found for this course', 'status': 404 };
@@ -114,7 +111,6 @@ exports.getCreatorDownloads = async (req, res) => {
 
         // Get downloads by creator: i.e notes.uploaded_by
         downloads = downloads.filter(download => download.notes.uploaded_by === req.params.id);
-        await setCachedData(cacheKey, downloads) && keysToClear.add(cacheKey);
         res.status(200).json(downloads);
     } catch (err) {
         console.log('Error getting downloads by course:', err.message);
@@ -158,7 +154,7 @@ exports.createDownload = async (req, res) => {
         const savedDownload = await newDownload.save();
         if (!savedDownload) throw { 'message': 'Something went wrong during creation!', 'status': 400 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedDownload);
     } catch (err) {
         handleError(res, err);
@@ -173,7 +169,7 @@ exports.deleteDownload = async (req, res) => {
         const removedDownload = await Download.deleteOne({ _id: req.params.id });
         if (removedDownload.deletedCount === 0) throw { message: 'Something went wrong while deleting!', status: 500 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(download);
     } catch (err) {
         handleError(res, err);
@@ -184,8 +180,6 @@ exports.deleteDownload = async (req, res) => {
 exports.getDatabaseStats = async (req, res) => {
     try {
         const cacheKey = 'downloads_db_stats';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const db = Download.db;
         const collection = db.collection('downloads');
@@ -258,7 +252,6 @@ exports.getDatabaseStats = async (req, res) => {
             }
         };
 
-        await setCachedData(cacheKey, dbStats, 600) && keysToClear.add(cacheKey);
         res.status(200).json(dbStats);
     } catch (err) {
         console.log('Error getting database stats:', err.message);

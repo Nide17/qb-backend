@@ -2,193 +2,219 @@ const Quiz = require('../models/Quiz');
 const Category = require('../models/Category');
 const Question = require('../models/Question');
 const User = require('../../users/models/User');
+const SubscribedUser = require('../../users/models/SubscribedUser');
+
 const { handleError } = require('../../../utils/error');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
 const { getBatchedQuizzesMap } = require('../helpers');
-const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
-const SubscribedUser = require('../../users/models/SubscribedUser');
+const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 3600; // 1 hour
+const CACHE_KEYS = {
+    ALL: "qz:all",
+    LIMITED: (limit, skip) => `qz:limited:${limit}:${skip}`,
+    PAGINATED: (pageNo) => `qz:paginated:${pageNo}`,
+    BY_CATEGORY: (categoryId) => `qz:by_category:${categoryId}`,
+    BY_USER: (userId) => `qz:by_user:${userId}`,
+    BY_NOTES: (notes) => `qz:by_notes:${notes}`,
+    ONE: (id) => `qz:${id}`,
+};
+
+// ------------------------------------------------------------------------------
+// GET QUIZZES
+// ------------------------------------------------------------------------------
 exports.getQuizzes = async (req, res) => {
-
     try {
+        const pageNo = parseInt(req.query.pageNo);
+        const limit = parseInt(req.query.limit);
+        const skip = parseInt(req.query.skip) || 0;
 
-        var pageNo = parseInt(req.query.pageNo);
-        // If limit & skip are defined
-        let limit = parseInt(req.query.limit);
-        let skip = parseInt(req.query.skip) || 0;
-
-        // LIMITED
+        // LIMITED QUERY ----------------------------------------------------------
         if (limit) {
+            const cacheKey = CACHE_KEYS.LIMITED(limit, skip);
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+                const quizzes = await Quiz.find({})
+                    .sort({ creation_date: -1 })
+                    .populate('category questions')
+                    .limit(limit)
+                    .skip(skip);
 
-            const cacheKey = `limited_quizzes_${limit}_${skip}`;
-            const cached = await getCachedData(cacheKey);
-            // if (cached) return res.status(200).json(cached);
+                if (!quizzes.length) throw { message: 'No quizzes found!', status: 404 };
+                return quizzes;
+            });
 
-            let limitedQuizzes = await Quiz.find({})
-                .sort({ creation_date: -1 })
-                .populate('category questions')
-                .limit(limit)
-                .skip(skip);
-
-            if (!limitedQuizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
-            await setCachedData(cacheKey, limitedQuizzes) && keysToClear.add(cacheKey);
-            res.status(200).json(limitedQuizzes);
+            return res.status(200).json(data);
         }
-        // PAGINATED
-        else if (pageNo && pageNo > 0) {
 
-            const totalQuizzes = await Quiz.countDocuments({});
-            const cacheKey = `paginated_quizzes_${pageNo}`;
-            const cached = await getCachedData(cacheKey);
-            if (cached) return res.status(200).json(cached);
+        // PAGINATED --------------------------------------------------------------
+        if (pageNo && pageNo > 0) {
+            const PAGE_SIZE = 20;
+            const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
 
-            // If limit & skip undefined: Pagination - ENFORCE pagination to prevent memory exhaustion
-            var PAGE_SIZE = 20;
-            var query = {};
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+                const totalQuizzes = await Quiz.countDocuments();
 
-            // Always enforce pagination - never load all quizzes
-            query.limit = PAGE_SIZE;
-            query.skip = PAGE_SIZE * (pageNo - 1);
+                const quizzes = await Quiz.find({})
+                    .sort({ creation_date: -1 })
+                    .limit(PAGE_SIZE)
+                    .skip(PAGE_SIZE * (pageNo - 1))
+                    .populate('category questions')
+                    .lean();
 
-            // Always use pagination to prevent memory exhaustion
-            let paginatedQuizzes = await Quiz.find({}, {}, query).populate('category questions').sort({ creation_date: -1 }).lean();
+                if (!quizzes.length) throw { message: 'No quizzes found', status: 204 };
 
-            if (!paginatedQuizzes || paginatedQuizzes.length === 0) throw { message: 'No quizzes found', status: 204 };
-            if (req.query?.filter === 'stats') return res.status(200).json(totalQuizzes);
-            if (!paginatedQuizzes.length) throw { message: 'No quizzes found!', status: 204 };
+                return {
+                    totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
+                    currentPage: pageNo,
+                    pageSize: PAGE_SIZE,
+                    totalQuizzes,
+                    paginatedQuizzes: quizzes,
+                };
+            });
 
-            const result = {
-                totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
-                currentPage: pageNo,
-                pageSize: PAGE_SIZE,
-                totalQuizzes,
-                paginatedQuizzes,
-            };
-            await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
-            res.status(200).json(result);
-
+            return res.status(200).json(data);
         }
-        // NO LIMIT AND NO SKIP AT ALL
-        else {
-            const cacheKey = 'all_quizzes';
-            const cached = await getCachedData(cacheKey);
-            if (cached) return res.status(200).json(cached);
 
-            let allQuizzes = await Quiz.find({})
+        // FULL LIST --------------------------------------------------------------
+        const cacheKey = CACHE_KEYS.ALL;
+
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const quizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
                 .populate('category questions');
 
-            if (!allQuizzes.length) throw { message: 'No quizzes found!', status: 204 };
-            await setCachedData(cacheKey, allQuizzes) && keysToClear.add(cacheKey);
-            res.status(200).json(allQuizzes);
-        }
+            if (!quizzes.length) throw { message: 'No quizzes found!', status: 204 };
+            return quizzes;
+        });
+
+        res.status(200).json(data);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// GET ONE QUIZ
+// ------------------------------------------------------------------------------
 exports.getOneQuiz = async (req, res) => {
-
     try {
         const id = req.params.id;
-        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+        const query = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { slug: id };
 
-        const quiz = await Quiz.findOne(query).populate('category questions', 'title questionText').select('-__v').lean();
+        const quiz = await Quiz.findOne(query)
+            .populate('category questions', 'title questionText')
+            .select('-__v')
+            .lean();
+
         if (!quiz) throw { status: 404, message: `Quiz with id ${id} not found` };
 
-        // Expand user data using simple direct calls
-        const expandedUser = await User.findById(quiz.created_by).select('name image').lean();
-        const expandedQuiz = { ...quiz, created_by: expandedUser };
+        const owner = await User.findById(quiz.created_by).select('name image').lean();
+        quiz.created_by = owner;
 
-        res.status(200).json(expandedQuiz || quiz);
+        res.status(200).json(quiz);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// GET QUIZZES BY CATEGORY
+// ------------------------------------------------------------------------------
 exports.getQuizzesByCategory = async (req, res) => {
     try {
-        const cacheKey = `category_quizzes_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
+        const cacheKey = CACHE_KEYS.BY_CATEGORY(req.params.id);
 
-        let quizzes = await Quiz.find({ category: req.params.id })
-            .populate('category questions');
-        if (!quizzes.length) throw { message: 'No quizzes found', status: 204 };
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            let quizzes = await Quiz.find({ category: req.params.id })
+                .populate('category questions');
 
-        const quizzesIDs = quizzes.map(q => q._id);
-        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-        quizzes = quizzes.map(q => quizzesMap.get(q._id.toString()) || q);
+            if (!quizzes.length) throw { message: 'No quizzes found', status: 204 };
 
-        await setCachedData(cacheKey, quizzes) && keysToClear.add(cacheKey);
-        res.status(200).json(quizzes);
+            const ids = quizzes.map(q => q._id);
+            const map = await getBatchedQuizzesMap(ids);
+
+            return quizzes.map(q => map.get(q._id.toString()) || q);
+        });
+
+        res.status(200).json(data);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// GET QUIZZES BY NOTES CATEGORY
+// ------------------------------------------------------------------------------
 exports.getQuizzesByNotes = async (req, res) => {
     try {
+        const cacheKey = CACHE_KEYS.BY_NOTES(req.params.id);
 
-        const cacheKey = `notes_quizzes_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const categories = await Category.find({ category: req.params.id });
+            const quizzes = await Quiz.find({ category: { $in: categories } })
+                .populate('category questions');
 
-        const categories = await Category.find({ category: req.params.id });
-        let quizzes = await Quiz.find({ category: { $in: categories } }).populate('category questions');
-        if (!quizzes.length) throw { message: 'No quizzes found!', status: 204 };
+            if (!quizzes.length) throw { message: 'No quizzes found!', status: 204 };
 
-        const quizzesIDs = quizzes.map(q => q._id);
-        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-        quizzes = quizzes.map(q => quizzesMap.get(q._id.toString()) || q);
+            const ids = quizzes.map(q => q._id);
+            const map = await getBatchedQuizzesMap(ids);
+            return quizzes.map(q => map.get(q._id.toString()) || q);
+        });
 
-        await setCachedData(cacheKey, quizzes) && keysToClear.add(cacheKey);
-        res.status(200).json(quizzes);
+        res.status(200).json(data);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// CREATE QUIZ
+// ------------------------------------------------------------------------------
 exports.createQuiz = async (req, res) => {
-
     try {
         const { title, description, category, created_by } = req.body;
 
-        if (!title || !description || !category) {
-            throw { message: 'There are missing info!', status: 400 };
-        }
+        if (!title || !description || !category)
+            throw { message: 'Missing required fields', status: 400 };
 
-        const existingQuiz = await Quiz.findOne({ title });
-        if (existingQuiz) throw { message: 'Quiz already exists!', status: 400 };
+        const exists = await Quiz.findOne({ title });
+        if (exists) throw { message: 'Quiz already exists!', status: 400 };
 
         const newQuiz = new Quiz({ title, description, category, created_by });
-        const updatedCategory = await Category.findByIdAndUpdate(category, { $addToSet: { quizes: newQuiz._id } }, { new: true });
 
-        if (!updatedCategory) throw { message: 'Cannot update corresponding category!', status: 400 };
+        // Atomic category update
+        const categoryUpdate = await Category.findByIdAndUpdate(
+            category,
+            { $addToSet: { quizes: newQuiz._id } },
+            { new: true }
+        );
 
-        keysToClear.add('categories'); // Clear cache for categories to reflect new quiz count
-        const savedQuiz = await newQuiz.save();
-        if (!savedQuiz) throw { message: 'Something went wrong during creation!', status: 400 };
+        if (!categoryUpdate) throw { message: 'Cannot update category!', status: 400 };
 
-        // Clear cache for keys
-        await redisCache.invalidateKeysCache(keysToClear);
-        res.status(200).json(savedQuiz);
+        const saved = await newQuiz.save();
+        await cacheManager.invalidatePattern("cat:*");
+        await cacheManager.invalidatePattern("qz:*");
+        res.status(200).json(saved);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// SEND NOTIFICATIONS
+// ------------------------------------------------------------------------------
 exports.notifying = async (req, res) => {
     try {
-        let subscribers = [];
         const cacheKey = 'subscribed_users';
-        const cached = await getCachedData(cacheKey);
-        if (cached) subscribers = cached;
-        else {
-            subscribers = await SubscribedUser.find({});
-            await setCachedData(cacheKey, subscribers) && keysToClear.add(cacheKey);
-        }
+
+        const subscribers = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () =>
+            SubscribedUser.find({})
+        );
 
         const { slug, title, category, created_by } = req.body;
         const clientURL = req.headers.origin;
@@ -209,67 +235,74 @@ exports.notifying = async (req, res) => {
         });
 
         res.status(200).json({ slug, title, category, created_by });
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// UPDATE QUIZ
+// ------------------------------------------------------------------------------
 exports.updateQuiz = async (req, res) => {
-
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw { message: 'Quiz not found!', status: 404 };
+        if (!quiz) throw { message: 'Quiz not found', status: 404 };
 
-        // If updating quiz
-        const updatedQuiz = await Quiz.updateOne(
+        const updated = await Quiz.updateOne(
             { _id: req.params.id },
-            { $set: req.body },
-            { new: true }
+            { $set: req.body }
         );
 
-        // If moving quiz from one category to another
+        // If category changed
         if (req.body?.oldCategoryID) {
-            Category.updateOne(
+            await Category.updateOne(
                 { _id: req.body.oldCategoryID },
                 { $pull: { quizes: quiz._id } }
-            )
-                .then(() => {
-                    Category.updateOne(
-                        { _id: req.body.category },
-                        { $addToSet: { 'quizes': quiz._id } }
-                    );
-                });
+            );
+
+            await Category.updateOne(
+                { _id: req.body.category },
+                { $addToSet: { quizes: quiz._id } }
+            );
         }
 
-        // Clear cache for keys
-        keysToClear.add('categories'); // Clear cache for categories to reflect quiz count changes
-        await redisCache.invalidateKeysCache(keysToClear);
-        res.status(200).json(updatedQuiz);
+        await cacheManager.invalidatePattern("cat:*");
+        await cacheManager.invalidatePattern("qz:*");
+        res.status(200).json(updated);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// ADD VIDEO LINK
+// ------------------------------------------------------------------------------
 exports.addVidLink = async (req, res) => {
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw { message: 'Quiz not found!', status: 404 };
+        if (!quiz) throw { message: 'Quiz not found', status: 404 };
 
         quiz.video_links.push(req.body);
         await quiz.save();
 
-        // Clear cache for keys
-        await redisCache.invalidateKeysCache(keysToClear);
+        await cacheManager.invalidatePattern("cat:*");
+        await cacheManager.invalidatePattern("qz:*");
         res.status(200).json(quiz);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// DELETE QUIZ
+// ------------------------------------------------------------------------------
 exports.deleteQuiz = async (req, res) => {
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw { message: 'Quiz not found!', status: 404 };
+        if (!quiz) throw { message: 'Quiz not found', status: 404 };
 
         await Category.updateOne(
             { _id: quiz.category },
@@ -277,120 +310,111 @@ exports.deleteQuiz = async (req, res) => {
         );
 
         await Question.deleteMany({ quiz: quiz._id });
-        await Quiz.deleteOne({ _id: req.params.id });
+        await Quiz.deleteOne({ _id: quiz._id });
 
-        // Clear cache for keys
-        await redisCache.invalidateKeysCache(keysToClear);
+        await cacheManager.invalidatePattern("cat:*");
+        await cacheManager.invalidatePattern("qz:*");
         res.status(200).json(quiz);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
+// ------------------------------------------------------------------------------
+// DELETE VIDEO
+// ------------------------------------------------------------------------------
 exports.deleteVideo = async (req, res) => {
-
     try {
         const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw { message: 'Quiz not found!', status: 404 };
+        if (!quiz) throw { message: 'Quiz not found', status: 404 };
 
-        quiz.video_links.id(req.body.vId).remove();
+        quiz.video_links.id(req.body.vId)?.remove();
         await quiz.save();
 
-        // Clear cache for keys
-        await redisCache.invalidateKeysCache(keysToClear);
+        await cacheManager.invalidatePattern("cat:*");
+        await cacheManager.invalidatePattern("qz:*");
         res.status(200).json(quiz);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
-// Get database statistics
+// ------------------------------------------------------------------------------
+// DATABASE STATS
+// ------------------------------------------------------------------------------
 exports.getDatabaseStats = async (req, res) => {
     try {
-
         const cacheKey = 'quizzes_db_stats';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
-        const db = Quiz.db;
 
-        // Get stats for quizzes collection using simpler approach
-        const quizzesCollection = db.collection('quizzes');
-        const quizzesCount = await quizzesCollection.countDocuments();
-        const quizSample = await quizzesCollection.find({}).limit(50).toArray();
-        const avgQuizSize = quizSample.length > 0 ?
-            quizSample.reduce((sum, doc) => sum + JSON.stringify(doc).length, 0) / quizSample.length : 0;
-        const estimatedQuizDataSize = quizzesCount * avgQuizSize;
+        const data = await cacheWrapper.wrap(cacheKey, 900, async () => {
+            const db = Quiz.db;
 
-        // Get stats for questions collection
-        const questionsCollection = db.collection('questions');
-        const questionsCount = await questionsCollection.countDocuments().catch(() => 0);
-        const estimatedQuestionDataSize = questionsCount * 200; // Estimate
+            const quizzesCol = db.collection('quizzes');
+            const questionsCol = db.collection('questions');
+            const categoriesCol = db.collection('categories');
 
-        // Get stats for categories collection
-        const categoriesCollection = db.collection('categories');
-        const categoriesCount = await categoriesCollection.countDocuments().catch(() => 0);
-        const estimatedCategoryDataSize = categoriesCount * 100; // Estimate
+            const quizzesCount = await quizzesCol.countDocuments();
+            const questionsCount = await questionsCol.countDocuments();
+            const categoriesCount = await categoriesCol.countDocuments();
 
-        // Get aggregated quiz data
-        const pipeline = [
-            {
-                $group: {
-                    _id: null,
-                    totalQuizzes: { $sum: 1 },
-                    activeQuizzes: {
-                        $sum: {
-                            $cond: [
-                                { $gte: ['$creation_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
-                                1,
-                                0
-                            ]
-                        }
-                    },
-                    avgQuestionsPerQuiz: { $avg: { $size: '$questions' } }
+            const sample = await quizzesCol.find({}).limit(50).toArray();
+            const avgQuizSize =
+                sample.length ?
+                    sample.reduce((a, doc) => a + JSON.stringify(doc).length, 0) / sample.length :
+                    0;
+
+            const estimatedQuizSize = quizzesCount * avgQuizSize;
+            const estimatedQSize = questionsCount * 200;
+            const estimatedCatSize = categoriesCount * 100;
+
+            const pipeline = [
+                {
+                    $group: {
+                        _id: null,
+                        totalQuizzes: { $sum: 1 },
+                        activeQuizzes: {
+                            $sum: {
+                                $cond: [
+                                    { $gte: ['$creation_date', new Date(Date.now() - 30 * 86400000)] },
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+                        avgQuestionsPerQuiz: { $avg: { $size: '$questions' } }
+                    }
                 }
-            }
-        ];
+            ];
 
-        const aggregatedStats = await quizzesCollection.aggregate(pipeline).toArray();
-        const quizStats = aggregatedStats[0] || {};
+            const aggregate = await quizzesCol.aggregate(pipeline).toArray();
+            const quizMetrics = aggregate[0] || {};
 
-        const dbStats = {
-            service: 'quizzes',
-            timestamp: new Date().toISOString(),
-            documents: quizzesCount + questionsCount + categoriesCount,
-            totalDocuments: quizzesCount + questionsCount + categoriesCount,
-            dataSize: estimatedQuizDataSize + estimatedQuestionDataSize + estimatedCategoryDataSize,
-            totalDataSize: estimatedQuizDataSize + estimatedQuestionDataSize + estimatedCategoryDataSize,
-            storageSize: Math.round((estimatedQuizDataSize + estimatedQuestionDataSize + estimatedCategoryDataSize) * 1.2),
-            totalStorageSize: Math.round((estimatedQuizDataSize + estimatedQuestionDataSize + estimatedCategoryDataSize) * 1.2),
-            indexSize: Math.round((estimatedQuizDataSize + estimatedQuestionDataSize + estimatedCategoryDataSize) * 0.1),
-            totalIndexSize: Math.round((estimatedQuizDataSize + estimatedQuestionDataSize + estimatedCategoryDataSize) * 0.1),
-            collections: {
-                quizzes: {
-                    documents: quizzesCount,
-                    dataSize: estimatedQuizDataSize,
-                    avgDocumentSize: avgQuizSize
+            const totalData = estimatedQuizSize + estimatedQSize + estimatedCatSize;
+
+            return {
+                service: 'quizzes',
+                timestamp: new Date().toISOString(),
+                totalDocuments: quizzesCount + questionsCount + categoriesCount,
+                totalDataSize: totalData,
+                storageSize: Math.round(totalData * 1.2),
+                indexSize: Math.round(totalData * 0.1),
+                collections: {
+                    quizzes: { documents: quizzesCount, dataSize: estimatedQuizSize, avgDocumentSize: avgQuizSize },
+                    questions: { documents: questionsCount, dataSize: estimatedQSize, avgDocumentSize: 200 },
+                    categories: { documents: categoriesCount, dataSize: estimatedCatSize, avgDocumentSize: 100 },
                 },
-                questions: {
-                    documents: questionsCount,
-                    dataSize: estimatedQuestionDataSize,
-                    avgDocumentSize: 200
-                },
-                categories: {
-                    documents: categoriesCount,
-                    dataSize: estimatedCategoryDataSize,
-                    avgDocumentSize: 100
+                quizMetrics: {
+                    totalQuizzes: quizMetrics.totalQuizzes || 0,
+                    activeQuizzes: quizMetrics.activeQuizzes || 0,
+                    avgQuestionsPerQuiz: Math.round(quizMetrics.avgQuestionsPerQuiz || 0)
                 }
-            },
-            quizMetrics: {
-                totalQuizzes: quizStats.totalQuizzes || 0,
-                activeQuizzes: quizStats.activeQuizzes || 0,
-                avgQuestionsPerQuiz: Math.round(quizStats.avgQuestionsPerQuiz || 0)
-            }
-        };
+            };
+        });
 
-        await setCachedData(cacheKey, dbStats) && keysToClear.add(cacheKey);
-        res.status(200).json(dbStats);
+        res.status(200).json(data);
+
     } catch (err) {
         handleError(res, err);
     }

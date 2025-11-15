@@ -1,15 +1,17 @@
 const ImageUpload = require('../../models/blog-posts/ImageUpload');
 const User = require('../../../users/models/User');
 const { getBatchedUsersMap } = require('../../../users/helpers');
-const { deleteImageFromS3, redisCache, getCachedData, setCachedData } = require('../../../../utils/global-helpers');
+const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 exports.getImageUploads = async (req, res) => {
     try {
         const cacheKey = `all_image_uploads`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
         let imageUploads = await ImageUpload.find().sort({ createdAt: -1 }).lean();
         if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
@@ -28,7 +30,6 @@ exports.getImageUploads = async (req, res) => {
         const result = expandedImageUploads || imageUploads;
 
         // Set cache
-        await setCachedData(cacheKey, result, 600) && keysToClear.add(cacheKey);
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -52,8 +53,6 @@ exports.getOneImageUpload = async (req, res) => {
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
         const cacheKey = `image_uploads_by_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 }).lean();
         if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
@@ -72,7 +71,6 @@ exports.getImageUploadsByOwner = async (req, res) => {
         const result = expandedImageUploads || imageUploads;
 
         // Set cache
-        await setCachedData(cacheKey, result, 600) && keysToClear.add(cacheKey);
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -106,7 +104,7 @@ exports.createImageUpload = async (req, res) => {
 
         const savedImgUp = await newImgUp.save();
         if (!savedImgUp) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedImgUp);
     } catch (err) {
         handleError(res, err);
@@ -119,7 +117,7 @@ exports.updateImageUpload = async (req, res) => {
         if (!imageUpload) throw { 'message': 'Image upload not found!', 'status': 404 };
 
         const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(updatedImageUpload);
     } catch (err) {
         handleError(res, err);
@@ -138,7 +136,7 @@ exports.deleteImageUpload = async (req, res) => {
         if (removedImageUpload.deletedCount === 0)
             throw { 'message': 'Something went wrong while deleting!', 'status': 503 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(imageUpload);
     } catch (err) {
         handleError(res, err);

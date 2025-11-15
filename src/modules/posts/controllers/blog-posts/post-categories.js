@@ -1,16 +1,18 @@
 const PostCategory = require('../../models/blog-posts/PostCategory');
 const { getBatchedUsersMap } = require('../../../users/helpers');
 const { handleError } = require('../../../../utils/error');
-const { validateRequiredFields, setCachedData, getCachedData } = require('../../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
 const User = require('../../../users/models/User');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 // Refactored code to use reusable utilities and align with patterns from other services.
 exports.getPostCategories = async (req, res) => {
     try {
         const cacheKey = 'all_post_categories';
-        const cached = await getCachedData(cacheKey);
-        if (cached) keysToClear.add(cacheKey);
         const postCategories = await PostCategory.find().sort({ createdAt: -1 }).lean();
         if (!postCategories || postCategories.length === 0) throw { 'status': 404, 'message': 'No postCategories found!' };
 
@@ -31,7 +33,6 @@ exports.getPostCategories = async (req, res) => {
         const result = expandedPostCategories || postCategories;
 
         // Set cache
-        await setCachedData(cacheKey, result, 600) && keysToClear.add(cacheKey);
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -73,7 +74,7 @@ exports.createPostCategory = async (req, res) => {
         const savedPostCategory = await newPostCategory.save();
 
         if (!savedPostCategory) throw { 'status': 500, 'message': 'Could not save post category, try again!' };
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedPostCategory);
     } catch (err) {
         handleError(res, err);
@@ -85,7 +86,7 @@ exports.updatePostCategory = async (req, res) => {
         const updatedPostCategory = await PostCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedPostCategory) throw { status: 404, message: 'PostCategory not found!' };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(updatedPostCategory);
     } catch (err) {
         handleError(res, err);
@@ -97,7 +98,7 @@ exports.deletePostCategory = async (req, res) => {
         const postCategory = await PostCategory.findById(req.params.id);
         if (!postCategory) throw { status: 404, message: 'PostCategory not found!' };
         await PostCategory.findByIdAndDelete(req.params.id);
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(postCategory);
     } catch (err) {
         handleError(res, err);

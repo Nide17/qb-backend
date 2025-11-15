@@ -1,18 +1,19 @@
 const SubscribedUser = require('../models/SubscribedUser');
 const { handleError } = require('../../../utils/error');
 const { sendSubscriptionEmail } = require('../helpers');
-const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 exports.getSubscribedUsers = async (req, res) => {
     try {
         const cacheKey = `subscribed_users`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const subscribedUsers = await SubscribedUser.find().sort({ createdAt: -1 });
         if (!subscribedUsers) throw { 'message': 'No subscribed users found!', 'status': 404 };
-        await setCachedData(cacheKey, subscribedUsers) && keysToClear.add(cacheKey);
         res.status(200).json(subscribedUsers);
     } catch (err) {
         handleError(res, err);
@@ -54,7 +55,7 @@ exports.createSubscribedUser = async (req, res) => {
         sendSubscriptionEmail(savedSubscriber);
 
         // Invalidate cache
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedSubscriber);
     } catch (err) {
         handleError(res, err);
@@ -79,7 +80,7 @@ exports.deleteSubscribedUser = async (req, res) => {
         if (removedSubscribedUser.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
 
         // Invalidate cache
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(subscribedUser);
     } catch (err) {
         handleError(res, err);

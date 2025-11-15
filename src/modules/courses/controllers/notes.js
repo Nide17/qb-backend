@@ -1,10 +1,14 @@
 const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
-const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const User = require('../../users/models/User');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 const expandNotes = async (notes) => {
 
     if (!notes) throw { status: 404, message: 'No notes found!' };
@@ -28,8 +32,6 @@ const expandNotes = async (notes) => {
 const findNotes = async (query, limit = 0, key) => {
 
     const cacheKey = `notes_${key}`
-    const cached = await getCachedData(cacheKey);
-    if (cached) return cached;
 
     let notes = await Notes.find(query).sort({ createdAt: -1 })
         .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
@@ -38,7 +40,6 @@ const findNotes = async (query, limit = 0, key) => {
         .lean();
 
     notes = await expandNotes(notes) || notes;
-    setCachedData(cacheKey, notes) && keysToClear.add(cacheKey);
     return notes;
 };
 
@@ -128,7 +129,7 @@ exports.createNotes = async (req, res) => {
         const savedNotes = await newNotes.save();
         if (!savedNotes) throw { message: 'Could not save notes, try again!', status: 500 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedNotes);
 
     } catch (err) {
@@ -191,7 +192,7 @@ exports.deleteNotes = async (req, res) => {
         // Delete this notes entry
         await notes.deleteOne();
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
