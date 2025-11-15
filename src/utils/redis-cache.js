@@ -1,223 +1,244 @@
-const Redis = require('ioredis');
+const Redis = require("ioredis");
 
 class RedisCacheManager {
-    constructor() {
+    constructor(options = {}) {
         this.redis = null;
         this.isConnected = false;
-        this.defaultTTL = 600; // 10 minutes in seconds
-        this.retryDelay = 30000; // 30 seconds
-        this.maxRetries = 1;
+        this.redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+        this.defaultTTL = options.defaultTTL || 600; // seconds
+        this.retryDelay = options.retryDelay || 30000;
+        this.maxRetries = options.maxRetries || 1;
+    }
+
+    isReady() {
+        return this.redis && this.isConnected && this.redis.status === "ready";
     }
 
     async connect() {
-        if (this.isConnected) {
-            return true;
-        }
-        try {
-            this.redis = new Redis(process.env.REDIS_URL);
+        if (this.isReady()) return true;
 
-            this.redis.on('connect', () => {
-                console.log('✅ Redis connected successfully');
+        try {
+            // keep your simple URL usage, but add a few resilience options
+            this.redis = new Redis(process.env.REDIS_URL, {
+                // allow ioredis to retry on transient errors (small exponential backoff)
+                retryStrategy(times) {
+                    return Math.min(times * 200, 2000); // ms
+                },
+                // don't fail a request immediately if reconnecting
+                maxRetriesPerRequest: null,
+                enableReadyCheck: true
+            });
+
+            // prefer 'ready' for when the client is actually usable
+            this.redis.once('ready', () => {
+                console.log('✅ Redis ready');
                 this.isConnected = true;
             });
 
+            this.redis.on('connect', () => {
+                console.log('🔗 Redis socket connected (TCP)');
+            });
+
             this.redis.on('error', (err) => {
-                console.log("❌ Failed to connect to redis. Error:", err.message);
+                console.error('❌ Redis error:', err && err.message ? err.message : err);
                 this.isConnected = false;
             });
 
-            this.redis.on('close', () => {
+            this.redis.on('end', () => {
+                console.warn('⚠️ Redis connection closed');
                 this.isConnected = false;
             });
 
+            // explicit connect call is fine — ioredis will attempt to use the URL (including rediss://)
             await this.redis.connect();
+
             return true;
         } catch (err) {
             this.isConnected = false;
+            console.error('Redis connect failed:', err && err.message ? err.message : err);
             return false;
         }
     }
 
     async disconnect() {
-        if (this.redis) {
-            try {
-                if (this.isConnected && this.redis.status === 'ready') {
-                    await this.redis.quit();
-                    console.log('✅ Redis disconnected gracefully');
-                } else {
-                    console.log('⚠️ Redis: ', this.redis.status);
-                    this.redis.disconnect(); // force close without sending commands
-                }
-            } catch (err) {
-                console.error('Redis disconnect error:', err.message);
+        if (!this.redis) return;
+
+        try {
+            if (this.isReady()) {
+                await this.redis.quit();
+                console.log("✅ Redis disconnected gracefully");
+            } else {
                 this.redis.disconnect();
-            } finally {
-                this.isConnected = false;
             }
+        } catch (err) {
+            console.error("Redis disconnect error:", err.message);
+            this.redis.disconnect();
+        } finally {
+            this.isConnected = false;
         }
     }
 
+    // -------------------------------------
+    // Basic cache operations
+    // -------------------------------------
+
     async get(key) {
-        // Try Redis first if connected
-        if (this.isConnected && this.redis) {
-            try {
-                const value = await this.redis.get(key);
-                return value ? JSON.parse(value) : null;
-            } catch (_error) {
-                void _error;
-            }
+        if (!this.isReady()) return null;
+
+        try {
+            const raw = await this.redis.get(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (err) {
+            console.error("Redis get error:", err.message);
+            return null;
         }
-        return null;
     }
 
     async set(key, value, ttl = this.defaultTTL) {
-        // Try Redis first if connected
-        if (this.isConnected && this.redis) {
-            try {
-                const serializedValue = JSON.stringify(value);
-                if (ttl > 0) {
-                    await this.redis.setex(key, ttl, serializedValue);
-                } else {
-                    await this.redis.set(key, serializedValue);
-                }
-                return true;
-            } catch (_error) {
-                void _error;
-            }
-        }
+        if (!this.isReady()) return false;
 
-        return false;
+        try {
+            const json = JSON.stringify(value);
+            if (ttl > 0) {
+                await this.redis.setex(key, ttl, json);
+            } else {
+                await this.redis.set(key, json);
+            }
+            return true;
+        } catch (err) {
+            console.error("Redis set error:", err.message);
+            return false;
+        }
     }
 
     async del(key) {
-        // Try Redis first if connected
-        if (this.isConnected && this.redis) {
-            try {
-                await this.redis.del(key);
-                return true;
-            } catch (_error) {
-                void _error;
-            }
-        }
+        if (!this.isReady()) return false;
 
-        return false;
+        try {
+            await this.redis.del(key);
+            return true;
+        } catch (err) {
+            console.error("Redis del error:", err.message);
+            return false;
+        }
     }
 
     async exists(key) {
-        // Try Redis first if connected
-        if (this.isConnected && this.redis) {
-            try {
-                const result = await this.redis.exists(key);
-                return result === 1;
-            } catch (_error) {
-                void _error;
-            }
-        }
+        if (!this.isReady()) return false;
 
-        return false;
+        try {
+            return (await this.redis.exists(key)) === 1;
+        } catch (err) {
+            console.error("Redis exists error:", err.message);
+            return false;
+        }
     }
 
     async expire(key, ttl) {
-        if (!this.isConnected || !this.redis) {
-            return false;
-        }
+        if (!this.isReady()) return false;
 
         try {
             await this.redis.expire(key, ttl);
             return true;
-        } catch (_error) {
-            void _error;
+        } catch (err) {
+            console.error("Redis expire error:", err.message);
             return false;
         }
     }
 
     async ttl(key) {
-        if (!this.isConnected || !this.redis) {
-            return -1;
-        }
+        if (!this.isReady()) return -1;
 
         try {
             return await this.redis.ttl(key);
-        } catch (error) {
-            console.error('Redis ttl error:', error);
+        } catch (err) {
+            console.error("Redis TTL error:", err.message);
             return -1;
         }
     }
 
-    async keys(pattern) {
-        if (!this.isConnected || !this.redis) {
-            return [];
-        }
+    // -------------------------------------
+    // Keys — using SCAN instead of KEYS
+    // -------------------------------------
+
+    async scan(pattern = "*", count = 500) {
+        if (!this.isReady()) return [];
+
+        let cursor = "0";
+        const keys = [];
 
         try {
-            return await this.redis.keys(pattern);
-        } catch (error) {
-            console.error('Redis keys error:', error);
+            do {
+                const [nextCursor, batch] = await this.redis.scan(cursor, "MATCH", pattern, "COUNT", count);
+                cursor = nextCursor;
+                keys.push(...batch);
+            } while (cursor !== "0");
+
+            return keys;
+        } catch (err) {
+            console.error("Redis scan error:", err.message);
             return [];
         }
     }
 
     async flush() {
-        if (!this.isConnected || !this.redis) {
-            return false;
-        }
+        if (!this.isReady()) return false;
 
         try {
             await this.redis.flushdb();
             return true;
-        } catch (error) {
-            console.error('Redis flush error:', error);
+        } catch (err) {
+            console.error("Redis flush error:", err.message);
             return false;
         }
     }
 
     async getStats() {
-        if (!this.isConnected || !this.redis) {
-            return null;
-        }
+        if (!this.isReady()) return null;
 
         try {
             const info = await this.redis.info();
-            const keys = await this.redis.dbsize();
+            const keyCount = await this.redis.dbsize();
+            const keys = await this.scan();
+
+            const parsedInfo = info
+                .split("\n")
+                .filter((line) => line.includes(":"))
+                .reduce((acc, line) => {
+                    const [k, v] = line.split(":");
+                    acc[k.trim()] = v.trim();
+                    return acc;
+                }, {});
+
             return {
                 connected: this.isConnected,
+                keyCount,
                 keys,
-                info: info.split('\r\n').reduce((acc, line) => {
-                    const [key, value] = line.split(':');
-                    if (key && value) {
-                        acc[key] = value;
-                    }
-                    return acc;
-                }, {})
+                info: parsedInfo,
             };
-        } catch (error) {
-            console.error('Redis stats error:', error);
+        } catch (err) {
+            console.error("Redis stats error:", err.message);
             return null;
         }
     }
 
-    // Cache invalidation patterns
+    // -------------------------------------
+    // Cache invalidation
+    // -------------------------------------
+
     async invalidatePattern(pattern) {
-        if (!this.isConnected || !this.redis) {
-            return false;
-        }
+        if (!this.isReady()) return false;
 
         try {
-            const keys = await this.keys(pattern);
+            const keys = await this.scan(pattern);
             if (keys.length > 0) {
                 await this.redis.del(...keys);
-                console.log(`Invalidated ${keys.length} keys matching pattern: ${pattern}`);
+                console.log(`🗑 Deleted ${keys.length} keys for pattern "${pattern}"`);
             }
             return true;
-        } catch (error) {
-            console.error('Redis invalidate pattern error:', error);
+        } catch (err) {
+            console.error("Redis invalidatePattern error:", err.message);
             return false;
-        }
-    }
-
-    async invalidateKeysCache(keys) {
-        for (const key of keys) {
-            await this.del(key);
         }
     }
 }

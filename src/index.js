@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const process = require('process');
-const { redisCache } = require('./utils/global-helpers');
+const { cacheManager } = require('./utils/global-helpers');
 const { handleError } = require('./utils/error');
 const socketManager = require('./utils/enhanced-socket');
 require('dotenv').config();
@@ -112,9 +112,9 @@ async function startServer() {
         });
 
         try {
-            await redisCache.connect()
+            await cacheManager.connect()
         } catch (error) {
-            console.log(`Redis error: ${error?.message || error}`);
+            console.log(`Redis error: ${error}`);
         }
     } catch (err) {
         console.error('Failed to start server:\n', err?.message || err);

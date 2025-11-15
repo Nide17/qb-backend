@@ -3,7 +3,11 @@ const { getBatchedUsersMap } = require('../users/helpers');
 const { sendEmail } = require('../../utils/emails/sendEmail');
 const { getCachedData, setCachedData } = require('../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 // Helper function to send emails
 const sendEmails = (recipients, title, message, clientURL) => {
     recipients.forEach((recipient, index) => {
@@ -29,15 +33,12 @@ const notifyAdmins = async (newContact) => {
                 const cacheKey = `admins-emails`;
 
                 // Check cache first
-                const cached = await getCachedData(cacheKey);
-                if (cached) return res.status(200).json(cached);
 
                 const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
                 if (!admins) throw { 'message': 'No admins found!', 'status': 404 };
                 const adminEmails = admins.map(admin => admin.email);
 
                 // Set cache
-                setCachedData(cacheKey, adminEmails) && keysToClear.add(cacheKey);
                 return adminEmails;
             } catch (error) {
                 console.warn('Failed to fetch admin emails:', error.message);

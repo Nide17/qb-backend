@@ -3,9 +3,13 @@ const Notes = require('../models/Notes');
 const User = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
-const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 const findChapters = async (query, limit = 0) => {
 
     let chaptersQuery = Chapter
@@ -39,11 +43,8 @@ const findChapters = async (query, limit = 0) => {
 exports.getChapters = async (req, res) => {
     try {
         const cacheKey = 'chapters';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
         const chapters = await findChapters({}, 0);
 
-        await setCachedData(cacheKey, chapters) && keysToClear.add(cacheKey);
         res.status(200).json(chapters);
     } catch (err) {
         handleError(res, err);
@@ -54,12 +55,9 @@ exports.getChaptersByCourse = async (req, res) => {
 
     try {
         const cacheKey = `course_chapters_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const notes = await findChapters({ course: req.params.id }, 0);
 
-        await setCachedData(cacheKey, notes) && keysToClear.add(cacheKey);
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
@@ -109,8 +107,6 @@ exports.createChapter = async (req, res) => {
         const savedChapter = await newChapter.save();
         if (!savedChapter) throw { 'message': 'Something went wrong during creation!', 'status': 503 };
 
-        // Clear redis cache
-        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(savedChapter);
     } catch (err) {
         handleError(res, err);
@@ -136,9 +132,6 @@ exports.deleteChapter = async (req, res) => {
 
         // Delete this chapter
         await Chapter.deleteOne({ _id: req.params.id });
-
-        // Clear redis cache
-        await redisCache.invalidateKeysCache(keysToClear);
         res.status(200).json(chapter);
     } catch (err) {
         handleError(res, err);

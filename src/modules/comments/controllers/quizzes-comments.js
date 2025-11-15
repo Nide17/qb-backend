@@ -3,21 +3,27 @@ const { handleError } = require('../../../utils/error');
 const { expandComments } = require('../helpers');
 const User = require('../../users/models/User');
 const Quiz = require('../../quizzing/models/Quiz');
-const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "qzcmt:all",
+    ONE: (id) => `qzcmt:${id}`,
+    BY_QUIZ: (quizId) => `qzcmt:quiz:${quizId}`
+};
 exports.getQuizzesComments = async (req, res) => {
     try {
-        const cacheKey = 'quizComments';
-        const cachedData = await getCachedData(cacheKey);
-        if (cachedData) return res.status(200).json(cachedData);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
-        let quizComments = await QuizComment.find().sort({ createdAt: -1 }).lean();
-        const expandedComments = await expandComments(quizComments);
-        quizComments = expandedComments ? expandedComments : quizComments;
+            let quizComments = await QuizComment.find().sort({ createdAt: -1 }).lean();
+            const expandedComments = await expandComments(quizComments);
+            quizComments = expandedComments ? expandedComments : quizComments;
 
-        await setCachedData(cacheKey, quizComments) && keysToClear.add(cacheKey);
-        res.status(200).json(quizComments);
+            return quizComments;
+        });
+
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -27,19 +33,25 @@ exports.getOneQuizComment = async (req, res) => {
 
     try {
 
-        let quizComment = await QuizComment.findById(req.params.id).lean();
-        if (!quizComment) throw { 'message': 'QuizComment not found!', 'status': 404 };
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
-        if (quizComment?.sender) {
-            const sender = await User.findById(quizComment.sender).select('name');
-            quizComment = { ...quizComment, sender };
-        }
-        if (quizComment?.quiz) {
-            const quiz = await Quiz.findById(quizComment.quiz).select('title');
-            quizComment = { ...quizComment, quiz };
-        }
+            let quizComment = await QuizComment.findById(req.params.id).lean();
+            if (!quizComment) throw { 'message': 'QuizComment not found!', 'status': 404 };
 
-        res.status(200).json(quizComment);
+            if (quizComment?.sender) {
+                const sender = await User.findById(quizComment.sender).select('name');
+                quizComment = { ...quizComment, sender };
+            }
+            if (quizComment?.quiz) {
+                const quiz = await Quiz.findById(quizComment.quiz).select('title');
+                quizComment = { ...quizComment, quiz };
+            }
+
+            return quizComment;
+        });
+
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -47,16 +59,16 @@ exports.getOneQuizComment = async (req, res) => {
 
 exports.getCommentsByQuiz = async (req, res) => {
     try {
-        const cacheKey = `quizComments_${req.params.id}`;
-        const cachedData = await getCachedData(cacheKey);
-        if (cachedData) return res.status(200).json(cachedData);
+        const cacheKey = CACHE_KEYS.BY_QUIZ(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
-        let quizComments = await QuizComment.find({ quiz: req.params.id }).sort({ createdAt: -1 }).lean();
-        const expandedComments = await expandComments(quizComments);
-        quizComments = expandedComments ? expandedComments : quizComments;
+            let quizComments = await QuizComment.find({ quiz: req.params.id }).sort({ createdAt: -1 }).lean();
+            const expandedComments = await expandComments(quizComments);
+            quizComments = expandedComments ? expandedComments : quizComments;
+            return quizComments;
+        });
 
-        await setCachedData(cacheKey, quizComments) && keysToClear.add(cacheKey);
-        res.status(200).json(quizComments);
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -75,7 +87,7 @@ exports.createQuizComment = async (req, res) => {
         const savedQuizComment = await newQuizComment.save();
         if (!savedQuizComment) throw { message: 'Something went wrong while creating!!', status: 500 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+        await cacheManager.invalidatePattern("qzcmt:*");
         res.status(200).json(savedQuizComment);
     } catch (err) {
         handleError(res, err);
@@ -88,6 +100,8 @@ exports.updateQuizComment = async (req, res) => {
         if (!quizComment) throw { message: 'QuizComment not found!', status: 404 };
 
         const updatedQuizComment = await QuizComment.findByIdAndUpdate(req.params.id, req.body, { new: true });
+
+        await cacheManager.invalidatePattern("qzcmt:*");
         res.status(200).json(updatedQuizComment);
     } catch (err) {
         handleError(res, err);
@@ -103,6 +117,8 @@ exports.approveRejectComment = async (req, res) => {
         if (!quizComment) throw { message: 'QuizComment not found!', status: 404 };
 
         const updatedQuizComment = await QuizComment.findByIdAndUpdate(commentID, { status: req.body.status }, { new: true });
+
+        await cacheManager.invalidatePattern("qzcmt:*");
         res.status(200).json(updatedQuizComment);
     } catch (err) {
         handleError(res, err);
@@ -117,7 +133,7 @@ exports.deleteQuizComment = async (req, res) => {
         const removedQuizComment = await QuizComment.deleteOne({ _id: req.params.id });
         if (removedQuizComment.deletedCount === 0) throw { message: 'Something went wrong while deleting!', status: 500 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+        await cacheManager.invalidatePattern("qzcmt:*");
         res.status(200).json(quizComment);
     } catch (err) {
         handleError(res, err);

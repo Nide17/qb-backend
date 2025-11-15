@@ -3,10 +3,14 @@ const Chapter = require('../models/Chapter');
 const Notes = require('../models/Notes');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
-const { validateRequiredFields, redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const User = require('../../users/models/User');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 const findCourses = async (query, limit = 0) => {
 
     let coursesQuery = Chapter.find(query).sort({ createdAt: -1 })
@@ -37,11 +41,8 @@ const findCourses = async (query, limit = 0) => {
 exports.getCourses = async (req, res) => {
     try {
         const cacheKey = 'courses';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const courses = await findCourses({}, 0);
-        await setCachedData(cacheKey, courses) && keysToClear.add(cacheKey);
         res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);
@@ -52,12 +53,9 @@ exports.getCoursesByCategory = async (req, res) => {
 
     try {
         const cacheKey = `category_courses_${req.params.id}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const courses = await findCourses({ courseCategory: req.params.id }, 0);
 
-        await setCachedData(cacheKey, courses) && keysToClear.add(cacheKey);
         res.status(200).json(courses);
     } catch (err) {
         handleError(res, err);
@@ -108,7 +106,7 @@ exports.createCourse = async (req, res) => {
         const savedCourse = await newCourse.save();
         if (!savedCourse) throw { 'message': 'Could not save course, try again!', 'status': 500 };
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(savedCourse);
     } catch (err) {
         handleError(res, err);
@@ -140,7 +138,7 @@ exports.deleteCourse = async (req, res) => {
         // Delete this course
         await Course.deleteOne({ _id: req.params.id });
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(course);
     } catch (err) {
         handleError(res, err);

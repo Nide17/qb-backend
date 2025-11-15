@@ -1,20 +1,22 @@
 const os = require('os');
 const process = require('process');
 const { handleError } = require('../../../utils/error');
-const { getCachedData, setCachedData, deleteCacheKey } = require('../../../utils/global-helpers');
+const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const User = require('../../users/models/User');
 const Quiz = require('../../quizzing/models/Quiz');
 const Download = require('../../downloads/models/Download');
 const Score = require('../../scores/models/Score');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 // Enhanced system monitoring
 exports.getSystemMetrics = async (req, res) => {
 
     try {
         const cacheKey = 'system_metrics';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Get system information
         const cpuUsage = process.cpuUsage();
@@ -49,7 +51,6 @@ exports.getSystemMetrics = async (req, res) => {
                 }
             },
         };
-        if (metrics) await setCachedData(cacheKey, metrics) && keysToClear.add(cacheKey);
         res.status(200).json(metrics);
     } catch (err) {
         handleError(res, err);
@@ -61,8 +62,6 @@ exports.getDashboardStats = async (req, res) => {
 
     try {
         const cacheKey = 'dashboard_stats';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Get actual data from working endpoints and count them through API Gateway
         const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
@@ -126,7 +125,6 @@ exports.getDashboardStats = async (req, res) => {
             }
         };
 
-        if (stats) await setCachedData(cacheKey, stats) && keysToClear.add(cacheKey);
         res.status(200).json(stats);
     } catch (err) {
         handleError(res, err);
@@ -159,12 +157,9 @@ exports.get50NewUsers = async (req, res) => {
 
     try {
         const cacheKey = 'new_users_50';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({}).sort({ register_date: -1 }).limit(50).lean();
 
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in get50NewUsers:', err.message);
@@ -175,12 +170,9 @@ exports.get50NewUsers = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
     try {
         const cacheKey = 'all_users';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({}).lean();
 
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         console.log('Unexpected error in getAllUsers:', err.message);
@@ -191,12 +183,9 @@ exports.getAllUsers = async (req, res) => {
 exports.getUsersWithImage = async (req, res) => {
     try {
         const cacheKey = `users_with_image`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({ image: { $exists: true, $ne: '' } }).lean();
 
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -206,11 +195,8 @@ exports.getUsersWithImage = async (req, res) => {
 exports.getUsersWithSchool = async (req, res) => {
     try {
         const cacheKey = `users_with_school`;
-        const cached = await getCachedData(cacheKey);
 
-        if (cached) return res.status(200).json(cached);
         let users = await User.find({ school: { $exists: true, $ne: null } }).lean();
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -220,12 +206,9 @@ exports.getUsersWithSchool = async (req, res) => {
 exports.getUsersWithLevel = async (req, res) => {
     try {
         const cacheKey = `users_with_level`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({ level: { $exists: true, $ne: null } }).lean();
 
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -235,11 +218,8 @@ exports.getUsersWithLevel = async (req, res) => {
 exports.getUsersWithFaculty = async (req, res) => {
     try {
         const cacheKey = `users_with_faculty`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({ faculty: { $exists: true, $ne: null } }).lean();
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -249,12 +229,9 @@ exports.getUsersWithFaculty = async (req, res) => {
 exports.getUsersWithYear = async (req, res) => {
     try {
         const cacheKey = `users_with_year`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({ year: { $exists: true, $ne: null } }).lean();
 
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -264,12 +241,9 @@ exports.getUsersWithYear = async (req, res) => {
 exports.getUsersWithInterests = async (req, res) => {
     try {
         const cacheKey = `users_with_interests`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({ interests: { $exists: true, $ne: [] } }).lean();
 
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -279,12 +253,9 @@ exports.getUsersWithInterests = async (req, res) => {
 exports.getUsersWithAbout = async (req, res) => {
     try {
         const cacheKey = `users_with_about`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let users = await User.find({ about: { $exists: true, $ne: '' } }).lean();
 
-        if (users) await setCachedData(cacheKey, users) && keysToClear.add(cacheKey);
         res.status(200).json(users);
     } catch (err) {
         handleError(res, err);
@@ -295,8 +266,6 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
     try {
         const cacheKey = 'top_10_quizzing_users';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         let topUsers = await Score.aggregate([
             { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
@@ -309,7 +278,6 @@ exports.getTop10QuizzingUsers = async (req, res) => {
             const usersMap = await getBatchedUsersMap(usersIDs);
             topUsers = topUsers.map(usr => usersMap?.get(usr?._id.toString()) || {});
         }
-        if (topUsers) await setCachedData(cacheKey, topUsers) && keysToClear.add(cacheKey);
         res.status(200).json(topUsers);
     } catch (err) {
         handleError(res, err);
@@ -320,8 +288,6 @@ exports.getTop10Quizzes = async (req, res) => {
 
     try {
         const cacheKey = 'top_10_quizzes';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Get top quizzes
         let topQuizzes = [];
@@ -338,7 +304,6 @@ exports.getTop10Quizzes = async (req, res) => {
             topQuizzes = topQuizzesData.map(qz => quizzesMap?.get(qz?._id.toString()) || {});
         }
 
-        if (topQuizzes) await setCachedData(cacheKey, topQuizzes) && keysToClear.add(cacheKey);
         res.status(200).json(topQuizzes);
     } catch (err) {
         handleError(res, err);
@@ -349,8 +314,6 @@ exports.getTop10Downloaders = async (req, res) => {
 
     try {
         const cacheKey = 'top_10_downloaders';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Get top downloaders aggregation
         let topDownloaders = await Download.aggregate([
@@ -374,7 +337,6 @@ exports.getTop10Downloaders = async (req, res) => {
                 };
             });
         }
-        if (topDownloaders) await setCachedData(cacheKey, topDownloaders) && keysToClear.add(cacheKey);
         res.status(200).json(topDownloaders);
     } catch (err) {
         handleError(res, err);
@@ -384,8 +346,6 @@ exports.getTop10Downloaders = async (req, res) => {
 exports.getTop10Notes = async (req, res) => {
     try {
         const cacheKey = 'top_10_notes';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Get top notes aggregation
         const topNotesData = await Download.aggregate([
@@ -412,7 +372,6 @@ exports.getTop10Notes = async (req, res) => {
                 };
             });
         }
-        if (topNotes) await setCachedData(cacheKey, topNotes) && keysToClear.add(cacheKey);
         res.status(200).json(topNotes);
     } catch (err) {
         handleError(res, err);
@@ -423,8 +382,6 @@ exports.getDailyUserRegistration = async (req, res) => {
 
     try {
         const cacheKey = 'daily_user_registration';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const usersStats = await User.aggregate([
             {
@@ -456,7 +413,6 @@ exports.getDailyUserRegistration = async (req, res) => {
         ]).exec();
 
         // Set cache
-        await setCachedData(cacheKey, usersStats) && keysToClear.add(cacheKey);
         res.status(200).json(usersStats);
     } catch (err) {
         handleError(res, err);
@@ -468,8 +424,6 @@ exports.getLiveAnalytics = async (req, res) => {
 
     try {
         const cacheKey = 'live_analytics';
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -489,8 +443,6 @@ exports.getLiveAnalytics = async (req, res) => {
             },
             timestamp: now.toISOString()
         };
-
-        await setCachedData(cacheKey, analytics);
 
         res.status(200).json(analytics);
     } catch (err) {

@@ -4,9 +4,13 @@ const User = require('../../users/models/User');
 const Score = require('../../scores/models/Score');
 const { handleError } = require('../../../utils/error');
 const { expandFeedbacks } = require('../helpers');
-const { redisCache, getCachedData, setCachedData } = require('../../../utils/global-helpers');
+const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
-const keysToClear = new Set();
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "cat:all",
+    ONE: (id) => `cat:${id}`,
+};
 exports.getFeedbacks = async (req, res) => {
 
     try {
@@ -19,8 +23,6 @@ exports.getFeedbacks = async (req, res) => {
         query.skip = PAGE_SIZE * (pageNo - 1);
 
         const cacheKey = `feedbacks_${query.limit}_${query.skip}`;
-        const cached = await getCachedData(cacheKey);
-        if (cached) return res.status(200).json(cached);
 
         // Get feedbacks
         let feedbacks = await Feedback.find({}, {}, query).sort({ createdAt: -1 }).lean();
@@ -29,7 +31,7 @@ exports.getFeedbacks = async (req, res) => {
         // Expand feedback details
         const expandedFeedbacks = await expandFeedbacks(feedbacks);
         const result = { feedbacks: expandedFeedbacks || feedbacks, totalPages: Math.ceil(totalPages / PAGE_SIZE) };
-        await setCachedData(cacheKey, result) && keysToClear.add(cacheKey);
+
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
@@ -64,7 +66,7 @@ exports.createFeedback = async (req, res) => {
         const newFeedback = new Feedback(req.body);
         const savedFeedback = await newFeedback.save();
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(201).json(savedFeedback);
     } catch (err) {
         handleError(res, err);
@@ -97,7 +99,7 @@ exports.deleteFeedback = async (req, res) => {
             throw { 'message': 'Something went wrong while deleting!', 'status': 503 };
         }
 
-        await redisCache.invalidateKeysCache(keysToClear);
+
         res.status(200).json(feedback);
     } catch (err) {
         handleError(res, err);
