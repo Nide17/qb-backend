@@ -6,8 +6,11 @@ const User = require('../../users/models/User');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "nt:all",
+    ONE: (id) => `nt:${id}`,
+    BY_CC: (id) => `nt:byCc:${id}`,
+    BY_COURSE: (id) => `nt:byCourse:${id}`,
+    BY_CHAPTER: (id) => `nt:byChapter:${id}`,
 };
 const expandNotes = async (notes) => {
 
@@ -29,10 +32,7 @@ const expandNotes = async (notes) => {
     return expandedNotes || notes;
 };
 
-const findNotes = async (query, limit = 0, key) => {
-
-    const cacheKey = `notes_${key}`
-
+const findNotes = async (query, limit = 0) => {
     let notes = await Notes.find(query).sort({ createdAt: -1 })
         .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
         .populate('course chapter courseCategory', 'title')
@@ -46,8 +46,11 @@ const findNotes = async (query, limit = 0, key) => {
 exports.getNotes = async (req, res) => {
 
     try {
-        const notes = await findNotes({}, 0, 'all');
-        res.status(200).json(notes);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            return await findNotes({}, 0);
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -57,8 +60,10 @@ exports.getLimitedNotes = async (req, res) => {
 
     try {
         const limit = parseInt(req.query.limit) || 5;
-        const notes = await findNotes({}, limit, `limit_${limit}`);
-        res.status(200).json(notes);
+        const data = await cacheWrapper(`limit_${limit}`, CACHE_TTL, async () => {
+            return await findNotes({}, limit);
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -66,17 +71,22 @@ exports.getLimitedNotes = async (req, res) => {
 
 exports.getNotesByCategory = async (req, res) => {
     try {
-        const notes = await findNotes({ courseCategory: req.params.id }, 0, `category_${req.params.id}`);
-        res.status(200).json(notes);
+        const cacheKey = CACHE_KEYS.BY_CC(req.params.id);
+        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            return await findNotes({ courseCategory: req.params.id }, 0);
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
 };
-
 exports.getNotesByChapter = async (req, res) => {
     try {
-        const notes = await findNotes({ chapter: req.params.id }, 0, `chapter_${req.params.id}`);
-        res.status(200).json(notes);
+        const cacheKey = CACHE_KEYS.BY_CHAPTER(req.params.id);
+        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            return await findNotes({ chapter: req.params.id }, 0);
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -85,13 +95,16 @@ exports.getNotesByChapter = async (req, res) => {
 exports.getOneNotes = async (req, res) => {
     try {
 
-        if (!req.params.id) throw { 'message': 'Notes ID is required!', 'status': 400 };
-        const query = req.params.id.match(/^[0-9a-fA-F]{24}$/) ? { _id: req.params.id } : { slug: req.params.id };
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            const query = req.params.id.match(/^[0-9a-fA-F]{24}$/) ? { _id: req.params.id } : { slug: req.params.id };
 
-        let notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title').lean();
-        if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
-        if (notes.uploaded_by) notes.uploaded_by = await User.findById(notes.uploaded_by).select('name');
-        res.status(200).json(notes);
+            let notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title').lean();
+            if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
+            if (notes.uploaded_by) notes.uploaded_by = await User.findById(notes.uploaded_by).select('name');
+            return notes;
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -129,7 +142,7 @@ exports.createNotes = async (req, res) => {
         const savedNotes = await newNotes.save();
         if (!savedNotes) throw { message: 'Could not save notes, try again!', status: 500 };
 
-
+        await cacheManager.invalidatePattern("nt:*");
         res.status(200).json(savedNotes);
 
     } catch (err) {
@@ -140,15 +153,14 @@ exports.createNotes = async (req, res) => {
 exports.updateNotes = async (req, res) => {
     try {
         const not_file = req.file;
-
         const notes = await Notes.findById(req.params.id);
-
         if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
 
         let updates = { ...req.body };
         if (not_file) updates.notes_file = not_file.location;
 
         const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, updates, { new: true });
+        await cacheManager.invalidatePattern("nt:*");
         res.status(200).json(updatedNotes);
     } catch (err) {
         handleError(res, err);
@@ -162,6 +174,7 @@ exports.updateNotesQuizzes = async (req, res) => {
             { $push: { 'quizzes': req.body.quizesState } },
             { new: true }
         );
+        await cacheManager.invalidatePattern("nt:*");
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);
@@ -177,7 +190,7 @@ exports.removeQuizFromNotes = async (req, res) => {
             { _id: note._id },
             { $pull: { quizes: req.body.quizID } }
         );
-
+        await cacheManager.invalidatePattern("nt:*");
         res.status(200).json({ message: 'Deleted!' });
     } catch (err) {
         handleError(res, err);
@@ -191,8 +204,7 @@ exports.deleteNotes = async (req, res) => {
 
         // Delete this notes entry
         await notes.deleteOne();
-
-
+        await cacheManager.invalidatePattern("nt:*");
         res.status(200).json(notes);
     } catch (err) {
         handleError(res, err);

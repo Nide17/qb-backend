@@ -66,7 +66,7 @@ const expandQuizzes = async (quizzes) => {
         return quizzes.map(q => {
             const quiz = quizzesMap.get(q._id.toString());
             return {
-                ...q._doc,
+                ...q,
                 category: quiz.category,
             };
         });
@@ -85,7 +85,7 @@ expandCategories = async (categories) => {
         return categories.map(c => {
             const courseCategory = coursesCategoriesMap.get(c.courseCategory.toString());
             return {
-                ...c._doc,
+                ...c,
                 courseCategory: courseCategory,
             };
         });
@@ -99,7 +99,7 @@ expandCategory = async (category) => {
         const courseCategory = await CourseCategory.findById(category.courseCategory).select('title');
         const created_by = await User.findById(category.created_by).select('name email');
         return {
-            ...category._doc,
+            ...category,
             courseCategory: courseCategory,
             created_by: created_by,
         };

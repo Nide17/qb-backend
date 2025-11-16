@@ -1,69 +1,102 @@
-const nodemailer = require('nodemailer');
-const handlebars = require('handlebars');
-const fs = require('fs');
-const path = require('path');
+const nodemailer = require("nodemailer");
+const handlebars = require("handlebars");
+const fs = require("fs/promises");
+const path = require("path");
 
+let cachedTransporter = null;
+let templateCache = {};
+
+// Create ONE reusable transporter
 const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    pool: true,
-    secure: true,
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    },
-    maxConnections: 20,
-    maxMessages: Infinity
-  });
+  if (!cachedTransporter) {
+    cachedTransporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      pool: true,
+      maxConnections: 20,
+      maxMessages: 1000,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+  return cachedTransporter;
 };
 
-const sendActualMail = async (transporter, mailOptions, retries) => {
+// Load and cache templates
+const loadTemplate = async (templatePath) => {
+  if (templateCache[templatePath]) return templateCache[templatePath];
+
+  const filePath = path.join(__dirname, templatePath);
+  const fileContent = await fs.readFile(filePath, "utf8");
+  const compiled = handlebars.compile(fileContent);
+
+  templateCache[templatePath] = compiled;
+  return compiled;
+};
+
+// Retry with exponential backoff
+const sendWithRetry = async (transporter, mailOptions, retries = 3) => {
   for (let i = 0; i < retries; i++) {
     try {
-      let info = await transporter.sendMail(mailOptions);
-      console.log('Email sent: ' + info.response);
+      const info = await transporter.sendMail(mailOptions);
+      console.log("📧 Email sent:", info.messageId);
       return info;
     } catch (error) {
-      console.error(`Attempt ${i + 1} failed: ${error.message}`);
-      if (i === retries - 1) {
-          return error.message;
-      }
+      console.error(`❌ Email attempt ${i + 1} failed:`, error.message);
+
+      if (i === retries - 1) throw error;
+
+      const delay = Math.pow(2, i) * 1000; // exponential
+      await new Promise((res) => setTimeout(res, delay));
     }
   }
 };
 
-const sendEmail = async (email, subject, payload, template, retries = 3) => {
+const sendEmail = async (email, subject, payload, templatePath, retries = 3) => {
   try {
     const transporter = createTransporter();
-    const source = fs.readFileSync(path.join(__dirname, template), 'utf8');
-    const compiledTemplate = handlebars.compile(source);
+    const compiledTemplate = await loadTemplate(templatePath);
+
+    const html = compiledTemplate(payload);
+
     const mailOptions = {
-      from: '"quizblog.rw(Quiz-Blog)" <quizblog.rw@gmail.com>',
+      from: `"QuizBlog Rwanda" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: subject,
-      html: compiledTemplate(payload),
+      subject,
+      html,
     };
-    return await sendActualMail(transporter, mailOptions, retries);
+
+    return await sendWithRetry(transporter, mailOptions, retries);
   } catch (error) {
-    return error.message;
+    console.error("❌ sendEmail error:", error.message);
+    return { success: false, error: error.message };
   }
 };
 
 const sendHtmlEmail = async (email, subject, html, retries = 3) => {
   try {
     const transporter = createTransporter();
+
     const mailOptions = {
-      from: '"quizblog.rw(Quiz-Blog)" <quizblog.rw@gmail.com>',
+      from: `"QuizBlog Rwanda" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: subject,
-      html: html,
+      subject,
+      html,
     };
-    return await sendActualMail(transporter, mailOptions, retries);
+
+    return await sendWithRetry(transporter, mailOptions, retries);
   } catch (error) {
-    return error.message;
+    console.error("❌ sendHtmlEmail error:", error.message);
+    return { success: false, error: error.message };
   }
 };
 
-module.exports = { sendEmail, sendHtmlEmail };
+module.exports = {
+  sendEmail,
+  sendHtmlEmail,
+  sendWithRetry,
+  createTransporter,
+};

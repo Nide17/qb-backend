@@ -50,7 +50,7 @@ const notifyAdmins = async (newContact) => {
         if (!adminEmails) return;
 
         const emailPromises = adminEmails.map((email) =>
-            sendEmail(email, 'New Contact Notification', { contact: newContact }, './template/contact-notification.handlebars')
+            sendEmail(email, 'New Contact Notification', { contact: newContact }, './template/contact.handlebars')
         );
         await Promise.all(emailPromises);
     } catch (err) {
