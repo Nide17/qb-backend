@@ -82,7 +82,6 @@ exports.updateLevel = async (req, res) => {
     try {
         const level = await Level.findById(req.params.id);
         if (!level) throw { 'status': 404, 'message': 'Level not found!' };
-
         const updatedLevel = await Level.findByIdAndUpdate(req.params.id, req.body, { new: true });
         await cacheManager.invalidatePattern("lvl:*");
         res.status(200).json(updatedLevel);
