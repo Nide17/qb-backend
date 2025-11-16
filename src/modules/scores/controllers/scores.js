@@ -8,8 +8,15 @@ const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "sc:all",
+    ONE: (id) => `sc:${id}`,
+    PAGINATED: (pageNo) => `sc:page:${pageNo}`,
+    LIMITED: (limit, skip) => `sc:limited:${limit}:${skip}`,
+    BY_TAKER: (taker) => `sc:taker:${taker}`,
+    BY_CREATOR: (creator) => `sc:creator:${creator}`,
+    QUIZ_RANKING: (quiz) => `sc:quiz:${quiz}`,
+    POPULAR_QUIZZES: "sc:popular",
+    MONTHLY_USER: "sc:monthly_user",
 };
 exports.getScores = async (req, res) => {
 
@@ -26,18 +33,46 @@ exports.getScores = async (req, res) => {
 
         if (req.query?.filter === 'stats') return res.status(200).json(totalScores);
 
-        const cacheKey = `scores_${query.limit}_${query.skip}`;
+        if (pageNo && pageNo > 0) {
+            const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
 
-        // Always use pagination to prevent memory exhaustion
-        let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
-        if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores found' };
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+                let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
+                if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores found' };
 
-        // Expand scores
-        const expandedScores = await expandScores(scores) || scores;
-        const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
+                // Expand scores
+                const expandedScores = await expandScores(scores) || scores;
+                const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
+                return result;
+            });
+            return res.status(200).json(data);
+        }
+        else if (req.query?.limit && req.query?.skip) {
+            const cacheKey = CACHE_KEYS.LIMITED(req.query.limit, req.query.skip);
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+                let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
+                if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores found' };
 
+                // Expand scores
+                const expandedScores = await expandScores(scores) || scores;
+                const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
+                return result;
+            });
+            return res.status(200).json(data);
+        }
+        else {
+            const cacheKey = CACHE_KEYS.ALL;
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+                let scores = await Score.find({}, {}, query).sort({ test_date: -1 }).lean();
+                if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores found' };
 
-        res.status(200).json(result);
+                // Expand scores
+                const expandedScores = await expandScores(scores) || scores;
+                const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
+                return result;
+            });
+            return res.status(200).json(data);
+        }
     } catch (err) {
         handleError(res, err);
     }
@@ -46,17 +81,16 @@ exports.getScores = async (req, res) => {
 exports.getScoresByTaker = async (req, res) => {
 
     try {
-        if (!req.params?.id) throw { 'status': 400, 'message': 'User ID is required' };
+        const cacheKey = CACHE_KEYS.BY_TAKER(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).lean();
+            if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
 
-        const cacheKey = `scores_user_${req.params.id}`;
-
-        let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).lean();
-        if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
-
-        // Expand scores
-        const result = await expandScores(scores) || scores;
-
-        res.status(200).json(result);
+            // Expand scores
+            const result = await expandScores(scores) || scores;
+            return result;
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -64,25 +98,23 @@ exports.getScoresByTaker = async (req, res) => {
 
 exports.getScoresForQuizCreator = async (req, res) => {
     try {
-        if (!req.params?.id) throw { 'status': 400, 'message': 'User ID is required' };
-
         // Add pagination to prevent memory exhaustion
         const PAGE_SIZE = 50; // Larger page size for creators but still limited
         const pageNo = parseInt(req.query.pageNo || '1');
         const skip = PAGE_SIZE * (pageNo - 1);
 
-        const cacheKey = `scores_quiz_${req.params.id}`;
+        const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const totalScores = await Score.countDocuments({});
+            let scores = await Score.find().skip(skip).limit(PAGE_SIZE).sort({ test_date: -1 }).lean();
+            if (!scores || scores.length === 0) throw { status: 404, message: '404' };
 
-        const totalScores = await Score.countDocuments({});
-        let scores = await Score.find().skip(skip).limit(PAGE_SIZE).sort({ test_date: -1 }).lean();
-        if (!scores || scores.length === 0) throw { status: 404, message: '404' };
-
-        // Expand scores
-        const expandedScores = await expandScores(scores) || scores;
-        const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
-
-
-        res.status(200).json(result);
+            // Expand scores
+            const expandedScores = await expandScores(scores) || scores;
+            const result = { scores: expandedScores || scores, totalPages: Math.ceil(totalScores / PAGE_SIZE), currentPage: pageNo, pageSize: PAGE_SIZE, totalScores };
+            return result;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -91,20 +123,24 @@ exports.getScoresForQuizCreator = async (req, res) => {
 exports.getOneScore = async (req, res) => {
 
     try {
-        let score = await Score.findOne({ id: req.params?.id }).lean();
-        if (!score) score = await Score.findById(req.params?.id).lean();
-        if (!score) throw { status: 404, message: 'Score not found!' };
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            let score = await Score.findOne({ id: req.params?.id }).lean();
+            if (!score) score = await Score.findById(req.params?.id).lean();
+            if (!score) throw { status: 404, message: 'Score not found!' };
 
-        if (score.taken_by) {
-            const user = await User.findById(score.taken_by).select('name image').lean();
-            score.taken_by = user || score.taken_by;
-        }
-        if (score.quiz) {
-            const quiz = await Quiz.findById(score.quiz).select('title category').populate('category', 'title').lean();
-            score.quiz = quiz || score.quiz;
-            score.category = quiz?.category || score.category;
-        }
-        res.status(200).json(score);
+            if (score.taken_by) {
+                const user = await User.findById(score.taken_by).select('name image').lean();
+                score.taken_by = user || score.taken_by;
+            }
+            if (score.quiz) {
+                const quiz = await Quiz.findById(score.quiz).select('title category').populate('category', 'title').lean();
+                score.quiz = quiz || score.quiz;
+                score.category = quiz?.category || score.category;
+            }
+            return score;
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -112,17 +148,16 @@ exports.getOneScore = async (req, res) => {
 
 exports.getQuizRanking = async (req, res) => {
     try {
-        if (!req.params?.id) throw { 'status': 400, 'message': 'Quiz ID is required' };
+        const cacheKey = CACHE_KEYS.QUIZ_RANKING(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).lean();
+            if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores to display' };
 
-        const cacheKey = `ranking_${req.params.id}`;
-
-        let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).lean();
-        if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores to display' };
-
-        // Expand scores
-        const result = await expandScores(scores) || scores;
-
-        res.status(200).json(result);
+            // Expand scores
+            const result = await expandScores(scores) || scores;
+            return result;
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -131,29 +166,31 @@ exports.getQuizRanking = async (req, res) => {
 exports.getPopularQuizzes = async (req, res) => {
 
     try {
-        const cacheKey = 'popular_quizzes';
+        const cacheKey = CACHE_KEYS.POPULAR_QUIZZES;
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const startOfDay = new Date();
+            startOfDay.setHours(0, 0, 0, 0);
 
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date();
+            endOfDay.setHours(23, 59, 59, 999);
 
-        const endOfDay = new Date();
-        endOfDay.setHours(23, 59, 59, 999);
+            let popularQuizzes = null;
 
-        let popularQuizzes = null;
+            const topQuizzes = await Score.aggregate([
+                { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
+                { $group: { _id: '$quiz', count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 3 }
+            ]).exec();
 
-        const topQuizzes = await Score.aggregate([
-            { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
-            { $group: { _id: '$quiz', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 3 }
-        ]).exec();
-
-        if (topQuizzes.length > 0) {
-            const quizzesIDs = topQuizzes.map(q => q._id);
-            const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-            popularQuizzes = topQuizzes.map(tq => quizzesMap.get(tq._id.toString()) || {});
-        }
-        res.status(200).json(popularQuizzes);
+            if (topQuizzes.length > 0) {
+                const quizzesIDs = topQuizzes.map(q => q._id);
+                const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+                popularQuizzes = topQuizzes.map(tq => quizzesMap.get(tq._id.toString()) || {});
+            }
+            return popularQuizzes;
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -162,32 +199,35 @@ exports.getPopularQuizzes = async (req, res) => {
 exports.getMonthlyUser = async (req, res) => {
 
     try {
-        const cacheKey = 'monthly_user';
+        const cacheKey = CACHE_KEYS.MONTHLY_USER;
 
-        let monthlyUserData = null;
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            let monthlyUserData = null;
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
 
-        const endOfMonth = new Date();
-        endOfMonth.setHours(23, 59, 59, 999);
+            const endOfMonth = new Date();
+            endOfMonth.setHours(23, 59, 59, 999);
 
-        const monthlyUser = await Score.aggregate([
-            { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
-            { $group: { _id: '$taken_by', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 1 }
-        ]).exec();
+            const monthlyUser = await Score.aggregate([
+                { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
+                { $group: { _id: '$taken_by', count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 1 }
+            ]).exec();
 
-        if (monthlyUser.length > 0) {
-            const user = await User.findById(monthlyUser[0]._id).select('name image');
-            monthlyUserData = user && {
-                uName: user.name,
-                uPhoto: user.image,
-                count: monthlyUser[0].count
-            };
-        }
-        res.status(200).json(monthlyUserData);
+            if (monthlyUser.length > 0) {
+                const user = await User.findById(monthlyUser[0]._id).select('name image');
+                monthlyUserData = user && {
+                    uName: user.name,
+                    uPhoto: user.image,
+                    count: monthlyUser[0].count
+                };
+            }
+            return monthlyUserData;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -252,8 +292,9 @@ exports.createScore = async (req, res) => {
                     data: { quiz, marks, out_of, taken_by }
                 });
             }
-            res.status(200).json(savedScore);
 
+            await cacheManager.invalidatePattern("sc:*");
+            res.status(200).json(savedScore);
         }
     } catch (err) {
         handleError(res, err);
@@ -270,8 +311,7 @@ exports.deleteScore = async (req, res) => {
         const removedScore = await Score.deleteOne({ _id: req.params.id });
         if (removedScore.deletedCount === 0) throw { 'status': 500, 'message': 'Something went wrong while deleting!' };
 
-        // Clear relevant cache entries
-
+        await cacheManager.invalidatePattern("sc:*");
         res.status(200).json(score);
     } catch (err) {
         handleError(res, err);
