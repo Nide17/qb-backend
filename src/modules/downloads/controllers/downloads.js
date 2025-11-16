@@ -32,7 +32,6 @@ exports.getDownloads = async (req, res) => {
 
         // Always use pagination to prevent memory exhaustion
         if (pageNo && pageNo > 0) {
-            const PAGE_SIZE = 20;
             const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
 
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
