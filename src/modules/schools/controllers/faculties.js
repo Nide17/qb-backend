@@ -1,12 +1,22 @@
 const Faculty = require('../models/Faculty');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields } = require('../helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
+
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "fct:all",
+    ONE: (id) => `fct:${id}`,
+    BY_LEVEL: (id) => `fct:lvl:${id}`
+};
 
 exports.getFaculties = async (req, res) => {
 
     try {
-        const faculties = await Faculty.find().sort({ createdAt: -1 }).populate('school level', 'title');
-        res.status(200).json(faculties);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await Faculty.find().sort({ createdAt: -1 }).populate('school level', 'title');
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -15,8 +25,11 @@ exports.getFaculties = async (req, res) => {
 
 exports.getFacultiesByLevel = async (req, res) => {
     try {
-        const faculties = await Faculty.find({ level: req.params.id }).sort({ createdAt: -1 }).populate('school level', 'title');
-        res.status(200).json(faculties);
+        const cacheKey = CACHE_KEYS.BY_LEVEL;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await Faculty.find({ level: req.params.id }).sort({ createdAt: -1 }).populate('school level', 'title');
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -24,10 +37,11 @@ exports.getFacultiesByLevel = async (req, res) => {
 
 exports.getOneFaculty = async (req, res) => {
     try {
-        const faculty = await Faculty.findById(req.params.id).populate('school level', 'title school level');
-
-        if (!faculty) throw { 'status': 404, 'message': 'Faculty not found!' };
-        res.status(200).json(faculty);
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await Faculty.findById(req.params.id).populate('school level', 'title school level');
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -53,7 +67,7 @@ exports.createFaculty = async (req, res) => {
 
         const savedFaculty = await newFaculty.save();
         if (!savedFaculty) throw { 'status': 503, 'message': 'Something went wrong during creation!' };
-
+        await cacheManager.invalidatePattern("fct:*");
         res.status(200).json({
             _id: savedFaculty._id,
             title: savedFaculty.title,
@@ -73,6 +87,7 @@ exports.updateFaculty = async (req, res) => {
         if (!faculty) throw { 'status': 404, 'message': 'Faculty not found!' };
 
         const updatedFaculty = await Faculty.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        await cacheManager.invalidatePattern("fct:*");
         res.status(200).json(updatedFaculty);
     } catch (err) {
         handleError(res, err);
@@ -86,7 +101,7 @@ exports.deleteFaculty = async (req, res) => {
 
         const removedFaculty = await faculty.deleteOne();
         if (removedFaculty.deletedCount === 0) throw { 'status': 503, 'message': 'Something went wrong while deleting!' };
-
+        await cacheManager.invalidatePattern("fct:*");
         res.status(200).json(faculty);
     } catch (err) {
         handleError(res, err);

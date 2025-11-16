@@ -2,12 +2,21 @@ const School = require('../models/School');
 const Level = require('../models/Level');
 const Faculty = require('../models/Faculty');
 const { handleError } = require('../../../utils/error');
-const { validateRequiredFields } = require('../helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
+
+const CACHE_TTL = 600; // 10 minutes
+const CACHE_KEYS = {
+    ALL: "skl:all",
+    ONE: (id) => `skl:${id}`,
+};
 
 exports.getSchools = async (req, res) => {
     try {
-        const schools = await School.find().sort({ createdAt: -1 });
-        res.status(200).json(schools);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await School.find().sort({ createdAt: -1 });
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -15,9 +24,11 @@ exports.getSchools = async (req, res) => {
 
 exports.getOneSchool = async (req, res) => {
     try {
-        let school = await School.findById(req.params.id).select('_id title');
-        if (!school) throw { 'status': 404, 'message': 'School not found!' };
-        res.status(200).json(school);
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await School.findById(req.params.id).select('_id title');
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -25,10 +36,7 @@ exports.getOneSchool = async (req, res) => {
 
 exports.createSchool = async (req, res) => {
     try {
-
         const { title, location, website } = req.body;
-
-        // Validation
         validateRequiredFields([{ name: 'title', value: title }]);
 
         // Check if school with same title exists
@@ -38,7 +46,7 @@ exports.createSchool = async (req, res) => {
         const newSchool = new School({ title, location, website });
         const savedSchool = await newSchool.save();
         if (!savedSchool) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
-
+        await cacheManager.invalidatePattern("skl:*");
         res.status(200).json({
             _id: savedSchool._id,
             title: savedSchool.title,
@@ -54,6 +62,7 @@ exports.createSchool = async (req, res) => {
 exports.updateSchool = async (req, res) => {
     try {
         const updatedSchool = await School.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        await cacheManager.invalidatePattern("skl:*");
         res.status(200).json(updatedSchool);
     } catch (err) {
         handleError(res, err);
@@ -72,7 +81,7 @@ exports.deleteSchool = async (req, res) => {
         // Delete this school
         const removedSchool = await school.deleteOne();
         if (removedSchool.deletedCount === 0) throw { 'status': 503, 'message': 'Something went wrong while deleting!' };
-
+        await cacheManager.invalidatePattern("skl:*");
         res.status(200).json(school);
     } catch (err) {
         handleError(res, err);
