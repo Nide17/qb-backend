@@ -1,72 +1,121 @@
 const Redis = require("ioredis");
+const { createTransporter, sendWithRetry } = require("./emails/sendEmail");
 
 class RedisCacheManager {
     constructor(options = {}) {
         this.redis = null;
         this.isConnected = false;
+
         this.redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-        this.defaultTTL = options.defaultTTL || 600; // seconds
-        this.retryDelay = options.retryDelay || 30000;
-        this.maxRetries = options.maxRetries || 1;
+        this.defaultTTL = options.defaultTTL || 600;
+
+        this.lastEmailSentAt = 0;
+        this.emailCooldownMs = 5 * 60 * 1000; // 5 minutes
+    }
+
+    // -------------------------------------
+    // EMAIL ALERT WRAPPER
+    // -------------------------------------
+    async sendAlert(subject, message) {
+
+        if (process.env.NODE_ENV !== 'production') return;
+        const now = Date.now();
+
+        // prevent spamming
+        if (now - this.lastEmailSentAt < this.emailCooldownMs) {
+            console.log("⏳ Email alert suppressed (cooldown)");
+            return;
+        }
+
+        const transporter = createTransporter();
+        const mailOptions = {
+            from: `"QuizBlog Rwanda" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
+            subject,
+            text: message
+        };
+
+        this.lastEmailSentAt = now;
+        try {
+            await sendWithRetry(transporter, mailOptions);
+        } catch (err) {
+            console.error("❌ Failed to send Redis alert email:", err.message);
+        }
     }
 
     isReady() {
         return this.redis && this.isConnected && this.redis.status === "ready";
     }
 
+    // -------------------------------------
+    // CONNECT
+    // -------------------------------------
     async connect() {
         if (this.isReady()) return true;
 
         try {
-            // keep your simple URL usage, but add a few resilience options
-            this.redis = new Redis(process.env.REDIS_URL, {
-                // allow ioredis to retry on transient errors (small exponential backoff)
+            this.redis = new Redis(this.redisUrl, {
                 retryStrategy(times) {
-                    return Math.min(times * 200, 2000); // ms
+                    return Math.min(times * 200, 2000);
                 },
-                // don't fail a request immediately if reconnecting
                 maxRetriesPerRequest: null,
                 enableReadyCheck: true
             });
 
-            // prefer 'ready' for when the client is actually usable
-            this.redis.once('ready', () => {
-                console.log('✅ Redis ready');
+            this.redis.once("ready", () => {
+                console.log("✅ Redis ready");
                 this.isConnected = true;
             });
 
-            this.redis.on('connect', () => {
-                console.log('🔗 Redis socket connected (TCP)');
+            this.redis.on("connect", () => {
+                console.log("🔗 Redis socket connected");
             });
 
-            this.redis.on('error', (err) => {
-                console.error('❌ Redis error:', err && err.message ? err.message : err);
+            this.redis.on("error", async (err) => {
+                console.error("❌ Redis error:", err.message);
                 this.isConnected = false;
+
+                await this.sendAlert(
+                    "Redis Error",
+                    `Redis error occurred: ${err.message}`
+                );
             });
 
-            this.redis.on('end', () => {
-                console.warn('⚠️ Redis connection closed');
+            this.redis.on("end", async () => {
+                console.warn("⚠️ Redis connection closed");
                 this.isConnected = false;
+
+                await this.sendAlert(
+                    "Redis Connection Closed",
+                    "Redis connection ended unexpectedly."
+                );
             });
 
-            // explicit connect call is fine — ioredis will attempt to use the URL (including rediss://)
             await this.redis.connect();
-
             return true;
+
         } catch (err) {
+            console.error("Redis connect failed:", err.message);
             this.isConnected = false;
-            console.error('Redis connect failed:', err && err.message ? err.message : err);
+
+            await this.sendAlert(
+                "Redis Failed to Connect",
+                `Could not connect to Redis: ${err.message}`
+            );
+
             return false;
         }
     }
 
+    // -------------------------------------
+    // DISCONNECT
+    // -------------------------------------
     async disconnect() {
         if (!this.redis) return;
-
         try {
             if (this.isReady()) {
                 await this.redis.quit();
-                console.log("✅ Redis disconnected gracefully");
+                console.log("✅ Redis disconnected");
             } else {
                 this.redis.disconnect();
             }
@@ -79,76 +128,81 @@ class RedisCacheManager {
     }
 
     // -------------------------------------
-    // Basic cache operations
+    // CACHE OPERATIONS WITH ALERT FALLBACK
     // -------------------------------------
-
     async get(key) {
-        if (!this.isReady()) return null;
-
+        if (!this.isReady()) {
+            await this.sendAlert("Redis Not Ready", "GET operation failed");
+            return null;
+        }
         try {
             const raw = await this.redis.get(key);
             return raw ? JSON.parse(raw) : null;
         } catch (err) {
-            console.error("Redis get error:", err.message);
+            console.error("Redis GET error:", err.message);
             return null;
         }
     }
 
     async set(key, value, ttl = this.defaultTTL) {
-        if (!this.isReady()) return false;
-
+        if (!this.isReady()) {
+            await this.sendAlert("Redis Not Ready", "SET operation failed");
+            return false;
+        }
         try {
             const json = JSON.stringify(value);
-            if (ttl > 0) {
-                await this.redis.setex(key, ttl, json);
-            } else {
-                await this.redis.set(key, json);
-            }
+            if (ttl > 0) await this.redis.setex(key, ttl, json);
+            else await this.redis.set(key, json);
             return true;
         } catch (err) {
-            console.error("Redis set error:", err.message);
+            console.error("Redis SET error:", err.message);
             return false;
         }
     }
 
     async del(key) {
-        if (!this.isReady()) return false;
-
+        if (!this.isReady()) {
+            await this.sendAlert("Redis Not Ready", "DEL operation failed");
+            return false;
+        }
         try {
             await this.redis.del(key);
             return true;
         } catch (err) {
-            console.error("Redis del error:", err.message);
+            console.error("Redis DEL error:", err.message);
             return false;
         }
     }
 
     async exists(key) {
-        if (!this.isReady()) return false;
-
+        if (!this.isReady()) {
+            await this.sendAlert("Redis Not Ready", "EXISTS operation failed");
+            return false;
+        }
         try {
             return (await this.redis.exists(key)) === 1;
         } catch (err) {
-            console.error("Redis exists error:", err.message);
+            console.error("Redis EXISTS error:", err.message);
             return false;
         }
     }
 
     async expire(key, ttl) {
-        if (!this.isReady()) return false;
-
+        if (!this.isReady()) {
+            await this.sendAlert("Redis Not Ready", "EXPIRE operation failed");
+            return false;
+        }
         try {
             await this.redis.expire(key, ttl);
             return true;
         } catch (err) {
-            console.error("Redis expire error:", err.message);
+            console.error("Redis EXPIRE error:", err.message);
             return false;
         }
     }
 
     async ttl(key) {
         if (!this.isReady()) return -1;
-
         try {
             return await this.redis.ttl(key);
         } catch (err) {
@@ -156,10 +210,6 @@ class RedisCacheManager {
             return -1;
         }
     }
-
-    // -------------------------------------
-    // Keys — using SCAN instead of KEYS
-    // -------------------------------------
 
     async scan(pattern = "*", count = 500) {
         if (!this.isReady()) return [];
@@ -169,26 +219,31 @@ class RedisCacheManager {
 
         try {
             do {
-                const [nextCursor, batch] = await this.redis.scan(cursor, "MATCH", pattern, "COUNT", count);
+                const [nextCursor, batch] = await this.redis.scan(
+                    cursor,
+                    "MATCH",
+                    pattern,
+                    "COUNT",
+                    count
+                );
                 cursor = nextCursor;
                 keys.push(...batch);
             } while (cursor !== "0");
 
             return keys;
         } catch (err) {
-            console.error("Redis scan error:", err.message);
+            console.error("Redis SCAN error:", err.message);
             return [];
         }
     }
 
     async flush() {
         if (!this.isReady()) return false;
-
         try {
             await this.redis.flushdb();
             return true;
         } catch (err) {
-            console.error("Redis flush error:", err.message);
+            console.error("Redis FLUSH error:", err.message);
             return false;
         }
     }
@@ -203,32 +258,22 @@ class RedisCacheManager {
 
             const parsedInfo = info
                 .split("\n")
-                .filter((line) => line.includes(":"))
+                .filter((l) => l.includes(":"))
                 .reduce((acc, line) => {
                     const [k, v] = line.split(":");
                     acc[k.trim()] = v.trim();
                     return acc;
                 }, {});
 
-            return {
-                connected: this.isConnected,
-                keyCount,
-                keys,
-                info: parsedInfo,
-            };
+            return { connected: this.isConnected, keyCount, keys, info: parsedInfo };
         } catch (err) {
             console.error("Redis stats error:", err.message);
             return null;
         }
     }
 
-    // -------------------------------------
-    // Cache invalidation
-    // -------------------------------------
-
     async invalidatePattern(pattern) {
         if (!this.isReady()) return false;
-
         try {
             const keys = await this.scan(pattern);
             if (keys.length > 0) {

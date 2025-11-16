@@ -7,8 +7,9 @@ const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../..
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "cpt:all",
+    ONE: (id) => `cpt:${id}`,
+    BY_COURSE: (id) => `cpt:by_course:${id}`
 };
 const findChapters = async (query, limit = 0) => {
 
@@ -42,10 +43,12 @@ const findChapters = async (query, limit = 0) => {
 
 exports.getChapters = async (req, res) => {
     try {
-        const cacheKey = 'chapters';
-        const chapters = await findChapters({}, 0);
-
-        res.status(200).json(chapters);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            const chapters = await findChapters({}, 0);
+            return chapters;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -54,11 +57,12 @@ exports.getChapters = async (req, res) => {
 exports.getChaptersByCourse = async (req, res) => {
 
     try {
-        const cacheKey = `course_chapters_${req.params.id}`;
-
-        const notes = await findChapters({ course: req.params.id }, 0);
-
-        res.status(200).json(notes);
+        const cacheKey = CACHE_KEYS.BY_COURSE(req.params.id);
+        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            const notes = await findChapters({ course: req.params.id }, 0);
+            return notes;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -66,13 +70,17 @@ exports.getChaptersByCourse = async (req, res) => {
 
 exports.getOneChapter = async (req, res) => {
     try {
-        let chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by').lean();
-        if (!chapter) throw { 'message': 'Chapter not found!', 'status': 404 };
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            const chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by').lean();
+            if (!chapter) throw { 'message': 'Chapter not found!', 'status': 404 };
 
-        if (chapter.created_by) {
-            chapter.created_by = await User.findById(chapter.created_by).select('name email');
-        }
-        res.status(200).json(chapter);
+            if (chapter.created_by) {
+                chapter.created_by = await User.findById(chapter.created_by).select('name email');
+            }
+            return chapter;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -107,6 +115,7 @@ exports.createChapter = async (req, res) => {
         const savedChapter = await newChapter.save();
         if (!savedChapter) throw { 'message': 'Something went wrong during creation!', 'status': 503 };
 
+        await cacheManager.invalidatePattern("cpt:*");
         res.status(200).json(savedChapter);
     } catch (err) {
         handleError(res, err);
@@ -116,6 +125,9 @@ exports.createChapter = async (req, res) => {
 exports.updateChapter = async (req, res) => {
     try {
         const updatedChapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!updatedChapter) throw { 'message': 'Chapter not found!', 'status': 404 };
+
+        await cacheManager.invalidatePattern("cpt:*");
         res.status(200).json(updatedChapter);
     } catch (err) {
         handleError(res, err);
@@ -132,6 +144,8 @@ exports.deleteChapter = async (req, res) => {
 
         // Delete this chapter
         await Chapter.deleteOne({ _id: req.params.id });
+
+        await cacheManager.invalidatePattern("cpt:*");
         res.status(200).json(chapter);
     } catch (err) {
         handleError(res, err);

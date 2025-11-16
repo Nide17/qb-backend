@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -5,7 +6,6 @@ const process = require('process');
 const { cacheManager } = require('./utils/global-helpers');
 const { handleError } = require('./utils/error');
 const socketManager = require('./utils/enhanced-socket');
-require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
