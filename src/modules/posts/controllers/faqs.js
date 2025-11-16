@@ -4,8 +4,9 @@ const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../..
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "fq:all",
+    ONE: (id) => `fq:${id}`,
+    BY_CREATOR: (id) => `fq:creator:${id}`,
 };
 const handleFindByIdAndUpdate = async (id, update) => {
     try {
@@ -21,11 +22,11 @@ const handleFindByIdAndUpdate = async (id, update) => {
 
 exports.getFaqs = async (req, res) => {
     try {
-        const cacheKey = `all_faqs`;
-        let faqs = await Faq.find().sort({ createdAt: -1 });
-        if (!faqs) throw { 'status': 404, message: 'No faqs found!' };
-        // Set cache
-        res.status(200).json(faqs);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await Faq.find().sort({ createdAt: -1 });
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -33,10 +34,11 @@ exports.getFaqs = async (req, res) => {
 
 exports.getOneFaq = async (req, res) => {
     try {
-        const faq = await Faq.findById(req.params.id);
-
-        if (!faq) throw { status: 404, message: 'Faq not found!' };
-        res.status(200).json(faq);
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await Faq.findById(req.params.id);
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -44,9 +46,11 @@ exports.getOneFaq = async (req, res) => {
 
 exports.getCreatedBy = async (req, res) => {
     try {
-        const faqs = await Faq.find({ created_by: req.params.id }).sort({ createdAt: -1 });
-        if (!faqs) throw { status: 404, message: 'No faqs found!' };
-        res.status(200).json(faqs);
+        const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await Faq.find({ created_by: req.params.id }).sort({ createdAt: -1 });
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -66,8 +70,7 @@ exports.createFaq = async (req, res) => {
         const newFaq = new Faq({ title, answer, created_by });
         const savedFaq = await newFaq.save();
         if (!savedFaq) throw { status: 503, message: 'Something went wrong during creation!' };
-
-
+        await cacheManager.invalidatePattern("fq:*");
         res.status(200).json(savedFaq);
     } catch (err) {
         handleError(res, err);
@@ -77,6 +80,7 @@ exports.createFaq = async (req, res) => {
 exports.addFaqVidLink = async (req, res) => {
     try {
         const updated = await handleFindByIdAndUpdate(req.params.id, { $push: { video_links: req.body } });
+        await cacheManager.invalidatePattern("fq:*");
         res.status(200).json(updated);
     } catch (err) {
         handleError(res, err);
@@ -86,6 +90,7 @@ exports.addFaqVidLink = async (req, res) => {
 exports.updateFaq = async (req, res) => {
     try {
         const updated = await handleFindByIdAndUpdate(req.params.id, req.body);
+        await cacheManager.invalidatePattern("fq:*");
         res.status(200).json(updated);
     } catch (err) {
         handleError(res, err);
@@ -96,10 +101,9 @@ exports.deleteFaq = async (req, res) => {
     try {
         const faq = await Faq.findById(req.params.id);
         if (!faq) throw { status: 404, message: 'Faq not found!' };
-
         const removedFaq = await faq.deleteOne();
         if (removedFaq.deletedCount === 0) throw { status: 503, message: 'Something went wrong while deleting!' };
-
+        await cacheManager.invalidatePattern("fq:*");
         res.status(200).json(faq);
     } catch (err) {
         handleError(res, err);
@@ -109,6 +113,7 @@ exports.deleteFaq = async (req, res) => {
 exports.deleteFaqVideo = async (req, res) => {
     try {
         const updated = await handleFindByIdAndUpdate(req.params.id, { $pull: { video_links: req.body } });
+        await cacheManager.invalidatePattern("fq:*");
         res.status(200).json(updated);
     } catch (err) {
         handleError(res, err);

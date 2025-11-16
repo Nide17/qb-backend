@@ -6,31 +6,33 @@ const { handleError } = require('../../../../utils/error');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "img:all",
+    ONE: (id) => `img:${id}`,
+    BY_OWNER: (id) => `img:own:${id}`
 };
 exports.getImageUploads = async (req, res) => {
     try {
-        const cacheKey = `all_image_uploads`;
-        let imageUploads = await ImageUpload.find().sort({ createdAt: -1 }).lean();
-        if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            let imageUploads = await ImageUpload.find().sort({ createdAt: -1 }).lean();
+            if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
-        // Extract unique IDs
-        const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
+            // Extract unique IDs
+            const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
 
-        // Get users details as a Map
-        const usersMap = await getBatchedUsersMap(usersIDs);
+            // Get users details as a Map
+            const usersMap = await getBatchedUsersMap(usersIDs);
 
-        // Map imageUploads to expanded objects
-        const expandedImageUploads = imageUploads.map(img => {
-            const owner = usersMap.get(img.owner?.toString()) || img.owner;
-            return { ...img, owner };
+            // Map imageUploads to expanded objects
+            const expandedImageUploads = imageUploads.map(img => {
+                const owner = usersMap.get(img.owner?.toString()) || img.owner;
+                return { ...img, owner };
+            });
+
+            const result = expandedImageUploads || imageUploads;
+            return result;
         });
-
-        const result = expandedImageUploads || imageUploads;
-
-        // Set cache
-        res.status(200).json(result);
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -38,13 +40,18 @@ exports.getImageUploads = async (req, res) => {
 
 exports.getOneImageUpload = async (req, res) => {
     try {
-        let imageUpload = await ImageUpload.findById(req.params.id).lean();
-        if (!imageUpload) throw { status: 404, message: 'Image upload not found!' };
+        const cacheKey = CACHE_KEYS.ONE(req.params.id)
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            let imageUpload = await ImageUpload.findById(req.params.id).lean();
+            if (!imageUpload) throw { status: 404, message: 'Image upload not found!' };
 
-        if (imageUpload.owner) {
-            imageUpload.owner = await User.findById(imageUpload.owner).select('-password -__v -createdAt -updatedAt');
-        }
-        res.status(200).json(imageUpload);
+            if (imageUpload.owner) {
+                imageUpload.owner = await User.findById(imageUpload.owner).select('-password -__v -createdAt -updatedAt');
+            }
+
+            return imageUpload;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -52,26 +59,27 @@ exports.getOneImageUpload = async (req, res) => {
 
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
-        const cacheKey = `image_uploads_by_${req.params.id}`;
+        const cacheKey = CACHE_KEYS.BY_OWNER(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
 
-        let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 }).lean();
-        if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
+            let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 }).lean();
+            if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
-        // Extract unique IDs
-        const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
+            // Extract unique IDs
+            const usersIDs = [...new Set(imageUploads.map(i => i.owner?.toString()))];
 
-        // Get users details as a Map
-        const usersMap = await getBatchedUsersMap(usersIDs);
+            // Get users details as a Map
+            const usersMap = await getBatchedUsersMap(usersIDs);
 
-        // Map imageUploads to expanded objects
-        const expandedImageUploads = imageUploads.map(img => {
-            const owner = usersMap.get(img.owner?.toString()) || img.owner;
-            return { ...img, owner };
+            // Map imageUploads to expanded objects
+            const expandedImageUploads = imageUploads.map(img => {
+                const owner = usersMap.get(img.owner?.toString()) || img.owner;
+                return { ...img, owner };
+            });
+            const result = expandedImageUploads || imageUploads;
+            return result;
         });
-        const result = expandedImageUploads || imageUploads;
-
-        // Set cache
-        res.status(200).json(result);
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -81,9 +89,7 @@ exports.createImageUpload = async (req, res) => {
 
     try {
         const { imageTitle, owner } = req.body;
-
         if (!req.file) throw { message: 'Image file is required!', status: 400 };
-
         const imgUp_file = req.file;
 
         // Validate required fields
@@ -104,7 +110,7 @@ exports.createImageUpload = async (req, res) => {
 
         const savedImgUp = await newImgUp.save();
         if (!savedImgUp) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
-
+        await cacheManager.invalidatePattern("img:*");
         res.status(200).json(savedImgUp);
     } catch (err) {
         handleError(res, err);
@@ -117,7 +123,7 @@ exports.updateImageUpload = async (req, res) => {
         if (!imageUpload) throw { 'message': 'Image upload not found!', 'status': 404 };
 
         const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { new: true });
-
+        await cacheManager.invalidatePattern("img:*");
         res.status(200).json(updatedImageUpload);
     } catch (err) {
         handleError(res, err);
@@ -136,7 +142,7 @@ exports.deleteImageUpload = async (req, res) => {
         if (removedImageUpload.deletedCount === 0)
             throw { 'message': 'Something went wrong while deleting!', 'status': 503 };
 
-
+        await cacheManager.invalidatePattern("img:*");
         res.status(200).json(imageUpload);
     } catch (err) {
         handleError(res, err);

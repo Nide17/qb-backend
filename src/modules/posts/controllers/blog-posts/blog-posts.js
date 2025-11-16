@@ -6,31 +6,35 @@ const { getBatchedUsersMap } = require('../../../users/helpers.js');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "bp:all",
+    ONE: (id) => `bp:${id}`,
+    BY_CATEGORY: (id) => `bp:category:${id}`,
+    BY_CREATOR: (id) => `bp:creator:${id}`,
 };
 exports.getBlogPosts = async (req, res) => {
 
     try {
-        const cacheKey = 'blogPosts';
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            let blogPosts = await BlogPost.find().sort({ createdAt: -1 }).populate('postCategory', 'title').lean();
+            if (!blogPosts || blogPosts.length === 0) throw { 'message': 'No blog posts found', 'status': 404 };
 
-        let blogPosts = await BlogPost.find().sort({ createdAt: -1 }).populate('postCategory', 'title').lean();
-        if (!blogPosts || blogPosts.length === 0) throw { 'message': 'No blog posts found', 'status': 404 };
+            // Extract unique IDs
+            const usersIDs = [...new Set(blogPosts.map(ch => ch.creator?.toString()))];
 
-        // Extract unique IDs
-        const usersIDs = [...new Set(blogPosts.map(ch => ch.creator?.toString()))];
+            // Get users details as a Map
+            const usersMap = await getBatchedUsersMap(usersIDs);
 
-        // Get users details as a Map
-        const usersMap = await getBatchedUsersMap(usersIDs);
+            // Map blogPosts to expanded objects
+            const expandedBlogPosts = blogPosts.map(bp => {
+                const creator = usersMap.get(bp.creator?.toString()) || bp.creator;
+                return { ...bp, creator };
+            });
+            blogPosts = expandedBlogPosts || blogPosts;
 
-        // Map blogPosts to expanded objects
-        const expandedBlogPosts = blogPosts.map(bp => {
-            const creator = usersMap.get(bp.creator?.toString()) || bp.creator;
-            return { ...bp, creator };
+            return blogPosts;
         });
-        blogPosts = expandedBlogPosts || blogPosts;
-
-        res.status(200).json(blogPosts);
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -40,18 +44,21 @@ exports.getOneBlogPost = async (req, res) => {
 
     try {
         const id = req.params.id;
-        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+        const cacheKey = CACHE_KEYS.ONE(id)
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+            let blogPost = await BlogPost
+                .findOne(query)
+                .populate('postCategory', 'title')
+                .lean();
 
-        let blogPost = await BlogPost
-            .findOne(query)
-            .populate('postCategory', 'title')
-            .lean();
+            if (!blogPost) throw { 'message': 'Blog post not found', 'status': 404 };
 
-        if (!blogPost) throw { 'message': 'Blog post not found', 'status': 404 };
+            blogPost.creator = await User.findById(blogPost.creator).select('-password -__v -createdAt -updatedAt').lean();
 
-        blogPost.creator = await User.findById(blogPost.creator).select('-password -__v -createdAt -updatedAt').lean();
-
-        res.status(200).json(blogPost);
+            return blogPost;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -60,50 +67,31 @@ exports.getOneBlogPost = async (req, res) => {
 exports.getBlogPostsByCategory = async (req, res) => {
 
     try {
-        const id = req.params.id;
+        const cacheKey = CACHE_KEYS.BY_CATEGORY(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            let blogPosts = await BlogPost.find({ postCategory: req.params.id }).sort({ createdAt: -1 })
+                .populate('postCategory', 'title').lean();
 
-        const cacheKey = `blogPostsByCategory-${id}`;
+            if (!blogPosts || blogPosts.length === 0) {
+                throw { 'message': 'No blog posts found for this category', 'status': 404 };
+            }
 
-        if (!id) {
-            throw { 'message': 'Category id not provided', 'status': 400 };
-        }
+            // Extract unique IDs
+            const usersIDs = [...new Set(blogPosts.map(b => b.creator?.toString()))];
 
-        let blogPosts = await BlogPost.find({ postCategory: id }).sort({ createdAt: -1 })
-            .populate('postCategory', 'title').lean();
+            // Get users details as a Map
+            const usersMap = await getBatchedUsersMap(usersIDs);
 
-        if (!blogPosts || blogPosts.length === 0) {
-            throw { 'message': 'No blog posts found for this category', 'status': 404 };
-        }
+            // Map blogPosts to expanded objects
+            const expandedBlogPosts = blogPosts.map(bp => {
+                const creator = usersMap.get(bp.creator?.toString()) || bp.creator;
+                return { ...bp, creator };
+            });
+            blogPosts = expandedBlogPosts || blogPosts;
 
-        // Extract unique IDs
-        const usersIDs = [...new Set(blogPosts.map(b => b.creator?.toString()))];
-
-        // Get users details as a Map
-        const usersMap = await getBatchedUsersMap(usersIDs);
-
-        // Map blogPosts to expanded objects
-        const expandedBlogPosts = blogPosts.map(bp => {
-            const creator = usersMap.get(bp.creator?.toString()) || bp.creator;
-            return { ...bp, creator };
+            return blogPosts;
         });
-        blogPosts = expandedBlogPosts || blogPosts;
-
-        res.status(200).json(blogPosts);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
-
-exports.deleteBlogPost = async (req, res) => {
-    try {
-        const id = req.params.id;
-        const blogPost = await BlogPost.findById(id);
-        if (!blogPost) throw { 'message': 'Blog post not found', 'status': 404 };
-
-        await blogPost.remove();
-        await deleteImageFromS3(blogPost.post_image);
-
-        res.status(200).json({ message: 'Blog post deleted successfully' });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -111,12 +99,15 @@ exports.deleteBlogPost = async (req, res) => {
 
 exports.getCreatedBy = async (req, res) => {
     try {
-
-        if (!req.params.id) throw { 'message': 'User id not provided', 'status': 400 };
-        const cacheKey = `blogPostsByCreator-${req.params.id}`;
-        const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
-        if (!blogPosts) throw { 'message': 'No blogPosts found!', 'status': 404 };
-        res.status(200).json(blogPosts);
+        const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
+            if (!blogPosts || blogPosts.length === 0) {
+                throw { 'message': 'No blog posts found for this creator', 'status': 404 };
+            }
+            return blogPosts;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -147,10 +138,8 @@ exports.createBlogPost = async (req, res) => {
 
         const savedBlogPost = await newBlogPost.save();
         if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
-
-
+        await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(savedBlogPost);
-
     } catch (err) {
         handleError(res, err);
     }
@@ -161,7 +150,7 @@ exports.updateBlogPost = async (req, res) => {
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, req.body, { new: true });
-
+        await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);
@@ -174,7 +163,7 @@ exports.updateBlogPostStatus = async (req, res) => {
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
-
+        await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);
@@ -191,7 +180,7 @@ exports.deleteBlogPost = async (req, res) => {
         const removedBlogPost = await blogPost.deleteOne();
 
         if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
-
+        await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(blogPost);
     } catch (err) {
         handleError(res, err);
@@ -205,7 +194,7 @@ exports.deleteBlogPostImage = async (req, res) => {
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { new: true });
         await deleteImageFromS3(blogPost.post_image);
-
+        await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);
     } catch (err) {
         handleError(res, err);
