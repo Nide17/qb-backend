@@ -1,13 +1,13 @@
 const express = require('express');
-const { getDownloads, getOneDownload, getNotesDownloader, getCreatorDownloads, createDownload, deleteDownload } = require('../controllers/downloads');
+const { getDownloads, getOneDownload, getDownloadsByUser, getDownloadsByCreator, createDownload, deleteDownload } = require('../controllers/downloads');
 const { auth, authRole } = require('../../../middlewares/auth');
 
 const router = express.Router();
 
 // GET routes
 router.get('/', getDownloads);
-router.get('/downloaded-by/:id', auth, getNotesDownloader);
-router.get('/creator/:id', auth, getCreatorDownloads);
+router.get('/downloaded-by/:id', auth, getDownloadsByUser);
+router.get('/creator/:id', auth, getDownloadsByCreator);
 router.get('/:id', getOneDownload);
 
 // POST routes
