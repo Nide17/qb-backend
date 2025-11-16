@@ -5,16 +5,16 @@ const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../..
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "sub:all",
+    ONE: (id) => `sub:${id}`,
 };
 exports.getSubscribedUsers = async (req, res) => {
     try {
-        const cacheKey = `subscribed_users`;
-
-        const subscribedUsers = await SubscribedUser.find().sort({ createdAt: -1 });
-        if (!subscribedUsers) throw { 'message': 'No subscribed users found!', 'status': 404 };
-        res.status(200).json(subscribedUsers);
+        const cacheKey = CACHE_KEYS.ALL;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await SubscribedUser.find().sort({ createdAt: -1 });
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -22,9 +22,11 @@ exports.getSubscribedUsers = async (req, res) => {
 
 exports.getOneSubscribedUser = async (req, res) => {
     try {
-        const subscribedUser = await SubscribedUser.findById(req.params.id).select('name email createdAt');
-        if (!subscribedUser) throw { 'message': 'No subscribed user found!', 'status': 404 };
-        return res.status(200).json(subscribedUser);
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            return await SubscribedUser.findById(req.params.id).select('name email createdAt');
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -47,15 +49,10 @@ exports.createSubscribedUser = async (req, res) => {
 
         const newSubscriber = new SubscribedUser({ name, email });
         const savedSubscriber = await newSubscriber.save();
-        if (!savedSubscriber) {
-            throw { 'message': 'Failed to subscribe!', 'status': 400 };
-        }
-
+        if (!savedSubscriber) throw { 'message': 'Failed to subscribe!', 'status': 400 };
         // Sending e-mail to subscribed user
         sendSubscriptionEmail(savedSubscriber);
-
-        // Invalidate cache
-
+        await cacheManager.invalidatePattern("sub:*");
         res.status(200).json(savedSubscriber);
     } catch (err) {
         handleError(res, err);
@@ -66,6 +63,7 @@ exports.updateSubscribedUser = async (req, res) => {
     try {
         const updatedSubscribedUser = await SubscribedUser.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedSubscribedUser);
+        await cacheManager.invalidatePattern("sub:*");
     } catch (err) {
         handleError(res, err);
     }
@@ -79,8 +77,7 @@ exports.deleteSubscribedUser = async (req, res) => {
         const removedSubscribedUser = await subscribedUser.deleteOne();
         if (removedSubscribedUser.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
 
-        // Invalidate cache
-
+        await cacheManager.invalidatePattern("sub:*");
         res.status(200).json(subscribedUser);
     } catch (err) {
         handleError(res, err);

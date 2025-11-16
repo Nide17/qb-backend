@@ -12,22 +12,34 @@ const { hashPassword, updateUserToken } = require('../helpers');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
+    ALL: "usr:all",
+    ONE: (id) => `usr:${id}`,
+    CURRENT: (id) => `usr:current:${id}`,
+    LATEST8: "usr:latest8",
+    ADMINSCREATORS: "usr:adminscreators",
 };
 // Get all users
 exports.getUsers = async (req, res) => {
 
     try {
-        const cacheKey = `all_users`;
-
         const limit = req.query.limit ? parseInt(req.query.limit) : 0;
         const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
-        let users = await User.find(filter ? { [filter]: { $exists: true } } : {}).limit(limit).sort({ register_date: -1 }).select('name email role register_date' + (filter ? ` ${filter}` : ''));
-        if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
 
-        // Set cache
-        res.status(200).json(users);
+        if (filter || limit) {
+            const query = filter
+                ? { [filter]: { $exists: true } }
+                : {};
+
+            let users = await User.find(query).limit(limit).sort({ register_date: -1 }).select('name email role register_date' + (filter ? ` ${filter}` : ''));
+            if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
+            return res.status(200).json(users);
+        } else {
+            const cacheKey = CACHE_KEYS.ALL;
+            const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+                return await User.find().sort({ createdAt: -1 }).select('name email role register_date')
+            });
+            res.status(200).json(data);
+        }
     } catch (err) {
         handleError(res, err);
     }
@@ -36,16 +48,13 @@ exports.getUsers = async (req, res) => {
 // Get 8 latest users
 exports.getLatestUsers = async (req, res) => {
     try {
-
-        const cacheKey = `latest-users`;
-
-        // Check cache first
-
-        let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
-        if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
-
-        // Set cache
-        res.status(200).json(users);
+        const cacheKey = CACHE_KEYS.LATEST8;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
+            if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
+            return users;
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -54,15 +63,13 @@ exports.getLatestUsers = async (req, res) => {
 // Get Admin and Creators users
 exports.getAdminsCreators = async (req, res) => {
     try {
-        const cacheKey = `admins-creators`;
-
-        // Check cache first
-
-        let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
-        if (!adminsCreators.length) throw { 'message': 'No users found!', 'status': 404 };
-
-        // Set cache
-        res.status(200).json(adminsCreators);
+        const cacheKey = CACHE_KEYS.ADMINSCREATORS;
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
+            if (!adminsCreators.length) throw { 'message': 'No users found!', 'status': 404 };
+            return adminsCreators;
+        })
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -72,23 +79,27 @@ exports.getAdminsCreators = async (req, res) => {
 exports.getOneUser = async (req, res) => {
 
     try {
-        let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
-        if (!user) throw { 'message': 'User not found!', 'status': 404 };
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
+            if (!user) throw { 'message': 'User not found!', 'status': 404 };
 
-        // Expand user school details
-        if (user.school && user.level && user.faculty) {
-            const faculty = await Faculty
-                .findById(user.faculty)
-                .populate('level school', 'title')
-                .select('title level school')
-                .lean();
-            if (faculty) {
-                user.faculty = { _id: faculty?._id, title: faculty?.title };
-                user.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
-                user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+            // Expand user school details
+            if (user.school && user.level && user.faculty) {
+                const faculty = await Faculty
+                    .findById(user.faculty)
+                    .populate('level school', 'title')
+                    .select('title level school')
+                    .lean();
+                if (faculty) {
+                    user.faculty = { _id: faculty?._id, title: faculty?.title };
+                    user.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+                    user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+                }
             }
-        }
-        res.status(200).json(user);
+            return user;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -97,29 +108,29 @@ exports.getOneUser = async (req, res) => {
 // Load user by token
 exports.loadUser = async (req, res) => {
     try {
-        const cacheKey = `user_${req?.user?._id}`;
+        const cacheKey = CACHE_KEYS.CURRENT(req.params.id);
+        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
 
-        // Check cache first
+            // If no cache, get user from database
+            let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
+            if (!user) throw { 'message': 'No active session!', 'status': 404 };
 
-        // If no cache, get user from database
-        let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
-        if (!user) throw { 'message': 'No active session!', 'status': 404 };
-
-        // Expand user school details
-        if (user.school && user.level && user.faculty) {
-            const faculty = await Faculty
-                .findById(user.faculty)
-                .populate('level school', 'title')
-                .select('title level school')
-                .lean();
-            if (faculty) {
-                user.faculty = { _id: faculty?._id, title: faculty?.title };
-                user.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
-                user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+            // Expand user school details
+            if (user.school && user.level && user.faculty) {
+                const faculty = await Faculty
+                    .findById(user.faculty)
+                    .populate('level school', 'title')
+                    .select('title level school')
+                    .lean();
+                if (faculty) {
+                    user.faculty = { _id: faculty?._id, title: faculty?.title };
+                    user.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+                    user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+                }
             }
-        }
-        // Set cache
-        res.status(200).json(user);
+            return user;
+        });
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
@@ -190,8 +201,7 @@ exports.logout = async (req, res) => {
             { new: true }
         );
         if (!loggedOutUser) throw { 'status': 404, 'message': 'User not found!' };
-
-
+        await cacheManager.invalidatePattern(`usr:current:${req.body.userId}`);
         res.status(200).json(loggedOutUser);
     } catch (err) {
         handleError(res, err);
@@ -232,9 +242,7 @@ exports.register = async (req, res) => {
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
             console.log('new user\'s otp: ', otp);
         }
-
-        // del cache
-
+        await cacheManager.invalidatePattern("usr:*");
         res.status(200).json(savedUser);
     } catch (err) {
         handleError(res, err);
@@ -245,7 +253,6 @@ exports.register = async (req, res) => {
 exports.verifyOTP = async (req, res) => {
 
     try {
-
         const { email, otp } = req.body;
         if (!email || !otp) throw { 'status': 400, 'message': 'Email and OTP are required!' };
 
@@ -258,7 +265,7 @@ exports.verifyOTP = async (req, res) => {
         const updatedUser = await updateUserToken(usr);
         if (!updatedUser) throw { status: 500, message: 'Could not verify user, try again!' };
 
-        res.status(200).json({
+        const result = {
             current_token: updatedUser.current_token,
             user: {
                 _id: updatedUser._id,
@@ -266,7 +273,8 @@ exports.verifyOTP = async (req, res) => {
                 email: updatedUser.email,
                 role: updatedUser.role
             }
-        });
+        }
+        res.status(200).json(result);
     } catch (err) {
         handleError(res, err, 500);
     }
@@ -362,7 +370,7 @@ exports.updateProfileImage = async (req, res) => {
                 updatedUserProfile.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
             }
         }
-
+        await cacheManager.invalidatePattern("usr:current:*");
         res.status(200).json(updatedUserProfile);
     } catch (err) {
         handleError(res, err);
@@ -388,7 +396,7 @@ exports.updateProfile = async (req, res) => {
                 user.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
             }
         }
-
+        await cacheManager.invalidatePattern("usr:current:*");
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
@@ -400,8 +408,7 @@ exports.updateUser = async (req, res) => {
     try {
         let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true }).lean();
         if (!user) throw { 'status': 404, 'message': 'User not found!' };
-
-
+        await cacheManager.invalidatePattern("usr:*");
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
@@ -416,9 +423,7 @@ exports.deleteUser = async (req, res) => {
 
         const removedUser = await User.deleteOne({ _id: req.params.id });
         if (removedUser.deletedCount === 0) throw { 'status': 500, 'message': 'Failed to delete user!' };
-
-        // del cache
-
+        await cacheManager.invalidatePattern("usr:*");
         res.status(200).json(user);
     } catch (err) {
         handleError(res, err);
