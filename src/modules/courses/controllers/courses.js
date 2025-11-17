@@ -14,8 +14,8 @@ const CACHE_KEYS = {
 };
 const findCourses = async (query, limit = 0) => {
 
-    let coursesQuery = Chapter.find(query).sort({ createdAt: -1 })
-        .select('title description courseCategory created_by createdAt')
+    let coursesQuery = Course.find(query).sort({ createdAt: -1 })
+        .select('-__v -updatedAt -last_updated_by')
         .populate('courseCategory', 'title')
         .lean();
 
@@ -31,9 +31,9 @@ const findCourses = async (query, limit = 0) => {
     const usersMap = await getBatchedUsersMap(usersIDs);
 
     // Map courses to expanded objects
-    const expandedCourses = courses.map(chapter => {
-        const created_by = usersMap.get(chapter?.created_by?.toString()) || chapter?.created_by;
-        return { ...chapter, created_by };
+    const expandedCourses = courses.map(course => {
+        const created_by = usersMap.get(course?.created_by?.toString()) || course?.created_by;
+        return { ...course, created_by };
     });
 
     return expandedCourses || courses;
@@ -51,6 +51,28 @@ exports.getCourses = async (req, res) => {
     }
 };
 
+exports.getOneCourse = async (req, res) => {
+
+    try {
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            let course = await Course
+            .findById(req.params.id)
+            .select('-__v -updatedAt')
+            .populate('courseCategory', 'title courseCategory')
+            .lean();
+            if (!course) throw { 'message': 'Course not found!', 'status': 404 };
+            const created_by = await User.findById(course.created_by).select('name');
+            course = { ...course, created_by };
+            return course;
+        })
+        res.status(200).json(data);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+
 exports.getCoursesByCategory = async (req, res) => {
 
     try {
@@ -63,21 +85,6 @@ exports.getCoursesByCategory = async (req, res) => {
         handleError(res, err);
     }
 }
-
-exports.getOneCourse = async (req, res) => {
-
-    try {
-        const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            let course = await Course.findById(req.params.id).populate('courseCategory', 'title description courseCategory created_by').lean();
-            if (!course) throw { 'message': 'Course not found!', 'status': 404 };
-            return course;
-        })
-        res.status(200).json(data);
-    } catch (err) {
-        handleError(res, err);
-    }
-};
 
 exports.createCourse = async (req, res) => {
 
