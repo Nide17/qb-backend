@@ -176,12 +176,14 @@ exports.getPopularQuizzes = async (req, res) => {
 
             let popularQuizzes = null;
 
+            // Use native MongoDB aggregation with proper options
+            const aggregationOptions = { allowDiskUse: true, maxTimeMS: 30000 };
             const topQuizzes = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
                 { $group: { _id: '$quiz', count: { $sum: 1 } } },
                 { $sort: { count: -1 } },
                 { $limit: 3 }
-            ]).exec();
+            ], aggregationOptions);
 
             if (topQuizzes.length > 0) {
                 const quizzesIDs = topQuizzes.map(q => q._id);
@@ -210,12 +212,14 @@ exports.getMonthlyUser = async (req, res) => {
             const endOfMonth = new Date();
             endOfMonth.setHours(23, 59, 59, 999);
 
+            // Use native MongoDB aggregation with proper options
+            const aggregationOptions = { allowDiskUse: true, maxTimeMS: 30000 };
             const monthlyUser = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
                 { $group: { _id: '$taken_by', count: { $sum: 1 } } },
                 { $sort: { count: -1 } },
                 { $limit: 1 }
-            ]).exec();
+            ], aggregationOptions);
 
             if (monthlyUser.length > 0) {
                 const user = await User.findById(monthlyUser[0]._id).select('name image');

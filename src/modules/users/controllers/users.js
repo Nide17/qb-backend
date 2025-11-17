@@ -35,7 +35,7 @@ exports.getUsers = async (req, res) => {
             return res.status(200).json(users);
         } else {
             const cacheKey = CACHE_KEYS.ALL;
-            const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
                 return await User.find().sort({ createdAt: -1 }).select('name email role register_date')
             });
             res.status(200).json(data);
@@ -49,7 +49,7 @@ exports.getUsers = async (req, res) => {
 exports.getLatestUsers = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.LATEST8;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
             if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
             return users;
@@ -64,7 +64,7 @@ exports.getLatestUsers = async (req, res) => {
 exports.getAdminsCreators = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ADMINSCREATORS;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
             if (!adminsCreators.length) throw { 'message': 'No users found!', 'status': 404 };
             return adminsCreators;
@@ -80,7 +80,7 @@ exports.getOneUser = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
             if (!user) throw { 'message': 'User not found!', 'status': 404 };
 
@@ -109,7 +109,7 @@ exports.getOneUser = async (req, res) => {
 exports.loadUser = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.CURRENT(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // If no cache, get user from database
             let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();

@@ -13,7 +13,7 @@ exports.getFaculties = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faculty.find().sort({ createdAt: -1 }).populate('school level', 'title');
         });
         res.status(200).json(data);
@@ -26,7 +26,7 @@ exports.getFaculties = async (req, res) => {
 exports.getFacultiesByLevel = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_LEVEL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faculty.find({ level: req.params.id }).sort({ createdAt: -1 }).populate('school level', 'title');
         });
         res.status(200).json(data);
@@ -38,7 +38,7 @@ exports.getFacultiesByLevel = async (req, res) => {
 exports.getOneFaculty = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faculty.findById(req.params.id).populate('school level', 'title school level');
         });
         res.status(200).json(data);

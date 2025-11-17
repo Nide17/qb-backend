@@ -25,7 +25,7 @@ exports.getContacts = async (req, res) => {
 
         if (pageNo > 0) {
             const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
-            const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
                 const contacts = await Contact.find({}, {}, query).sort({ contact_date: -1 }).lean();
                 const result = { contacts, totalPages: Math.ceil(totalPages / PAGE_SIZE), currentPage: pageNo };
                 return result;
@@ -35,7 +35,7 @@ exports.getContacts = async (req, res) => {
         }
         else {
             const cacheKey = CACHE_KEYS.ALL;
-            const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+            const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
                 const contacts = await Contact.find().sort({ contact_date: -1 });
                 return contacts;
             })

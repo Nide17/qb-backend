@@ -12,7 +12,7 @@ const CACHE_KEYS = {
 exports.getAdverts = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Advert.find().sort({ createdAt: -1 }).select('-__v -updatedAt');
         });
         res.status(200).json(data);
@@ -24,7 +24,7 @@ exports.getAdverts = async (req, res) => {
 exports.getOneAdvert = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Advert.findById(req.params.id);
         });
         res.status(200).json(data);
@@ -36,7 +36,7 @@ exports.getOneAdvert = async (req, res) => {
 exports.getActiveAdverts = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ACTIVE;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Advert.find({ status: 'Active' }).sort({ createdAt: -1 }).select('-__v -updatedAt');
         });
         res.status(200).json(data);
@@ -48,7 +48,7 @@ exports.getActiveAdverts = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Advert.find({ owner: req.params.id }).sort({ createdAt: -1 });
         });
         res.status(200).json(data);

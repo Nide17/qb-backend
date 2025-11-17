@@ -23,7 +23,7 @@ const handleFindByIdAndUpdate = async (id, update) => {
 exports.getFaqs = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faq.find().sort({ createdAt: -1 });
         });
         res.status(200).json(data);
@@ -35,7 +35,7 @@ exports.getFaqs = async (req, res) => {
 exports.getOneFaq = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faq.findById(req.params.id);
         });
         res.status(200).json(data);
@@ -47,7 +47,7 @@ exports.getOneFaq = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faq.find({ created_by: req.params.id }).sort({ createdAt: -1 });
         });
         res.status(200).json(data);

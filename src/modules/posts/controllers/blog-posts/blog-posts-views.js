@@ -17,7 +17,7 @@ scheduledReportMessage();
 exports.getBlogPostsViews = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             // Extract unique IDs
             let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
             if (!blogPostsViews) throw { 'message': 'No blog Posts Views found!', 'status': 404 };
@@ -43,7 +43,7 @@ exports.getBlogPostsViews = async (req, res) => {
 exports.getOneBlogPostsView = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let blogPostsView = await BlogPostsView.findById(req.params.id).lean();
             if (!blogPostsView) throw { 'message': 'Blog Post View not found!', 'status': 404 };
 
@@ -62,7 +62,7 @@ exports.getOneBlogPostsView = async (req, res) => {
 exports.getRecentTenViews = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.RECENT_TEN;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let recentTenViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).limit(10).select('-__v').lean();
             if (!recentTenViews) throw { 'message': '10 blog posts views not found!', 'status': 404 };
 

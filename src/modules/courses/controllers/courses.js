@@ -42,7 +42,7 @@ const findCourses = async (query, limit = 0) => {
 exports.getCourses = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await findCourses({}, 0);
         })
         res.status(200).json(data);
@@ -55,7 +55,7 @@ exports.getCoursesByCategory = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.BY_CC(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await findCourses({ courseCategory: req.params.id }, 0);
         })
         res.status(200).json(data);
@@ -68,7 +68,7 @@ exports.getOneCourse = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let course = await Course.findById(req.params.id).populate('courseCategory', 'title description courseCategory created_by').lean();
             if (!course) throw { 'message': 'Course not found!', 'status': 404 };
             return course;

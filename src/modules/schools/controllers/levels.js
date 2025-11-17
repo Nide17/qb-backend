@@ -14,7 +14,7 @@ exports.getLevels = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Level.find().sort({ createdAt: -1 }).populate('school', 'title');
         });
         res.status(200).json(data);
@@ -27,7 +27,7 @@ exports.getLevels = async (req, res) => {
 exports.getLevelsBySchool = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_SCHOOL(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Level.find({ school: req.params.id }).sort({ createdAt: -1 }).populate('school', 'title');
         });
         res.status(200).json(data);
@@ -39,7 +39,7 @@ exports.getLevelsBySchool = async (req, res) => {
 exports.getOneLevel = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Level.findById(req.params.id).populate('school', 'title');
         });
         res.status(200).json(data);

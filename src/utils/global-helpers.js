@@ -10,17 +10,43 @@ const getCachedData = async (key) => {
     try {
         if (cacheManager.isReady()) {
             const cached = await cacheManager.get(key);
+
             if (cached !== null) {
                 console.log(`📦 Redis HIT → "${key}"`);
+                return cached;
             }
+
             console.log(`📦 Redis MISS → "${key}"`);
+            return null;
         }
+
         return null;
     } catch (err) {
         console.error("Redis get error:", err.message || err);
         return null;
     }
 };
+
+function isCacheable(value) {
+    if (value === undefined) return false;
+    if (value === null) return false;
+    if (typeof value === "number" && isNaN(value)) return false;
+
+    // Empty primitives
+    if (typeof value === "string" && value.trim() === "") return false;
+
+    // Arrays
+    if (Array.isArray(value) && value.length === 0) return false;
+
+    // Objects
+    if (typeof value === "object") {
+        if (value.constructor === Object && Object.keys(value).length === 0) return false;
+        if (value instanceof Map && value.size === 0) return false;
+        if (value instanceof Set && value.size === 0) return false;
+    }
+
+    return true;
+}
 
 /**
  * Wrapper: Safely set Redis cache
@@ -65,11 +91,23 @@ const validateRequiredFields = (fields) => {
 const cacheWrapper = {
     async wrap(key, ttl, fetchFn) {
         try {
+            // 1️⃣ Try Redis
+            const cached = await getCachedData(key);
+            if (cached !== null) return cached;
+            // if (cached !== null) console.log(cached);
 
+            // 2️⃣ Cache MISS → Fetch from DB
             const fresh = await fetchFn();
-            await setCachedData(key, fresh, ttl);
+
+            // 3️⃣ Only cache if valid
+            if (isCacheable(fresh)) {
+                await setCachedData(key, fresh, ttl);
+            } else {
+                console.log(`⚠️ Skipped caching invalid/empty data for key "${key}"`);
+            }
 
             return fresh;
+
         } catch (e) {
             console.error("Cache wrap error:", e);
             return fetchFn(); // fallback to DB

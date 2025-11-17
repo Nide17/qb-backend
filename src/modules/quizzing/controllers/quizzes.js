@@ -33,9 +33,12 @@ exports.getQuizzes = async (req, res) => {
         if (limit) {
             const cacheKey = CACHE_KEYS.LIMITED(limit, skip);
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-                const quizzes = await Quiz.find({})
+                const quizzes = await Quiz.find({
+                    questions: { $exists: true, $type: "array" },
+                    $expr: { $gt: [{ $size: "$questions" }, 5] }
+                })
                     .sort({ creation_date: -1 })
-                    .populate('category questions')
+                    .populate("category questions")
                     .limit(limit)
                     .skip(skip);
 
