@@ -13,7 +13,7 @@ const CACHE_KEYS = {
 exports.getPostCategories = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const postCategories = await PostCategory.find().sort({ createdAt: -1 }).lean();
             if (!postCategories || postCategories.length === 0) throw { 'status': 404, 'message': 'No postCategories found!' };
 
@@ -44,7 +44,7 @@ exports.getOnePostCategory = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let postCategory = await PostCategory.findById(req.params.id).lean();
             if (!postCategory) throw { status: 404, message: 'Image upload not found!' };
 

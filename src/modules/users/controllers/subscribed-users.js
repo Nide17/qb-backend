@@ -11,7 +11,7 @@ const CACHE_KEYS = {
 exports.getSubscribedUsers = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await SubscribedUser.find().sort({ createdAt: -1 });
         });
         res.status(200).json(data);
@@ -23,7 +23,7 @@ exports.getSubscribedUsers = async (req, res) => {
 exports.getOneSubscribedUser = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await SubscribedUser.findById(req.params.id).select('name email createdAt');
         });
         res.status(200).json(data);

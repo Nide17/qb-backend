@@ -13,7 +13,7 @@ const CACHE_KEYS = {
 exports.getImageUploads = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let imageUploads = await ImageUpload.find().sort({ createdAt: -1 }).lean();
             if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
 
@@ -41,7 +41,7 @@ exports.getImageUploads = async (req, res) => {
 exports.getOneImageUpload = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let imageUpload = await ImageUpload.findById(req.params.id).lean();
             if (!imageUpload) throw { status: 404, message: 'Image upload not found!' };
 
@@ -60,7 +60,7 @@ exports.getOneImageUpload = async (req, res) => {
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_OWNER(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 }).lean();
             if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };

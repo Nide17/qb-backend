@@ -13,7 +13,7 @@ const CACHE_KEYS = {
 exports.getSchools = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await School.find().sort({ createdAt: -1 });
         });
         res.status(200).json(data);
@@ -25,7 +25,7 @@ exports.getSchools = async (req, res) => {
 exports.getOneSchool = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await School.findById(req.params.id).select('_id title');
         });
         res.status(200).json(data);

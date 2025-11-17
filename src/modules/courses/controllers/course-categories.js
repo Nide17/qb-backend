@@ -13,9 +13,8 @@ const CACHE_KEYS = {
 exports.getCourseCategories = async (req, res) => {
 
     try {
-
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
             if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 404 };
             return courseCategories;
@@ -29,7 +28,7 @@ exports.getCourseCategories = async (req, res) => {
 exports.getOneCategory = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const category = await CourseCategory.findById(req.params.id).select('title description created_by');
             if (!category) throw { 'message': 'Category not found!', 'status': 404 };
             return category;

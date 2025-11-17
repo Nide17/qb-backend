@@ -47,7 +47,7 @@ exports.getNotes = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await findNotes({}, 0);
         })
         res.status(200).json(data);
@@ -60,7 +60,7 @@ exports.getLimitedNotes = async (req, res) => {
 
     try {
         const limit = parseInt(req.query.limit) || 5;
-        const data = await cacheWrapper(`limit_${limit}`, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(`limit_${limit}`, CACHE_TTL, async () => {
             return await findNotes({}, limit);
         })
         res.status(200).json(data);
@@ -72,7 +72,7 @@ exports.getLimitedNotes = async (req, res) => {
 exports.getNotesByCategory = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CC(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await findNotes({ courseCategory: req.params.id }, 0);
         })
         res.status(200).json(data);
@@ -83,7 +83,7 @@ exports.getNotesByCategory = async (req, res) => {
 exports.getNotesByChapter = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CHAPTER(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await findNotes({ chapter: req.params.id }, 0);
         })
         res.status(200).json(data);
@@ -96,7 +96,7 @@ exports.getOneNotes = async (req, res) => {
     try {
 
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const query = req.params.id.match(/^[0-9a-fA-F]{24}$/) ? { _id: req.params.id } : { slug: req.params.id };
 
             let notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title').lean();

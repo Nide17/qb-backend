@@ -14,7 +14,7 @@ const CACHE_KEYS = {
 exports.getRoomMessages = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             const roomMessages = await RoomMessage.find().sort({ createdAt: -1 }).lean();
 
@@ -46,7 +46,7 @@ exports.getRoomMessages = async (req, res) => {
 exports.getRoomMessageByRoom = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_ROOM(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const roomMessages = await RoomMessage.find({ room: req.params.id });
             return roomMessages;
         })
@@ -59,7 +59,7 @@ exports.getRoomMessageByRoom = async (req, res) => {
 exports.getOneRoomMessage = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const roomMessage = await RoomMessage.findById(req.params.id);
             return roomMessage;
         })

@@ -15,7 +15,7 @@ exports.getBlogPosts = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let blogPosts = await BlogPost.find().sort({ createdAt: -1 }).populate('postCategory', 'title').lean();
             if (!blogPosts || blogPosts.length === 0) throw { 'message': 'No blog posts found', 'status': 404 };
 
@@ -45,7 +45,7 @@ exports.getOneBlogPost = async (req, res) => {
     try {
         const id = req.params.id;
         const cacheKey = CACHE_KEYS.ONE(id)
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
             let blogPost = await BlogPost
                 .findOne(query)
@@ -68,7 +68,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.BY_CATEGORY(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let blogPosts = await BlogPost.find({ postCategory: req.params.id }).sort({ createdAt: -1 })
                 .populate('postCategory', 'title').lean();
 
@@ -100,7 +100,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const blogPosts = await BlogPost.find({ owner: req.params.id }).sort({ createdAt: -1 });
             if (!blogPosts || blogPosts.length === 0) {
                 throw { 'message': 'No blog posts found for this creator', 'status': 404 };

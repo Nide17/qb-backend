@@ -23,7 +23,7 @@ exports.getSystemMetrics = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.SYSTEM_METRICS;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get system information
             const cpuUsage = process.cpuUsage();
@@ -72,7 +72,7 @@ exports.getDashboardStats = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.DASHBOARD_STATS;
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get actual data from working endpoints and count them through API Gateway
             const [usersResponse, quizzesResponse, downloadsResponse, scoresResponse] = await Promise.allSettled([
@@ -170,7 +170,7 @@ exports.get50NewUsers = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('new50');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({}).sort({ register_date: -1 }).limit(50).lean();
         });
         res.status(200).json(data);
@@ -183,7 +183,7 @@ exports.get50NewUsers = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
     try {
         const cacheKey = 'usr:all';
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({}).lean();
         });
         res.status(200).json(data);
@@ -196,7 +196,7 @@ exports.getAllUsers = async (req, res) => {
 exports.getUsersWithImage = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('image');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ image: { $exists: true, $ne: '' } }).lean();
         });
         res.status(200).json(data);
@@ -208,7 +208,7 @@ exports.getUsersWithImage = async (req, res) => {
 exports.getUsersWithSchool = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('school');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ school: { $exists: true, $ne: null } }).lean();
         });
         res.status(200).json(data);
@@ -220,7 +220,7 @@ exports.getUsersWithSchool = async (req, res) => {
 exports.getUsersWithLevel = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('level');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ level: { $exists: true, $ne: null } }).lean();
         });
         res.status(200).json(data);
@@ -232,7 +232,7 @@ exports.getUsersWithLevel = async (req, res) => {
 exports.getUsersWithFaculty = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('faculty');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ faculty: { $exists: true, $ne: null } }).lean();
         });
         res.status(200).json(data);
@@ -244,7 +244,7 @@ exports.getUsersWithFaculty = async (req, res) => {
 exports.getUsersWithYear = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('year');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ year: { $exists: true, $ne: null } }).lean();
         });
         res.status(200).json(data);
@@ -256,7 +256,7 @@ exports.getUsersWithYear = async (req, res) => {
 exports.getUsersWithInterests = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('interests');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ interests: { $exists: true, $ne: [] } }).lean();
         });
         res.status(200).json(data);
@@ -268,7 +268,7 @@ exports.getUsersWithInterests = async (req, res) => {
 exports.getUsersWithAbout = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('about');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ about: { $exists: true, $ne: '' } }).lean();
         });
         res.status(200).json(data);
@@ -281,7 +281,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('top10quizzing');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             let topUsers = await Score.aggregate([
                 { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
@@ -307,7 +307,7 @@ exports.getTop10Quizzes = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.QUIZZES_STATS('top10');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get top quizzes
             let topQuizzes = [];
@@ -336,7 +336,7 @@ exports.getTop10Downloaders = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.DOWNLOADS_STATS('top10');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get top downloaders aggregation
             let topDownloaders = await Download.aggregate([
@@ -372,7 +372,7 @@ exports.getTop10Downloaders = async (req, res) => {
 exports.getTop10Notes = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.NOTES_STATS('top10');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get top notes aggregation
             const topNotesData = await Download.aggregate([
@@ -412,7 +412,7 @@ exports.getDailyUserRegistration = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('dailyRegistration');
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const usersStats = await User.aggregate([
                 {
                     $project: {
@@ -455,7 +455,7 @@ exports.getLiveAnalytics = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.LIVE
-        const data = await cacheWrapper(cacheManager, cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());

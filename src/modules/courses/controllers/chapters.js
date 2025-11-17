@@ -44,7 +44,7 @@ const findChapters = async (query, limit = 0) => {
 exports.getChapters = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const chapters = await findChapters({}, 0);
             return chapters;
         });
@@ -58,7 +58,7 @@ exports.getChaptersByCourse = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.BY_COURSE(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const notes = await findChapters({ course: req.params.id }, 0);
             return notes;
         });
@@ -71,7 +71,7 @@ exports.getChaptersByCourse = async (req, res) => {
 exports.getOneChapter = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const data = await cacheWrapper(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by').lean();
             if (!chapter) throw { 'message': 'Chapter not found!', 'status': 404 };
 
