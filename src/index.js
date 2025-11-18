@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const compression = require("compression");
 const process = require('process');
 const { cacheManager } = require('./utils/global-helpers');
 const { handleError } = require('./utils/error');
@@ -13,6 +14,13 @@ const io = socketManager.initialize(server);
 
 app.use(express.json());
 app.use(cors());
+app.use(compression());
+
+// Middleware to attach socket.io to requests
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
 
 // Users
 app.use('/api/users', require('./modules/users/routes/users'));
@@ -85,12 +93,6 @@ app.use((req, res, _next) => {
 console.log('🔌 Enhanced Socket.IO manager initialized');
 console.log('✨ Features: Real-time chat, quiz sessions, user presence, private messaging');
 
-// Middleware to attach socket.io to requests
-app.use((req, res, next) => {
-    req.io = io;
-    next();
-});
-
 // Port
 const PORT = process.env.PORT || 5000;
 
@@ -107,15 +109,16 @@ async function startServer() {
             console.error('Uncaught Exception:', error);
         });
 
-        server.listen(PORT, () => {
-            console.log(`🚀 Server with Socket.io running on port ${PORT}`);
-        });
-
         try {
             await cacheManager.connect()
         } catch (error) {
             console.log(`Redis error: ${error}`);
         }
+
+        server.listen(PORT, () => {
+            console.log(`🚀 Server with Socket.io running on port ${PORT}`);
+        });
+
     } catch (err) {
         console.error('Failed to start server:\n', err?.message || err);
     }

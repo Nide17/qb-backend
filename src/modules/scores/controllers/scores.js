@@ -290,8 +290,8 @@ exports.createScore = async (req, res) => {
                     }
                 });
 
-                // Broadcast dashboard stats update
-                req.io.emit('dashboard-stats-update', {
+                // Broadcast summary stats update
+                req.io.emit('summary-stats-update', {
                     type: 'new_score',
                     data: { quiz, marks, out_of, taken_by }
                 });

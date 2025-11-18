@@ -11,7 +11,7 @@ const getCachedData = async (key) => {
         if (cacheManager.isReady()) {
             const cached = await cacheManager.get(key);
 
-            if (cached !== null) {
+            if (cached !== undefined && cached !== null) {
                 console.log(`📦 Redis HIT → "${key}"`);
                 return cached;
             }
@@ -89,12 +89,12 @@ const validateRequiredFields = (fields) => {
 
 // --- Cache wrapper -------------------------------------------------------------
 const cacheWrapper = {
-    async wrap(key, ttl, fetchFn) {
+async wrap(key, ttl, fetchFn) {
         try {
             // 1️⃣ Try Redis
             const cached = await getCachedData(key);
-            if (cached !== null) return cached;
-            // if (cached !== null) console.log(cached);
+            if (cached !== undefined && cached !== null) return cached;
+            // if (cached !== undefined && cached !== null) console.log(cached);
 
             // 2️⃣ Cache MISS → Fetch from DB
             const fresh = await fetchFn();
