@@ -1,64 +1,103 @@
 const mongoose = require('mongoose');
 
 const connections = {};
-const maxRetries = 3;
-const retryDelay = 5000; // 5 seconds
+const maxRetries = 5;
+const retryDelay = 5000; // 5s
+const reconnectDelay = 5000;
+
+// Prevent simultaneous retries for the same DB
+const retryLocks = {};
+
+function log(name, msg, ...rest) {
+    console.log(`[DB:${name}] ${msg}`, ...rest);
+}
 
 function getConnection(name, uri) {
     if (!connections[name]) {
+
+        retryLocks[name] = false;
         let retryCount = 0;
-        
-        const connectWithRetry = () => {
+
+        const connect = () => {
+            if (retryLocks[name]) return; // Prevent double retries
+            retryLocks[name] = true;
+
             connections[name] = mongoose.createConnection(uri, {
-                // Connection options
-                connectTimeoutMS: 60000, // 60 seconds
-                socketTimeoutMS: 60000,   // 60 seconds
-                serverSelectionTimeoutMS: 60000, // 60 seconds
-                maxPoolSize: 10, // Maintain up to 10 socket connections
-                bufferCommands: true // Enable mongoose buffering to prevent errors when connection is not ready
+                connectTimeoutMS: 60000,
+                socketTimeoutMS: 60000,
+                serverSelectionTimeoutMS: 60000,
+                maxPoolSize: 20,
+                minPoolSize: 2,
+                bufferCommands: true,
+                retryWrites: true,
+                w: "majority",
             });
-            
-            // Add connection event listeners
-            connections[name].on('connected', () => {
-                console.log(`Connected to ${name} database`);
-                retryCount = 0; // Reset retry count on successful connection
+
+            const conn = connections[name];
+
+            // -------------------------
+            // Event Listeners
+            // -------------------------
+            conn.on("connected", () => {
+                log(name, "Connected");
+                retryCount = 0;
+                retryLocks[name] = false;
             });
-            
-            connections[name].on('error', (err) => {
-                console.error(`Error connecting to ${name} database:`, err);
-                
-                // Implement retry logic
+
+            conn.on("error", (err) => {
+                log(name, "Error:", err.message);
+
                 if (retryCount < maxRetries) {
                     retryCount++;
-                    console.log(`Retrying connection to ${name} database (${retryCount}/${maxRetries}) in ${retryDelay/1000} seconds...`);
-                    
-                    // Close current connection before retry
-                    if (connections[name].readyState !== 0) {
-                        connections[name].close();
-                    }
-                    
-                    // Retry after delay
-                    setTimeout(connectWithRetry, retryDelay);
+                    log(name, `Retrying ${retryCount}/${maxRetries} in ${retryDelay / 1000}s...`);
+
+                    setTimeout(() => {
+                        safeClose(conn).then(() => {
+                            retryLocks[name] = false;
+                            connect();
+                        });
+                    }, retryDelay);
+
                 } else {
-                    console.error(`Max retries (${maxRetries}) reached for ${name} database. Giving up.`);
+                    log(name, `Max retries reached. No further attempts will be made.`);
+                    retryLocks[name] = false;
                 }
             });
-            
-            connections[name].on('disconnected', () => {
-                console.log(`Disconnected from ${name} database`);
-                
-                // Attempt to reconnect after disconnection
-                if (retryCount < maxRetries) {
-                    console.log(`Attempting to reconnect to ${name} database...`);
-                    setTimeout(connectWithRetry, retryDelay);
+
+            conn.on("disconnected", () => {
+                log(name, "Disconnected");
+
+                if (!retryLocks[name] && retryCount < maxRetries) {
+                    retryLocks[name] = true;
+                    log(name, `Reconnecting in ${reconnectDelay / 1000}s...`);
+
+                    setTimeout(() => {
+                        retryLocks[name] = false;
+                        connect();
+                    }, reconnectDelay);
                 }
+            });
+
+            conn.on("reconnected", () => {
+                log(name, "Reconnected");
             });
         };
-        
-        // Start the connection process
-        connectWithRetry();
+
+        connect();
     }
+
     return connections[name];
 }
 
-module.exports = { getConnection };
+// Safely close a connection before a retry
+async function safeClose(conn) {
+    try {
+        if (conn && conn.readyState !== 0) {
+            await conn.close();
+        }
+    } catch (err) {
+        // ignore
+    }
+}
+
+module.exports = { getConnection, };

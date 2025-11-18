@@ -1,5 +1,5 @@
 const express = require('express');
-const { get50NewUsers, getAllUsers, getUsersWithImage, getUsersWithSchool, getUsersWithLevel, getUsersWithFaculty, getUsersWithInterests, getUsersWithAbout, getTop10QuizzingUsers, getTop10Downloaders, getTop10Quizzes, getTop10Notes, getDailyUserRegistration, getDashboardStats, updateDashboardStats, getLiveAnalytics, getSystemMetrics } = require('../controllers/statistics');
+const { get50NewUsers, getAllUsers, getUsersWithImage, getUsersWithSchool, getUsersWithLevel, getUsersWithFaculty, getUsersWithInterests, getUsersWithAbout, getTop10QuizzingUsers, getTop10Downloaders, getTop10Quizzes, getTop10Notes, getDailyUserRegistration, getSummaryStats, updateSummaryStats, getLiveAnalytics, getSystemMetrics, getDataMetrics } = require('../controllers/statistics');
 const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
@@ -19,11 +19,10 @@ router.get('/top-10-notes', authRole(['Admin', 'SuperAdmin']), getTop10Notes);
 router.get('/daily-user-registration', authRole(['Admin', 'SuperAdmin']), getDailyUserRegistration);
 
 // New enhanced endpoints
-router.get('/dashboard-stats', getDashboardStats);
-router.post('/update-dashboard-stats', authRole(['Admin', 'SuperAdmin']), updateDashboardStats);
-router.get('/live-analytics', authRole(['Admin', 'SuperAdmin']), getLiveAnalytics);
-
-// System endpoints
-router.get('/system-metrics', authRole(['Admin', 'SuperAdmin']), getSystemMetrics);
+router.get('/summary-stats', getSummaryStats);
+router.post('/update-summary-stats', updateSummaryStats);
+router.get('/system-metrics', getSystemMetrics);
+router.get('/data-metrics', getDataMetrics);
+router.get('/live-analytics', getLiveAnalytics);
 
 module.exports = router;

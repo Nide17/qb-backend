@@ -20,36 +20,42 @@ const CACHE_KEYS = {
     ONE: (id) => `qz:${id}`,
 };
 
-// ------------------------------------------------------------------------------
-// GET QUIZZES
-// ------------------------------------------------------------------------------
 exports.getQuizzes = async (req, res) => {
+    // Cache all quiz responses for 1 hour in the browser
+    // res.set('Cache-Control', 'public, max-age=3600');
+
     try {
         const pageNo = parseInt(req.query.pageNo);
         const limit = parseInt(req.query.limit);
         const skip = parseInt(req.query.skip) || 0;
 
-        // LIMITED QUERY ----------------------------------------------------------
+        // LIMITED
         if (limit) {
             const cacheKey = CACHE_KEYS.LIMITED(limit, skip);
+
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
                 const quizzes = await Quiz.find({
                     questions: { $exists: true, $type: "array" },
                     $expr: { $gt: [{ $size: "$questions" }, 5] }
                 })
                     .sort({ creation_date: -1 })
-                    .populate("category questions")
+                    .select('title slug category questions creation_date')
+                    .populate("category questions", 'title questionText')
                     .limit(limit)
                     .skip(skip);
 
-                if (!quizzes.length) throw { message: 'No quizzes found!', status: 404 };
+                if (!quizzes.length) {
+                    res.set('Cache-Control', 'no-store');
+                    throw { message: 'No quizzes found!', status: 404 };
+                }
+
                 return quizzes;
             });
 
             return res.status(200).json(data);
         }
 
-        // PAGINATED --------------------------------------------------------------
+        // PAGINATED
         if (pageNo && pageNo > 0) {
             const PAGE_SIZE = 20;
             const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
@@ -61,10 +67,14 @@ exports.getQuizzes = async (req, res) => {
                     .sort({ creation_date: -1 })
                     .limit(PAGE_SIZE)
                     .skip(PAGE_SIZE * (pageNo - 1))
-                    .populate('category questions')
+                    .select('title slug category questions creation_date')
+                    .populate('category questions', 'title questionText')
                     .lean();
 
-                if (!quizzes.length) throw { message: 'No quizzes found', status: 204 };
+                if (!quizzes.length) {
+                    res.set('Cache-Control', 'no-store');
+                    throw { message: 'No quizzes found', status: 404 };
+                }
 
                 return {
                     totalPages: Math.ceil(totalQuizzes / PAGE_SIZE),
@@ -78,15 +88,20 @@ exports.getQuizzes = async (req, res) => {
             return res.status(200).json(data);
         }
 
-        // FULL LIST --------------------------------------------------------------
+        // FULL LIST
         const cacheKey = CACHE_KEYS.ALL;
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const quizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
-                .populate('category questions');
+                .select('title slug category questions creation_date')
+                .populate('category questions', 'title questionText');
 
-            if (!quizzes.length) throw { message: 'No quizzes found!', status: 204 };
+            if (!quizzes.length) {
+                res.set('Cache-Control', 'no-store');
+                throw { message: 'No quizzes found!', status: 404 };
+            }
+
             return quizzes;
         });
 
@@ -131,9 +146,9 @@ exports.getQuizzesByCategory = async (req, res) => {
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let quizzes = await Quiz.find({ category: req.params.id })
-                .populate('category questions');
+                .populate('category questions', 'title questionText');
 
-            if (!quizzes.length) throw { message: 'No quizzes found', status: 204 };
+            if (!quizzes.length) throw { message: 'No quizzes found', status: 404, };
 
             const ids = quizzes.map(q => q._id);
             const map = await getBatchedQuizzesMap(ids);
@@ -158,9 +173,9 @@ exports.getQuizzesByNotes = async (req, res) => {
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const categories = await Category.find({ category: req.params.id });
             const quizzes = await Quiz.find({ category: { $in: categories } })
-                .populate('category questions');
+                .populate('category questions', 'title questionText');
 
-            if (!quizzes.length) throw { message: 'No quizzes found!', status: 204 };
+            if (!quizzes.length) throw { message: 'No quizzes found!', status: 404, };
 
             const ids = quizzes.map(q => q._id);
             const map = await getBatchedQuizzesMap(ids);
