@@ -117,7 +117,7 @@ exports.getOneUser = async (req, res) => {
 };
 
 // Load user by token
-exports.loadUser = async (req, res) => {
+exports.loadUser = async (req, res, next) => {
     try {
         const cacheKey = CACHE_KEYS.CURRENT(req?.user?._id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
@@ -146,7 +146,7 @@ exports.loadUser = async (req, res) => {
         });
         res.status(200).json(data);
     } catch (err) {
-        handleError(res, err);
+        next(err); // pass error to global handler
     }
 };
 

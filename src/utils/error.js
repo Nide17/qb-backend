@@ -1,153 +1,185 @@
-const handleError = (res, err, status) => {
-    console.log(err);
+const handleError = (res, err, statusOverride) => {
+    console.error("🔥 ERROR:", err);
 
-    // Handle MongoDB Errors
-    // MongoNetworkError
-    if (err.name === 'MongoNetworkError') {
+    const timestamp = new Date().toISOString();
+
+    // Normalize errors thrown as raw objects
+    const normalized = normalizeError(err);
+
+    // Override status if provided
+    const status = statusOverride || normalized.status || 500;
+
+    // MongoDB Network Error
+    if (normalized.name === "MongoNetworkError") {
         return res.status(503).json({
             success: false,
-            message: 'Cannot get the resource you are looking for. try again later.',
-            code: 'DB_CONNECTION_ERROR',
-            timestamp: new Date().toISOString()
-        });
-    }
-    else if (err.name === 'CastError') {
-        if (err.kind === 'ObjectId') {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid ID format provided',
-                code: 'INVALID_ID_FORMAT',
-                error: 'The provided ID is not a valid MongoDB ObjectId',
-                timestamp: new Date().toISOString()
-            });
-        }
-        return res.status(400).json({
-            success: false,
-            message: `Invalid ${err.path} format`,
-            code: 'CAST_ERROR',
-            error: err.message,
-            timestamp: new Date().toISOString()
+            message: "Database temporarily unreachable. Try again later.",
+            code: "DB_CONNECTION_ERROR",
+            timestamp
         });
     }
 
-    // Handle MongoDB Validation Errors
-    else if (err.name === 'ValidationError') {
-        const validationErrors = Object.values(err.errors).map(e => ({
+    // Invalid ObjectId / CastError
+    if (normalized.name === "CastError") {
+        const path = normalized.path || "unknown_field";
+
+        return res.status(400).json({
+            success: false,
+            message: `Invalid value for field: ${path}`,
+            code: "CAST_ERROR",
+            timestamp
+        });
+    }
+
+    // Validation Errors
+    if (normalized.name === "ValidationError") {
+        const errors = Object.values(normalized.errors || {}).map(e => ({
             field: e.path,
             message: e.message,
             value: e.value
         }));
+
         return res.status(400).json({
             success: false,
-            message: 'Validation failed',
-            code: 'VALIDATION_ERROR',
-            errors: validationErrors,
-            timestamp: new Date().toISOString()
+            message: "Validation failed",
+            code: "VALIDATION_ERROR",
+            errors,
+            timestamp
         });
     }
 
-    // Handle MongoDB Duplicate Key Error
-    else if (err.code === 11000) {
-        const field = Object.keys(err.keyPattern)[0];
+    // Duplicate Key Error
+    if (normalized.code === 11000) {
+        const field = Object.keys(normalized.keyPattern || {})[0];
+
         return res.status(409).json({
             success: false,
             message: `${field} already exists`,
-            code: 'DUPLICATE_KEY',
-            error: `A record with this ${field} already exists`,
-            timestamp: new Date().toISOString()
+            code: "DUPLICATE_KEY",
+            timestamp
         });
     }
 
-    // Handle JWT Errors
-    else if (err.name === 'JsonWebTokenError') {
+    // JWT Errors
+    if (normalized.name === "JsonWebTokenError") {
         return res.status(401).json({
             success: false,
-            message: 'Invalid token',
-            code: 'INVALID_TOKEN',
-            timestamp: new Date().toISOString()
+            message: "Invalid token",
+            code: "INVALID_TOKEN",
+            timestamp
         });
     }
 
-    else if (err.name === 'TokenExpiredError') {
+    if (normalized.name === "TokenExpiredError") {
         return res.status(401).json({
             success: false,
-            message: 'You need to login again!',
-            code: 'TOKEN_EXPIRED',
-            timestamp: new Date().toISOString()
+            message: "Login expired. Please authenticate again.",
+            code: "TOKEN_EXPIRED",
+            timestamp
         });
     }
 
-    // Handle Axios Errors
-    else if (err.isAxiosError) {
-        console.error('Axios error occurred:', err.code, err.name, err.message);
-        if (err.code === 'ECONNREFUSED') {
-            return res.status(503).json({
-                success: false,
-                message: err.message || `Service for ${err.config.url} is unavailable`,
-                code: 'SERVICE_UNAVAILABLE',
-                timestamp: new Date().toISOString()
-            });
-        }
-        // Aggregate errors
-        else if (err.response?.data?.errors) {
-            let numberOfErrors = err.response.data.errors.length;
-            let message = `${numberOfErrors} errors occurred: `;
-            console.error(`${numberOfErrors} errors occurred.`);
-            err.response.data.errors.forEach(e => message += `${e.message}, `);
-            return res.status(err.response.status).json({
-                success: false,
-                numberOfErrors,
-                message,
-                code: `HTTP_${err.response.status}`,
-                timestamp: new Date().toISOString(),
-            });
-        }
-        else if (err.response) {
-            return res.status(err.response.status).json({
-                success: false,
-                message: err.response.data?.message || err.response.data?.msg || err.message,
-                code: `HTTP_${err.response.status}`,
-                timestamp: new Date().toISOString()
-            });
-        }
+    // Axios Errors
+    if (normalized.isAxiosError) {
+        return handleAxiosError(res, normalized, timestamp);
     }
 
-    // Handle 404 errors
-    else if (err.code === 'ENOTFOUND' || status === 404 || err.status === 404) {
+    // 404
+    if (normalized.status === 404 || normalized.code === "ENOTFOUND") {
         return res.status(404).json({
             success: false,
-            message: err.message || 'Resource not found',
-            code: 'NOT_FOUND',
-            timestamp: new Date().toISOString()
+            message: normalized.message || "Resource not found",
+            code: "NOT_FOUND",
+            timestamp
         });
     }
 
-    // Handle BadRequestError
-    else if (err.code === 'BAD_REQUEST') {
+    // Custom BAD_REQUEST
+    if (normalized.code === "BAD_REQUEST") {
         return res.status(400).json({
             success: false,
-            message: err.message || 'Bad Request',
-            code: 'BAD_REQUEST',
-            timestamp: new Date().toISOString()
+            message: normalized.message || "Bad request",
+            code: "BAD_REQUEST",
+            timestamp
         });
     }
 
-    else if (err.name === 'ReferenceError') {
+    // ReferenceError
+    if (normalized.name === "ReferenceError") {
         return res.status(400).json({
             success: false,
-            message: err.message || 'Reference Error',
-            code: 'REFERENCE_ERROR',
-            timestamp: new Date().toISOString()
+            message: normalized.message || "Reference error occurred",
+            code: "REFERENCE_ERROR",
+            timestamp
         });
     }
 
-    // Default error response
-    res.status(status ? status : err.status || 500).json({
+    // Default Fallback
+    return res.status(status).json({
         success: false,
-        message: err?.message || 'Internal server error',
-        code: err?.code || 'INTERNAL_ERROR',
-        timestamp: new Date().toISOString()
+        message: normalized.message || "Internal server error",
+        code: normalized.code || "INTERNAL_ERROR",
+        timestamp
     });
 };
+
+/**
+ * Normalize different error types into a consistent structure.
+ */
+function normalizeError(err) {
+    if (err instanceof Error) return err;
+    if (typeof err === "object") {
+        const normalized = new Error(err.message || "Unknown error");
+        normalized.status = err.status || 500;
+        normalized.code = err.code || "INTERNAL_ERROR";
+        normalized.name = err.name || "Error";
+        return normalized;
+    }
+    const normalized = new Error(String(err));
+    normalized.status = 500;
+    normalized.code = "INTERNAL_ERROR";
+    return normalized;
+}
+
+/**
+ * Handle axios-specific errors
+ */
+function handleAxiosError(res, err, timestamp) {
+    if (err.code === "ECONNREFUSED") {
+        return res.status(503).json({
+            success: false,
+            message: err.message || "Dependency service unavailable",
+            code: "SERVICE_UNAVAILABLE",
+            timestamp
+        });
+    }
+
+    if (err.response?.data?.errors) {
+        const list = err.response.data.errors.map(e => e.message);
+        return res.status(err.response.status).json({
+            success: false,
+            message: `${list.length} errors occurred`,
+            errors: list,
+            code: `HTTP_${err.response.status}`,
+            timestamp
+        });
+    }
+
+    if (err.response) {
+        return res.status(err.response.status).json({
+            success: false,
+            message: err.response.data?.message || err.message,
+            code: `HTTP_${err.response.status}`,
+            timestamp
+        });
+    }
+
+    return res.status(500).json({
+        success: false,
+        message: "Unexpected network error",
+        code: "NETWORK_ERROR",
+        timestamp
+    });
+}
 
 module.exports = { handleError };

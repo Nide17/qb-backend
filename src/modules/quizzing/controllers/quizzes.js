@@ -122,21 +122,26 @@ exports.getOneQuiz = async (req, res) => {
     try {
         const id = req.params.id;
         const query = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { slug: id };
-        const Quiz = await QuizModel();
 
-        const quiz = await Quiz.findOne(query)
-            .populate('category questions', 'title questionText')
-            .select('-__v')
-            .lean();
+        const cacheKey = CACHE_KEYS.ONE(id);
 
-        if (!quiz) throw { status: 404, message: `Quiz with id ${id} not found` };
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
-        const User = await UserModel();
-        const owner = await User.findById(quiz.created_by).select('name image').lean();
-        quiz.created_by = owner;
+            const Quiz = await QuizModel();
+            let quiz = await Quiz.findOne(query)
+                .populate('category questions', 'title question_image questionText answerOptions duration slug')
+                .select('-__v')
+                .lean();
 
-        res.status(200).json(quiz);
+            if (!quiz) throw { status: 404, message: `Quiz with id ${id} not found` };
 
+            const User = await UserModel();
+            const owner = await User.findById(quiz.created_by).select('name image').lean();
+            quiz.created_by = owner || quiz.created_by;
+            return quiz;
+        });
+
+        res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
     }
