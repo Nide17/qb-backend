@@ -42,13 +42,19 @@ app.get("/api/health", async (req, res) => {
 app.use((req, res) => handleError(res, { status: 404, message: `Route ${req.url} not found` }));
 
 // Error Handler
-app.use((err, req, res) => {
+app.use((err, req, res, next) => {  // eslint-disable-line no-unused-vars
     console.error("❌ Error:", err);
-    handleError(res, {
-        status: err.status || 500,
-        message: err.message || "Internal Server Error",
+
+    const safeError = {
+        message: err.message,
+        name: err.name,
+        status: err.status,
+        code: err.code,
         stack: process.env.NODE_ENV === "production" ? undefined : err.stack
-    });
+    };
+    handleError(res, safeError);
+
+    handleError(res, safeError);
 });
 
 // Start server
