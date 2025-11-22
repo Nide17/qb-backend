@@ -1,14 +1,8 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-const slugify = require('slugify');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
+const slugify = require('slugify');
+const { getDB } = require('../../../utils/db-manager');
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('courses', process.env.COURSES_URI);
-
-//create a schema object
 const NotesSchema = new Schema({
     title: {
         type: String,
@@ -57,4 +51,7 @@ NotesSchema.pre('validate', function (next) {
     next();
 });
 
-module.exports = conn.model('Notes', NotesSchema);
+module.exports = async function NotesModel() {
+    const db = await getDB("courses", process.env.COURSES_URI);
+    return db.model("Notes", NotesSchema);
+};

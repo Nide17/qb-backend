@@ -1,4 +1,4 @@
-const Question = require('../models/Question');
+const QuestionModel = require('../models/Question');
 const slugify = require('slugify');
 const { handleError } = require('../../../utils/error');
 const { updateQuizQuestions } = require('../helpers');
@@ -9,10 +9,15 @@ const CACHE_KEYS = {
     ALL: "qn:all",
     ONE: (id) => `qn:${id}`,
 };
+
 exports.getQuestions = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
+
+        // Initialize all models before any populate operations
+        const Question = await QuestionModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const questions = await Question.find().sort({ creation_date: -1 }).lean();
             if (!questions || questions.length === 0) throw { 'message': 'No questions found!', 'status': 404 };
@@ -29,6 +34,8 @@ exports.getQuestions = async (req, res) => {
 exports.getOneQuestion = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const Question = await QuestionModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
             if (!question) throw { 'message': 'Question not found!', 'status': 404 };
@@ -59,6 +66,8 @@ exports.createQuestion = async (req, res) => {
             { name: 'answerOptions', value: answerOptions },
             { name: 'duration', value: duration }
         ]);
+
+        const Question = await QuestionModel();
 
         // Check for duplicate questionText
         let existingQtn = await Question.findOne({ questionText });
@@ -104,6 +113,8 @@ exports.updateQuestion = async (req, res) => {
     try {
         const { questionText, answerOptions, newQuiz, oldQuizID, last_updated_by, duration } = req.body;
         const qnImage = req.file;
+
+        const Question = await QuestionModel();
 
         // Find the Question by id
         const qtn = await Question.findOne({ _id: req.params.id });
@@ -154,6 +165,8 @@ exports.updateQuestion = async (req, res) => {
 
 exports.deleteQuestion = async (req, res) => {
     try {
+        const Question = await QuestionModel();
+
         // Find the Question to delete by id first
         const question = await Question.findById(req.params.id);
         if (!question) throw { 'message': 'Question not found', 'status': 404 };

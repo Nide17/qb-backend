@@ -1,4 +1,4 @@
-const SubscribedUser = require('../models/SubscribedUser');
+const SubscribedUserModel = require('../models/SubscribedUser');
 const { handleError } = require('../../../utils/error');
 const { sendSubscriptionEmail } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -8,10 +8,12 @@ const CACHE_KEYS = {
     ALL: "sub:all",
     ONE: (id) => `sub:${id}`,
 };
+
 exports.getSubscribedUsers = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const SubscribedUser = await SubscribedUserModel();
             return await SubscribedUser.find().sort({ createdAt: -1 });
         });
         res.status(200).json(data);
@@ -24,6 +26,7 @@ exports.getOneSubscribedUser = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const SubscribedUser = await SubscribedUserModel();
             return await SubscribedUser.findById(req.params.id).select('name email createdAt');
         });
         res.status(200).json(data);
@@ -42,6 +45,7 @@ exports.createSubscribedUser = async (req, res) => {
             { name: 'name', value: name },
             { name: 'email', value: email },
         ]);
+        const SubscribedUser = await SubscribedUserModel();
         const subscriber = await SubscribedUser.findOne({ email });
         if (subscriber) {
             throw { 'message': 'You are already subscribed!', 'status': 400 };
@@ -61,6 +65,7 @@ exports.createSubscribedUser = async (req, res) => {
 
 exports.updateSubscribedUser = async (req, res) => {
     try {
+        const SubscribedUser = await SubscribedUserModel();
         const updatedSubscribedUser = await SubscribedUser.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.status(200).json(updatedSubscribedUser);
         await cacheManager.invalidatePattern("sub:*");
@@ -71,6 +76,7 @@ exports.updateSubscribedUser = async (req, res) => {
 
 exports.deleteSubscribedUser = async (req, res) => {
     try {
+        const SubscribedUser = await SubscribedUserModel();
         const subscribedUser = await SubscribedUser.findById(req.params.id);
         if (!subscribedUser) throw { 'message': 'Subscribed user not found!', 'status': 404 };
 

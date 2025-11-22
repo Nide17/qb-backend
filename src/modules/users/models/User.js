@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-// Initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('users', process.env.USERS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 // Create a schema object
 const UserSchema = new Schema({
@@ -75,4 +71,8 @@ const UserSchema = new Schema({
   }
 });
 
-module.exports = conn.model('User', UserSchema);
+// IMPORTANT: export a function that returns the model
+module.exports = async function UserModel() {
+  const db = await getDB("users", process.env.USERS_URI);
+  return db.model("User", UserSchema);
+};

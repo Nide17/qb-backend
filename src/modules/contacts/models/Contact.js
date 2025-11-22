@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('contacts', process.env.CONTACTS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const ContactSchema = new Schema({
@@ -49,4 +45,8 @@ const ContactSchema = new Schema({
     }
 });
 
-module.exports = conn.model('Contact', ContactSchema);
+module.exports = async function ContactModel() {
+    const db = await getDB("contacts", process.env.CONTACTS_URI);
+    return db.model("Contact", ContactSchema);
+};
+

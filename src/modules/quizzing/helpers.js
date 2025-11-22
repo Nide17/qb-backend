@@ -1,12 +1,13 @@
-const Quiz = require('./models/Quiz');
-const Question = require('./models/Question');
-const CourseCategory = require('../courses/models/CourseCategory');
-const User = require('../users/models/User');
+const QuizModel = require('./models/Quiz');
+const QuestionModel = require('./models/Question');
+const CourseCategoryModel = require('../courses/models/CourseCategory');
+const UserModel = require('../users/models/User');
 const { getBatchedCourseCategoriesMap } = require('../courses/helpers');
 
 const updateQuizQuestions = async (quizId, questionId, action) => {
 
     try {
+        const Quiz = await QuizModel();
         const quiz = await Quiz.findById(quizId);
 
         if (!quiz) throw { 'message': 'Quiz not found while updating questions!', 'status': 404 };
@@ -19,6 +20,7 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
         await quiz.save();
         return true;
     } catch (err) {
+        console.log(err.name);
         throw { 'message': 'Error updating quiz questions!', 'status': 500 };
     }
 };
@@ -29,6 +31,8 @@ const getBatchedQuizzesMap = async (quizzesIds) => {
     try {
         if (!quizzesIds || !Array.isArray(quizzesIds) || quizzesIds.length === 0) return new Map();
 
+        const Quiz = await QuizModel();
+
         const quizzes = await Quiz.find({ _id: { $in: quizzesIds } }).populate('category questions', 'title questionText').select('title slug');
         if (!quizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
 
@@ -36,6 +40,7 @@ const getBatchedQuizzesMap = async (quizzesIds) => {
         quizzes.forEach(q => quizzesMap.set(q._id.toString(), q));
         return quizzesMap;
     } catch (err) {
+        console.log(err.name);
         return new Map();
     }
 };
@@ -44,6 +49,8 @@ const getBatchedQuestionsMap = async (questionsIds) => {
     try {
         if (!questionsIds || !Array.isArray(questionsIds) || questionsIds.length === 0) return new Map();
 
+        const Question = await QuestionModel();
+
         const questions = await Question.find({ _id: { $in: questionsIds } }).populate('quiz', 'questionText title');
         if (!questions.length) throw { 'message': 'No questions found!', 'status': 404 };
 
@@ -51,6 +58,7 @@ const getBatchedQuestionsMap = async (questionsIds) => {
         questions.forEach(q => questionsMap.set(q._id.toString(), q));
         return questionsMap;
     } catch (err) {
+        console.log(err.name);
         return new Map();
     }
 };
@@ -71,11 +79,12 @@ const expandQuizzes = async (quizzes) => {
             };
         });
     } catch (err) {
+        console.log(err.name);
         return quizzes;
     }
 };
 
-expandCategories = async (categories) => {
+const expandCategories = async (categories) => {
     try {
         if (!categories || !Array.isArray(categories) || categories.length === 0) return [];
 
@@ -90,12 +99,16 @@ expandCategories = async (categories) => {
             };
         });
     } catch (err) {
+        console.log(err.name);
         return categories;
     }
 };
 
-expandCategory = async (category) => {
+const expandCategory = async (category) => {
     try {
+        const CourseCategory = await CourseCategoryModel();
+        const User = await UserModel();
+
         const courseCategory = await CourseCategory.findById(category.courseCategory).select('title');
         const created_by = await User.findById(category.created_by).select('name email');
         return {
@@ -104,6 +117,7 @@ expandCategory = async (category) => {
             created_by: created_by,
         };
     } catch (err) {
+        console.log(err.name);
         return category;
     }
 };

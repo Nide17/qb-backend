@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('contacts', process.env.CONTACTS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const ChatRoomSchema = new Schema({
@@ -16,4 +12,8 @@ const ChatRoomSchema = new Schema({
     users: [{ type: Schema.Types.ObjectId, }]
 }, { timestamps: true });
 
-module.exports = conn.model('ChatRoom', ChatRoomSchema);
+module.exports = async function ChatRoomModel() {
+    const db = await getDB("contacts", process.env.CONTACTS_URI);
+    return db.model("ChatRoom", ChatRoomSchema);
+};
+

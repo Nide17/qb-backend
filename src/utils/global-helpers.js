@@ -89,7 +89,7 @@ const validateRequiredFields = (fields) => {
 
 // --- Cache wrapper -------------------------------------------------------------
 const cacheWrapper = {
-async wrap(key, ttl, fetchFn) {
+    async wrap(key, ttl, fetchFn) {
         try {
             // 1️⃣ Try Redis
             const cached = await getCachedData(key);

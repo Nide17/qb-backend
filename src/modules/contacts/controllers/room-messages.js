@@ -1,5 +1,5 @@
-const RoomMessage = require('../models/RoomMessage');
-const User = require('../../users/models/User');
+const RoomMessageModel = require('../models/RoomMessage');
+const UserModel = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
 const { notifyAdmins, validateRoomMessageData } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -14,6 +14,9 @@ const CACHE_KEYS = {
 exports.getRoomMessages = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
+        const RoomMessage = await RoomMessageModel();
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             const roomMessages = await RoomMessage.find().sort({ createdAt: -1 }).lean();
@@ -46,6 +49,8 @@ exports.getRoomMessages = async (req, res) => {
 exports.getRoomMessageByRoom = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_ROOM(req.params.id);
+        const RoomMessage = await RoomMessageModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const roomMessages = await RoomMessage.find({ room: req.params.id });
             return roomMessages;
@@ -59,6 +64,8 @@ exports.getRoomMessageByRoom = async (req, res) => {
 exports.getOneRoomMessage = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const RoomMessage = await RoomMessageModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const roomMessage = await RoomMessage.findById(req.params.id);
             return roomMessage;
@@ -81,6 +88,8 @@ exports.createRoomMessage = async (req, res) => {
             { name: 'roomID', value: roomID }
         ]);
 
+        const RoomMessage = await RoomMessageModel();
+
         const newRoomMessage = new RoomMessage({
             sender: senderID,
             receiver: receiverID,
@@ -97,12 +106,7 @@ exports.createRoomMessage = async (req, res) => {
         await notifyAdmins(newRoomMessage);
         await cacheManager.invalidatePattern("rmsg:*");
         const result = {
-            _id: savedMessage._id,
-            sender: savedMessage.sender,
-            receiver: savedMessage.receiver,
-            content: savedMessage.content,
-            room: savedMessage.room,
-            createdAt: savedMessage.createdAt,
+            ...savedMessage,
             senderName,
         };
         res.status(200).json(result);
@@ -115,6 +119,7 @@ exports.createRoomMessage = async (req, res) => {
 exports.updateRoomMessage = async (req, res) => {
     try {
         validateRoomMessageData(req.body);
+        const RoomMessage = await RoomMessageModel();
 
         const updatedRoomMessage = await RoomMessage.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedRoomMessage) throw { message: 'Something went wrong during update!', status: 500 };
@@ -127,6 +132,8 @@ exports.updateRoomMessage = async (req, res) => {
 
 exports.deleteRoomMessage = async (req, res) => {
     try {
+        const RoomMessage = await RoomMessageModel();
+
         const roomMessage = await RoomMessage.findById(req.params.id);
         if (!roomMessage) return;
 

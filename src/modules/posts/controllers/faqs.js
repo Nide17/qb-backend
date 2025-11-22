@@ -1,4 +1,4 @@
-const Faq = require('../models/Faq');
+const FaqModel = require('../models/Faq');
 const { handleError } = require('../../../utils/error');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
@@ -8,20 +8,21 @@ const CACHE_KEYS = {
     ONE: (id) => `fq:${id}`,
     BY_CREATOR: (id) => `fq:creator:${id}`,
 };
-const handleFindByIdAndUpdate = async (id, update) => {
-    try {
-        const faq = await Faq.findById(id);
-        if (!faq) throw { status: 404, message: 'Faq not found!' };
 
-        const updatedFaq = await Faq.updateOne({ _id: id }, update, { new: true });
-        return updatedFaq;
-    } catch (err) {
-        throw err;
-    }
+const handleFindByIdAndUpdate = async (id, update) => {
+    const Faq = await FaqModel();
+
+    const faq = await Faq.findById(id);
+    if (!faq) throw { status: 404, message: 'Faq not found!' };
+
+    const updatedFaq = await Faq.updateOne({ _id: id }, update, { new: true });
+    return updatedFaq;
 };
 
 exports.getFaqs = async (req, res) => {
     try {
+        const Faq = await FaqModel();
+
         const cacheKey = CACHE_KEYS.ALL;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faq.find().sort({ createdAt: -1 });
@@ -34,6 +35,8 @@ exports.getFaqs = async (req, res) => {
 
 exports.getOneFaq = async (req, res) => {
     try {
+        const Faq = await FaqModel();
+
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faq.findById(req.params.id);
@@ -46,6 +49,8 @@ exports.getOneFaq = async (req, res) => {
 
 exports.getCreatedBy = async (req, res) => {
     try {
+        const Faq = await FaqModel();
+
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Faq.find({ created_by: req.params.id }).sort({ createdAt: -1 });
@@ -66,6 +71,8 @@ exports.createFaq = async (req, res) => {
             { name: 'answer', value: answer },
             { name: 'created_by', value: created_by }
         ]);
+
+        const Faq = await FaqModel();
 
         const newFaq = new Faq({ title, answer, created_by });
         const savedFaq = await newFaq.save();
@@ -99,6 +106,8 @@ exports.updateFaq = async (req, res) => {
 
 exports.deleteFaq = async (req, res) => {
     try {
+        const Faq = await FaqModel();
+
         const faq = await Faq.findById(req.params.id);
         if (!faq) throw { status: 404, message: 'Faq not found!' };
         const removedFaq = await faq.deleteOne();

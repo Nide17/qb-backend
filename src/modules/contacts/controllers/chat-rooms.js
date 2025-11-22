@@ -1,5 +1,5 @@
-const ChatRoom = require('../models/ChatRoom');
-const RoomMessage = require('../models/RoomMessage');
+const ChatRoomModel = require('../models/ChatRoom');
+const RoomMessageModel = require('../models/RoomMessage');
 const { handleError } = require('../../../utils/error');
 const { notifyAdmins, expandRoomsUsers } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -9,9 +9,12 @@ const CACHE_KEYS = {
     ALL: "crm:all",
     ONE: (id) => `crm:${id}`,
 };
+
 exports.getChatRooms = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
+        const ChatRoom = await ChatRoomModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let chatRooms = await ChatRoom.find().sort({ createdAt: -1 });
             chatRooms = await expandRoomsUsers(chatRooms);
@@ -26,6 +29,8 @@ exports.getChatRooms = async (req, res) => {
 exports.getOneChatRoom = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const ChatRoom = await ChatRoomModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await ChatRoom.findById(req.params.id);
         });
@@ -42,6 +47,8 @@ exports.createChatRoom = async (req, res) => {
 
         // Validation
         validateRequiredFields([{ name: 'name', value: name }, { name: 'users', value: users }]);
+
+        const ChatRoom = await ChatRoomModel();
 
         const newRoom = new ChatRoom({ name, users });
         const savedRoom = await newRoom.save();
@@ -62,6 +69,7 @@ exports.createOpenChatRoom = async (req, res) => {
     const name = req.params.roomNameToOpen;
 
     try {
+        const ChatRoom = await ChatRoomModel();
         let chatroom = await ChatRoom.findOne({ name });
 
         if (chatroom) {
@@ -98,6 +106,8 @@ exports.createOpenChatRoom = async (req, res) => {
 
 exports.updateChatRoom = async (req, res) => {
     try {
+        const ChatRoom = await ChatRoomModel();
+
         const updatedChatRoom = await ChatRoom.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedChatRoom) throw { message: 'Something went wrong during update!', status: 500 };
         await cacheManager.invalidatePattern("crm:*");
@@ -109,6 +119,9 @@ exports.updateChatRoom = async (req, res) => {
 
 exports.deleteChatRoom = async (req, res) => {
     try {
+        const ChatRoom = await ChatRoomModel();
+        const RoomMessage = await RoomMessageModel();
+
         await RoomMessage.deleteMany({ room: req.params.id });
 
         const deletedChatRoom = await ChatRoom.findByIdAndDelete(req.params.id);

@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('scores', process.env.SCORES_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 // The alternative to the export model pattern is the export schema pattern.
 const ScoreSchema = new Schema({
@@ -82,5 +78,7 @@ const ScoreSchema = new Schema({
     }
 });
 
-//create a model
-module.exports = conn.model('Score', ScoreSchema);
+module.exports = async function ScoreModel() {
+    const db = await getDB("scores", process.env.SCORES_URI);
+    return db.model("Score", ScoreSchema);
+};

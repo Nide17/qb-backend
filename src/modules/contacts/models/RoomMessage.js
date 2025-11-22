@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('contacts', process.env.CONTACTS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const RoomMessageSchema = new Schema({
@@ -25,4 +21,8 @@ const RoomMessageSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = conn.model('RoomMessage', RoomMessageSchema);
+module.exports = async function RoomMessageModel() {
+    const db = await getDB("contacts", process.env.CONTACTS_URI);
+    return db.model("RoomMessage", RoomMessageSchema);
+};
+

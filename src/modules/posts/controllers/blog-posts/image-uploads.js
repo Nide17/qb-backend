@@ -1,7 +1,7 @@
-const ImageUpload = require('../../models/blog-posts/ImageUpload');
-const User = require('../../../users/models/User');
+const ImageUploadModel = require('../../models/blog-posts/ImageUpload');
+const UserModel = require('../../../users/models/User');
 const { getBatchedUsersMap } = require('../../../users/helpers');
-const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
+const { deleteImageFromS3, cacheManager, cacheWrapper, validateRequiredFields } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -10,9 +10,12 @@ const CACHE_KEYS = {
     ONE: (id) => `img:${id}`,
     BY_OWNER: (id) => `img:own:${id}`
 };
+
 exports.getImageUploads = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
+        const ImageUpload = await ImageUploadModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let imageUploads = await ImageUpload.find().sort({ createdAt: -1 }).lean();
             if (!imageUploads) throw { 'message': 'No image uploads found!', 'status': 404 };
@@ -41,6 +44,9 @@ exports.getImageUploads = async (req, res) => {
 exports.getOneImageUpload = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
+        const ImageUpload = await ImageUploadModel();
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let imageUpload = await ImageUpload.findById(req.params.id).lean();
             if (!imageUpload) throw { status: 404, message: 'Image upload not found!' };
@@ -60,6 +66,8 @@ exports.getOneImageUpload = async (req, res) => {
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_OWNER(req.params.id);
+        const ImageUpload = await ImageUploadModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             let imageUploads = await ImageUpload.find({ owner: req.params.id }).sort({ createdAt: -1 }).lean();
@@ -98,6 +106,8 @@ exports.createImageUpload = async (req, res) => {
             { name: 'owner', value: owner },
             { name: 'uploadImage', value: imgUp_file }
         ]);
+        const ImageUpload = await ImageUploadModel();
+
         // Check for duplicate imageTitle
         const imgUp = await ImageUpload.findOne({ imageTitle });
         if (imgUp) throw { 'message': 'Failed! Image with that name already exists!', 'status': 400 };
@@ -119,6 +129,8 @@ exports.createImageUpload = async (req, res) => {
 
 exports.updateImageUpload = async (req, res) => {
     try {
+        const ImageUpload = await ImageUploadModel();
+
         const imageUpload = await ImageUpload.findById(req.params.id);
         if (!imageUpload) throw { 'message': 'Image upload not found!', 'status': 404 };
 
@@ -133,6 +145,8 @@ exports.updateImageUpload = async (req, res) => {
 exports.deleteImageUpload = async (req, res) => {
 
     try {
+        const ImageUpload = await ImageUploadModel();
+
         const imageUpload = await ImageUpload.findById(req.params.id);
         if (!imageUpload) throw { 'message': 'Image upload is not found!', 'status': 404 };
 

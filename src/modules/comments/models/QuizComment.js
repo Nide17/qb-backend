@@ -1,11 +1,8 @@
-// Bring in Mongo
+const process = require("process");
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('comments', process.env.COMMENTS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const QuizCommentSchema = new Schema({
@@ -21,4 +18,7 @@ const QuizCommentSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = conn.model('QuizComment', QuizCommentSchema);
+module.exports = async function QuizCommentModel() {
+    const db = await getDB("comments", process.env.COMMENTS_URI);
+    return db.model("QuizComment", QuizCommentSchema);
+};

@@ -1,4 +1,5 @@
-const BlogPostsView = require('../../models/blog-posts/BlogPostsView');
+const BlogPostsViewModel = require('../../models/blog-posts/BlogPostsView');
+const UserModel = require('../../../users/models/User');
 const { scheduledReportMessage } = require('../../helpers');
 const { getBatchedUsersMap } = require('../../../users/helpers');
 const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
@@ -17,6 +18,8 @@ scheduledReportMessage();
 exports.getBlogPostsViews = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
+        const BlogPostsView = await BlogPostsViewModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             // Extract unique IDs
             let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
@@ -43,6 +46,9 @@ exports.getBlogPostsViews = async (req, res) => {
 exports.getOneBlogPostsView = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
+        const BlogPostsView = await BlogPostsViewModel();
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let blogPostsView = await BlogPostsView.findById(req.params.id).lean();
             if (!blogPostsView) throw { 'message': 'Blog Post View not found!', 'status': 404 };
@@ -62,6 +68,8 @@ exports.getOneBlogPostsView = async (req, res) => {
 exports.getRecentTenViews = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.RECENT_TEN;
+        const BlogPostsView = await BlogPostsViewModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let recentTenViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).limit(10).select('-__v').lean();
             if (!recentTenViews) throw { 'message': '10 blog posts views not found!', 'status': 404 };
@@ -89,6 +97,8 @@ exports.createBlogPostsView = async (req, res) => {
     if (!blogPost) throw { 'message': 'Blog post does not exist.', 'status': 400 };
 
     try {
+        const BlogPostsView = await BlogPostsViewModel();
+
         const newBlogPostView = new BlogPostsView({ blogPost, viewer, device, country });
         const savedBlogPost = await newBlogPostView.save();
         if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! File size should not exceed 1MB', 'status': 503 };
@@ -101,6 +111,8 @@ exports.createBlogPostsView = async (req, res) => {
 
 exports.updateBlogPostsView = async (req, res) => {
     try {
+        const BlogPostsView = await BlogPostsViewModel();
+
         let blogPostsView = await BlogPostsView.findById(req.params.id);
         if (!blogPostsView) throw { 'message': 'BlogPostsView not found!', 'status': 404 };
         const updatedBlogPostsView = await BlogPostsView.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -113,6 +125,8 @@ exports.updateBlogPostsView = async (req, res) => {
 
 exports.deleteBlogPostsView = async (req, res) => {
     try {
+        const BlogPostsView = await BlogPostsViewModel();
+
         const blogPost = await BlogPostsView.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
         blogPost.post_image && await deleteImageFromS3(blogPost.post_image);

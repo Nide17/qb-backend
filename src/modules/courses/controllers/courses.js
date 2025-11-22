@@ -1,10 +1,10 @@
-const Course = require('../models/Course');
-const Chapter = require('../models/Chapter');
-const Notes = require('../models/Notes');
+const CourseModel = require('../models/Course');
+const ChapterModel = require('../models/Chapter');
+const NotesModel = require('../models/Notes');
+const UserModel = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
-const User = require('../../users/models/User');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -12,7 +12,10 @@ const CACHE_KEYS = {
     ONE: (id) => `crs:${id}`,
     BY_CC: (id) => `crs_cc:${id}`,
 };
+
 const findCourses = async (query, limit = 0) => {
+
+    const Course = await CourseModel();
 
     let coursesQuery = Course.find(query).sort({ createdAt: -1 })
         .select('-__v -updatedAt -last_updated_by')
@@ -55,12 +58,15 @@ exports.getOneCourse = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const Course = await CourseModel();
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let course = await Course
-            .findById(req.params.id)
-            .select('-__v -updatedAt')
-            .populate('courseCategory', 'title courseCategory')
-            .lean();
+                .findById(req.params.id)
+                .select('-__v -updatedAt')
+                .populate('courseCategory', 'title courseCategory')
+                .lean();
             if (!course) throw { 'message': 'Course not found!', 'status': 404 };
             const created_by = await User.findById(course.created_by).select('name');
             course = { ...course, created_by };
@@ -99,6 +105,8 @@ exports.createCourse = async (req, res) => {
             { name: 'created_by', value: created_by }
         ]);
 
+        const Course = await CourseModel();
+
         const course = await Course.findOne({ title });
         if (course) throw { 'message': 'Course with this title already exists!', 'status': 409 };
 
@@ -121,6 +129,8 @@ exports.createCourse = async (req, res) => {
 
 exports.updateCourse = async (req, res) => {
     try {
+        const Course = await CourseModel();
+
         let course = await Course.findById(req.params.id);
         if (!course) throw { 'message': 'Course not found!', 'status': 404 };
 
@@ -136,6 +146,9 @@ exports.updateCourse = async (req, res) => {
 
 exports.deleteCourse = async (req, res) => {
     try {
+        const Course = await CourseModel();
+        const Chapter = await ChapterModel();
+        const Notes = await NotesModel();
 
         let course = await Course.findById(req.params.id);
         if (!course) throw { 'message': 'Course not found!', 'status': 404 };

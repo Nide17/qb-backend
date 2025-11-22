@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('downloads', process.env.DOWNLOADS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const DownloadSchema = new Schema({
@@ -26,4 +22,8 @@ const DownloadSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = conn.model('Download', DownloadSchema);
+module.exports = async function DownloadModel() {
+    const db = await getDB("downloads", process.env.DOWNLOADS_URI);
+    return db.model("Download", DownloadSchema);
+};
+

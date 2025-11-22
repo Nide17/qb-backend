@@ -1,17 +1,20 @@
-const PostCategory = require('../../models/blog-posts/PostCategory');
 const { getBatchedUsersMap } = require('../../../users/helpers');
 const { handleError } = require('../../../../utils/error');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
-const User = require('../../../users/models/User');
+const UserModel = require('../../../users/models/User');
+const PostCategoryModel = require('../../models/blog-posts/PostCategory');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
     ALL: "pc:all",
     ONE: (id) => `pc:${id}`,
 };
+
 // Refactored code to use reusable utilities and align with patterns from other services.
 exports.getPostCategories = async (req, res) => {
     try {
+        const PostCategory = await PostCategoryModel();
+
         const cacheKey = CACHE_KEYS.ALL;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const postCategories = await PostCategory.find().sort({ createdAt: -1 }).lean();
@@ -44,6 +47,9 @@ exports.getOnePostCategory = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
+        const PostCategory = await PostCategoryModel();
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let postCategory = await PostCategory.findById(req.params.id).lean();
             if (!postCategory) throw { status: 404, message: 'Image upload not found!' };
@@ -71,6 +77,9 @@ exports.createPostCategory = async (req, res) => {
             { name: 'description', value: description },
             { name: 'creator', value: creator }
         ]);
+
+        const PostCategory = await PostCategoryModel();
+
         // Check for duplicate title
         const postCat = await PostCategory.findOne({ title });
         if (postCat) {
@@ -89,6 +98,8 @@ exports.createPostCategory = async (req, res) => {
 
 exports.updatePostCategory = async (req, res) => {
     try {
+        const PostCategory = await PostCategoryModel();
+
         const updatedPostCategory = await PostCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedPostCategory) throw { status: 404, message: 'PostCategory not found!' };
         await cacheManager.invalidatePattern("pc:*");
@@ -100,6 +111,8 @@ exports.updatePostCategory = async (req, res) => {
 
 exports.deletePostCategory = async (req, res) => {
     try {
+        const PostCategory = await PostCategoryModel();
+
         const postCategory = await PostCategory.findById(req.params.id);
         if (!postCategory) throw { status: 404, message: 'PostCategory not found!' };
         await PostCategory.findByIdAndDelete(req.params.id);

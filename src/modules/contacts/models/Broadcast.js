@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('contacts', process.env.CONTACTS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const BroadcastSchema = new Schema({
@@ -23,4 +19,7 @@ const BroadcastSchema = new Schema({
 },
     { timestamps: true });
 
-module.exports = conn.model('Broadcast', BroadcastSchema);
+module.exports = async function BroadcastModel() {
+    const db = await getDB("contacts", process.env.CONTACTS_URI);
+    return db.model("Broadcast", BroadcastSchema);
+};

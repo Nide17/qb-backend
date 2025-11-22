@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('posts', process.env.POSTS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const FaqSchema = new Schema({
@@ -36,4 +32,7 @@ const FaqSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = conn.model('Faq', FaqSchema);
+module.exports = async function FaqModel() {
+    const db = await getDB("posts", process.env.POSTS_URI);
+    return db.model("Faq", FaqSchema);
+};

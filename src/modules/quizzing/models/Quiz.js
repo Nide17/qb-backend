@@ -1,12 +1,8 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 const slugify = require('slugify');
 
-//initialize Mongo schema
-const Schema = mongoose.Schema;
-
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('quizzing', process.env.QUIZZING_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const QuizSchema = new Schema({
@@ -75,4 +71,7 @@ QuizSchema.pre('validate', function (next) {
   next();
 });
 
-module.exports = conn.model('Quiz', QuizSchema);
+module.exports = async function QuizModel() {
+  const db = await getDB("quizzing", process.env.QUIZZING_URI);
+  return db.model("Quiz", QuizSchema);
+};

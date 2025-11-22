@@ -3,10 +3,16 @@ const process = require('process');
 const { handleError } = require('../../../utils/error');
 const { getEventLoopLag, getCpuUsagePercent } = require('../helpers');
 const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
-const User = require('../../users/models/User');
-const Quiz = require('../../quizzing/models/Quiz');
-const Download = require('../../downloads/models/Download');
-const Score = require('../../scores/models/Score');
+const { getDB } = require('../../../utils/db-manager');
+
+const { getBatchedUsersMap } = require('../../users/helpers');
+const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
+const { getBatchedNotesMap } = require('../../courses/helpers');
+
+const UserModel = require('../../users/models/User');
+const QuizModel = require('../../quizzing/models/Quiz');
+const DownloadModel = require('../../downloads/models/Download');
+const ScoreModel = require('../../scores/models/Score');
 
 const CACHE_TTL = 300; // 5 minutes
 const CACHE_KEYS = {
@@ -19,10 +25,6 @@ const CACHE_KEYS = {
     NOTES_STATS: (key) => `st:notes:${key}`,
     LIVE: "st:liveAnalytics"
 };
-
-// Enhanced & reusable System Metrics
-const { getConnection } = require('../../../utils/db-manager');
-
 
 // ===================================================================
 // SYSTEM METRICS CONTROLLER
@@ -110,8 +112,8 @@ exports.getDataMetrics = async (req, res) => {
             const dbMetrics = {};
 
             for (const cfg of DATABASES) {
-                const conn = getConnection(cfg.key, cfg.uri);
-                const isConnected = conn.readyState === 1;
+                const db = await getDB(cfg.key, cfg.uri);
+                const isConnected = db?.readyState === 1;
 
                 let stats = null;
                 let latency = null;
@@ -119,15 +121,21 @@ exports.getDataMetrics = async (req, res) => {
                 if (isConnected) {
                     try {
                         const start = Date.now();
-                        stats = await conn.db.stats();
+
+                        // FIX: correct Mongo stats command
+                        stats = await db.db.command({ dbStats: 1 });
+
                         latency = Date.now() - start;
-                    } catch { latency = null; }
+                    } catch (err) {
+                        console.error(`DB Stats error for ${cfg.key}:`, err.message);
+                        latency = null;
+                    }
                 }
 
                 dbMetrics[cfg.key] = {
                     connected: isConnected,
                     latencyMs: latency,
-                    name: conn?.db?.databaseName || null,
+                    name: db?.name || cfg.key,
                     stats: stats && {
                         collections: stats.collections,
                         objects: stats.objects,
@@ -208,6 +216,11 @@ exports.getSummaryStats = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.SUMMARY_STATS;
+        const User = await UserModel();
+        const Quiz = await QuizModel();
+        const Download = await DownloadModel();
+        const Score = await ScoreModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get actual data from working endpoints and count them through API Gateway
@@ -306,6 +319,8 @@ exports.get50NewUsers = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('new50');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({}).sort({ register_date: -1 }).limit(50).lean();
         });
@@ -319,6 +334,8 @@ exports.get50NewUsers = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
     try {
         const cacheKey = 'usr:all';
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({}).lean();
         });
@@ -332,6 +349,8 @@ exports.getAllUsers = async (req, res) => {
 exports.getUsersWithImage = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('image');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ image: { $exists: true, $ne: '' } }).lean();
         });
@@ -344,6 +363,8 @@ exports.getUsersWithImage = async (req, res) => {
 exports.getUsersWithSchool = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('school');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ school: { $exists: true, $ne: null } }).lean();
         });
@@ -356,6 +377,8 @@ exports.getUsersWithSchool = async (req, res) => {
 exports.getUsersWithLevel = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('level');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ level: { $exists: true, $ne: null } }).lean();
         });
@@ -368,6 +391,8 @@ exports.getUsersWithLevel = async (req, res) => {
 exports.getUsersWithFaculty = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('faculty');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ faculty: { $exists: true, $ne: null } }).lean();
         });
@@ -380,6 +405,8 @@ exports.getUsersWithFaculty = async (req, res) => {
 exports.getUsersWithYear = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('year');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ year: { $exists: true, $ne: null } }).lean();
         });
@@ -392,6 +419,8 @@ exports.getUsersWithYear = async (req, res) => {
 exports.getUsersWithInterests = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('interests');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ interests: { $exists: true, $ne: [] } }).lean();
         });
@@ -404,6 +433,8 @@ exports.getUsersWithInterests = async (req, res) => {
 exports.getUsersWithAbout = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('about');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ about: { $exists: true, $ne: '' } }).lean();
         });
@@ -417,6 +448,8 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('top10quizzing');
+        const Score = await ScoreModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             let topUsers = await Score.aggregate([
@@ -448,6 +481,8 @@ exports.getTop10Quizzes = async (req, res) => {
             // Get top quizzes
             let topQuizzes = [];
 
+            const Score = await ScoreModel();
+
             const topQuizzesData = await Score.aggregate([
                 { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
                 { $sort: { totalTaken: -1 } },
@@ -472,6 +507,8 @@ exports.getTop10Downloaders = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.DOWNLOADS_STATS('top10');
+        const Download = await DownloadModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get top downloaders aggregation
@@ -508,6 +545,8 @@ exports.getTop10Downloaders = async (req, res) => {
 exports.getTop10Notes = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.NOTES_STATS('top10');
+        const Download = await DownloadModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // Get top notes aggregation
@@ -548,6 +587,8 @@ exports.getDailyUserRegistration = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('dailyRegistration');
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const usersStats = await User.aggregate([
                 {
@@ -591,6 +632,10 @@ exports.getLiveAnalytics = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.LIVE
+        const User = await UserModel();
+        const Download = await DownloadModel();
+        const Score = await ScoreModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             const now = new Date();
