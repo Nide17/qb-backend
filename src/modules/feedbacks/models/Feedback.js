@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('feedbacks', process.env.FEEDBACKS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 const FeedbackSchema = new Schema({
   rating: {
@@ -27,4 +23,8 @@ const FeedbackSchema = new Schema({
   }
 }, { timestamps: true });
 
-module.exports = conn.model('Feedback', FeedbackSchema);
+module.exports = async function FeedbackModel() {
+  const db = await getDB("feedbacks", process.env.FEEDBACKS_URI);
+  return db.model("Feedback", FeedbackSchema);
+};
+

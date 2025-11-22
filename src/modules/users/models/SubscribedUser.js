@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../utils/db-manager');
-const conn = getConnection('users', process.env.USERS_URI);
+const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const SubscribedUserSchema = new Schema({
@@ -20,4 +16,7 @@ const SubscribedUserSchema = new Schema({
   }
 }, { timestamps: true });
 
-module.exports = conn.model('SubscribedUser', SubscribedUserSchema);
+module.exports = async function SubscribedUserModel() {
+  const db = await getDB("users", process.env.USERS_URI);
+  return db.model("SubscribedUser", SubscribedUserSchema);
+};

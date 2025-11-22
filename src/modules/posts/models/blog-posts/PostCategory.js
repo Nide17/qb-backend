@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-//initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../../utils/db-manager');
-const conn = getConnection('posts', process.env.POSTS_URI);
+const { getDB } = require('../../../../utils/db-manager');
 
 //create a schema object
 const PostCategorySchema = new Schema({
@@ -23,4 +19,8 @@ const PostCategorySchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = conn.model('PostCategory', PostCategorySchema);
+module.exports = async function PostCategoryModel() {
+    const db = await getDB("posts", process.env.POSTS_URI);
+    return db.model("PostCategory", PostCategorySchema);
+};
+

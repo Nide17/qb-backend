@@ -1,7 +1,8 @@
-const CourseCategory = require('../models/CourseCategory');
-const Course = require('../models/Course');
-const Chapter = require('../models/Chapter');
-const Notes = require('../models/Notes');
+const CourseCategoryModel = require('../models/CourseCategory');
+const CourseModel = require('../models/Course');
+const ChapterModel = require('../models/Chapter');
+const NotesModel = require('../models/Notes');
+
 const { handleError } = require('../../../utils/error');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
@@ -10,10 +11,13 @@ const CACHE_KEYS = {
     ALL: "cc:all",
     ONE: (id) => `cc:${id}`,
 };
+
 exports.getCourseCategories = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
+        const CourseCategory = await CourseCategoryModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const courseCategories = await CourseCategory.find().sort({ createdAt: -1 }).select('title created_by');
             if (!courseCategories) throw { 'message': 'No course categories found!', 'status': 404 };
@@ -28,6 +32,8 @@ exports.getCourseCategories = async (req, res) => {
 exports.getOneCategory = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const CourseCategory = await CourseCategoryModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const category = await CourseCategory.findById(req.params.id).select('title description created_by');
             if (!category) throw { 'message': 'Category not found!', 'status': 404 };
@@ -50,6 +56,8 @@ exports.createCategory = async (req, res) => {
             { name: 'created_by', value: created_by }
         ]);
 
+        const CourseCategory = await CourseCategoryModel();
+
         const category = await CourseCategory.findOne({ title });
         if (category) throw { 'message': 'Category with this title already exists!', 'status': 409 };
 
@@ -66,6 +74,8 @@ exports.createCategory = async (req, res) => {
 
 exports.updateCategory = async (req, res) => {
     try {
+        const CourseCategory = await CourseCategoryModel();
+
         const category = await CourseCategory.findById(req.params.id);
         if (!category) throw { 'message': 'Category not found!', 'status': 404 };
 
@@ -81,6 +91,11 @@ exports.updateCategory = async (req, res) => {
 
 exports.deleteCategory = async (req, res) => {
     try {
+        const CourseCategory = await CourseCategoryModel();
+        const Course = await CourseModel();
+        const Chapter = await ChapterModel();
+        const Notes = await NotesModel();
+
         const category = await CourseCategory.findById(req.params.id);
         if (!category) throw { 'message': 'Category not found!', 'status': 404 };
 

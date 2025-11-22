@@ -14,40 +14,6 @@ class RedisCacheManager {
     }
 
     // -------------------------------------
-    // EMAIL ALERT WRAPPER
-    // -------------------------------------
-    async sendAlert(subject, message) {
-
-        if (process.env.NODE_ENV !== 'production') return;
-        const now = Date.now();
-
-        // prevent spamming
-        if (now - this.lastEmailSentAt < this.emailCooldownMs) {
-            console.log("⏳ Email alert suppressed (cooldown)");
-            return;
-        }
-
-        const transporter = createTransporter();
-        const mailOptions = {
-            from: `"QuizBlog Rwanda" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,
-            subject,
-            text: message
-        };
-
-        this.lastEmailSentAt = now;
-        try {
-            await sendWithRetry(transporter, mailOptions);
-        } catch (err) {
-            console.error("❌ Failed to send Redis alert email:", err.message);
-        }
-    }
-
-    isReady() {
-        return this.redis && this.isConnected && this.redis.status === "ready";
-    }
-
-    // -------------------------------------
     // CONNECT
     // -------------------------------------
     async connect() {
@@ -72,7 +38,7 @@ class RedisCacheManager {
             });
 
             this.redis.on("error", async (err) => {
-                console.error("❌ Redis error:", err.message);
+                // console.error("❌ Redis error:", err.name, err.message);
                 this.isConnected = false;
 
                 await this.sendAlert(
@@ -125,6 +91,41 @@ class RedisCacheManager {
         } finally {
             this.isConnected = false;
         }
+    }
+
+
+    // -------------------------------------
+    // EMAIL ALERT WRAPPER
+    // -------------------------------------
+    async sendAlert(subject, message) {
+
+        if (process.env.NODE_ENV !== 'production') return;
+        const now = Date.now();
+
+        // prevent spamming
+        if (now - this.lastEmailSentAt < this.emailCooldownMs) {
+            console.log("⏳ Email alert suppressed (cooldown)");
+            return;
+        }
+
+        const transporter = createTransporter();
+        const mailOptions = {
+            from: `"QuizBlog Rwanda" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
+            subject,
+            text: message
+        };
+
+        this.lastEmailSentAt = now;
+        try {
+            await sendWithRetry(transporter, mailOptions);
+        } catch (err) {
+            console.error("❌ Failed to send Redis alert email:", err.message);
+        }
+    }
+
+    isReady() {
+        return this.redis && this.isConnected && this.redis.status === "ready";
     }
 
     // -------------------------------------

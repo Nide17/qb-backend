@@ -1,7 +1,7 @@
-const Feedback = require('../models/Feedback');
-const Quiz = require('../../quizzing/models/Quiz');
-const User = require('../../users/models/User');
-const Score = require('../../scores/models/Score');
+const FeedbackModel = require('../models/Feedback');
+const QuizModel = require('../../quizzing/models/Quiz');
+const UserModel = require('../../users/models/User');
+const ScoreModel = require('../../scores/models/Score');
 const { handleError } = require('../../../utils/error');
 const { expandFeedbacks } = require('../helpers');
 const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -12,6 +12,7 @@ const CACHE_KEYS = {
     ONE: (id) => `fdb:${id}`,
     PAGINATED: (pageNo) => `fdb:page:${pageNo}`
 };
+
 exports.getFeedbacks = async (req, res) => {
 
     try {
@@ -22,6 +23,7 @@ exports.getFeedbacks = async (req, res) => {
 
         query.limit = PAGE_SIZE;
         query.skip = PAGE_SIZE * (pageNo - 1);
+        const Feedback = await FeedbackModel();
 
         if (pageNo && pageNo > 0) {
             const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
@@ -53,6 +55,12 @@ exports.getOneFeedback = async (req, res) => {
     try {
 
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+
+        const Feedback = await FeedbackModel();
+        const Quiz = await QuizModel();
+        const User = await UserModel();
+        const Score = await ScoreModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let feedback = await Feedback.findById(req.params.id).select('quiz score user comment rating').lean();
             if (!feedback) throw { 'message': 'Feedback not found!', 'status': 404 };
@@ -80,6 +88,8 @@ exports.getOneFeedback = async (req, res) => {
 
 exports.createFeedback = async (req, res) => {
     try {
+        const Feedback = await FeedbackModel();
+
         const newFeedback = new Feedback(req.body);
         const savedFeedback = await newFeedback.save();
         await cacheManager.invalidatePattern("fdb:*");
@@ -91,6 +101,8 @@ exports.createFeedback = async (req, res) => {
 
 exports.updateFeedback = async (req, res) => {
     try {
+        const Feedback = await FeedbackModel();
+
         const updatedFeedback = await Feedback.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedFeedback) throw { 'message': 'Feedback not found!', 'status': 404 };
 
@@ -103,6 +115,8 @@ exports.updateFeedback = async (req, res) => {
 
 exports.deleteFeedback = async (req, res) => {
     try {
+        const Feedback = await FeedbackModel();
+
         const feedback = await Feedback.findById(req.params.id);
         if (!feedback) throw { 'message': 'Feedback not found!', 'status': 404 };
         const removedFeedback = await feedback.deleteOne();

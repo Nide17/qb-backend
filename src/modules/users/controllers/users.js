@@ -3,12 +3,13 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
-const User = require('../models/User');
-const Faculty = require('../../schools/models/Faculty');
-const PswdResetToken = require('../models/PswdResetToken');
 const { handleError } = require('../../../utils/error');
 const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const { hashPassword, updateUserToken } = require('../helpers');
+
+const UserModel = require('../models/User');
+const FacultyModel = require('../../schools/models/Faculty');
+const PswdResetTokenModel = require('../models/PswdResetToken');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -18,12 +19,15 @@ const CACHE_KEYS = {
     LATEST8: "usr:latest8",
     ADMINSCREATORS: "usr:adminscreators",
 };
+
 // Get all users
 exports.getUsers = async (req, res) => {
 
     try {
         const limit = req.query.limit ? parseInt(req.query.limit) : 0;
         const filter = req.query.filter ? req.query.filter : ''; // Eg: name, school, level, faculty, interests, about, image
+
+        const User = await UserModel();
 
         if (filter || limit) {
             const query = filter
@@ -50,6 +54,7 @@ exports.getLatestUsers = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.LATEST8;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const User = await UserModel();
             let users = await User.find().sort({ register_date: -1 }).select('name email role image register_date').limit(8);
             if (!users.length) throw { 'message': 'No users found!', 'status': 404 };
             return users;
@@ -65,6 +70,9 @@ exports.getAdminsCreators = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ADMINSCREATORS;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+
+            const User = await UserModel();
+
             let adminsCreators = await User.find({ role: { $in: ['Admin', 'SuperAdmin', 'Creator'] } }).select('name email role image register_date');
             if (!adminsCreators.length) throw { 'message': 'No users found!', 'status': 404 };
             return adminsCreators;
@@ -81,6 +89,9 @@ exports.getOneUser = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const User = await UserModel();
+            const Faculty = await FacultyModel();
+
             let user = await User.findById(req.params.id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
             if (!user) throw { 'message': 'User not found!', 'status': 404 };
 
@@ -108,10 +119,13 @@ exports.getOneUser = async (req, res) => {
 // Load user by token
 exports.loadUser = async (req, res) => {
     try {
-        const cacheKey = CACHE_KEYS.CURRENT(req.params.id);
+        const cacheKey = CACHE_KEYS.CURRENT(req?.user?._id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             // If no cache, get user from database
+            const User = await UserModel();
+            const Faculty = await FacultyModel();
+
             let user = await User.findById(req?.user?._id).select('-password -__v -verified -otp -otpExpires -register_date -last_login').lean();
             if (!user) throw { 'message': 'No active session!', 'status': 404 };
 
@@ -143,6 +157,7 @@ exports.login = async (req, res) => {
         const { email, password, confirmLogin } = req.body;
         if (!email || !password) throw { 'status': 400, 'message': 'Please fill all fields' };
 
+        const User = await UserModel();
         const user = await User.findOne({ email });
         if (!user) throw { 'status': 404, 'message': 'User not found' };
 
@@ -195,6 +210,7 @@ exports.login = async (req, res) => {
 // User logout
 exports.logout = async (req, res) => {
     try {
+        const User = await UserModel();
         const loggedOutUser = await User.findByIdAndUpdate(
             req.body.userId,
             { $set: { current_token: null } },
@@ -219,6 +235,7 @@ exports.register = async (req, res) => {
         if (!name || !email || !password) throw { 'status': 400, 'message': 'Please fill all fields' };
         if (!emailTest.test(email)) throw { 'status': 400, 'message': 'Please provide a valid email!' };
 
+        const User = await UserModel();
         const user = await User.findOne({ email });
         const hash = await hashPassword(password);
 
@@ -232,10 +249,11 @@ exports.register = async (req, res) => {
         console.log('existing user otp: ', otp);
 
         // If user does not exist, create a new one
+        let savedUser;
         if (!user) {
 
             const newUser = new User({ name, email, password: hash, otp, verified: false });
-            const savedUser = await newUser.save();
+            savedUser = await newUser.save();
 
             if (!savedUser) throw { status: 500, message: 'Could not save user, try again!' };
 
@@ -256,6 +274,7 @@ exports.verifyOTP = async (req, res) => {
         const { email, otp } = req.body;
         if (!email || !otp) throw { 'status': 400, 'message': 'Email and OTP are required!' };
 
+        const User = await UserModel();
         const usr = await User.findOne({ email }).select('-password');
 
         if (!usr) throw { 'status': 400, 'message': 'User does not exist' };
@@ -284,6 +303,9 @@ exports.verifyOTP = async (req, res) => {
 exports.sendResetLink = async (req, res) => {
     try {
         const email = req.body.email;
+
+        const User = await UserModel();
+        const PswdResetToken = await PswdResetTokenModel();
         const userToReset = await User.findOne({ email });
         if (!userToReset) {
             throw { 'status': 404, 'message': 'User with that email does not exist!' };
@@ -311,6 +333,7 @@ exports.sendResetLink = async (req, res) => {
         ).then(async () => {
             res.status(200).json({ message: 'Reset email sent successfully', status: 200 });
         }).catch((err) => {
+            console.log(err.name);
             handleError(res, { status: 500, message: 'Failed to send reset link to your email!' }, 500);
         });
     } catch (err) {
@@ -322,6 +345,9 @@ exports.sendResetLink = async (req, res) => {
 exports.sendNewPassword = async (req, res) => {
     try {
         const { userId, token, password } = req.body;
+        const User = await UserModel();
+        const PswdResetToken = await PswdResetTokenModel();
+
         let passwordResetToken = await PswdResetToken.findOne({ userId });
         if (!passwordResetToken) throw { 'status': 400, 'message': 'Invalid or expired link, try resetting again!' };
 
@@ -329,6 +355,8 @@ exports.sendNewPassword = async (req, res) => {
         if (!isValid) throw { 'status': 400, 'message': 'Invalid link, try resetting again!' };
 
         const hash = await hashPassword(password);
+
+
         await User.updateOne({ _id: userId }, { $set: { password: hash } }, { new: true });
 
         const resetUser = await User.findById({ _id: userId });
@@ -352,8 +380,12 @@ exports.updateProfileImage = async (req, res) => {
         if (!req.file) throw { 'status': 400, 'message': 'Profile image is required!' };
         const img_file = req.file;
 
+        const User = await UserModel();
+        const Faculty = await FacultyModel();
+
         const user = await User.findOne({ _id: req.params.id });
         if (!user) throw { 'status': 404, 'message': 'Failed! user not exists!' };
+
         user.image && await deleteImageFromS3(user.image);
         let updatedUserProfile = await User.findByIdAndUpdate({ _id: req.params.id }, { image: img_file.location }, { new: true }).lean();
 
@@ -380,6 +412,9 @@ exports.updateProfileImage = async (req, res) => {
 // Update profile
 exports.updateProfile = async (req, res) => {
     try {
+        const User = await UserModel();
+        const Faculty = await FacultyModel();
+
         let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true }).lean();
         if (!user) throw { 'status': 404, 'message': 'User not found!' };
 
@@ -406,6 +441,7 @@ exports.updateProfile = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
     try {
+        const User = await UserModel();
         let user = await User.findByIdAndUpdate({ _id: req.params.id }, req.body, { new: true }).lean();
         if (!user) throw { 'status': 404, 'message': 'User not found!' };
         await cacheManager.invalidatePattern("usr:*");
@@ -418,6 +454,7 @@ exports.updateUser = async (req, res) => {
 // Delete user
 exports.deleteUser = async (req, res) => {
     try {
+        const User = await UserModel();
         const user = await User.findById(req.params.id);
         if (!user) throw { 'status': 404, 'message': 'User not found!' };
 

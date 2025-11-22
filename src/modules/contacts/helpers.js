@@ -1,13 +1,7 @@
-const User = require('../users/models/User');
+const UserModel = require('../users/models/User');
 const { getBatchedUsersMap } = require('../users/helpers');
 const { sendEmail } = require('../../utils/emails/sendEmail');
-const { getCachedData, setCachedData } = require('../../utils/global-helpers');
 
-const CACHE_TTL = 600; // 10 minutes
-const CACHE_KEYS = {
-    ALL: "cat:all",
-    ONE: (id) => `cat:${id}`,
-};
 // Helper function to send emails
 const sendEmails = (recipients, title, message, clientURL) => {
     recipients.forEach((recipient, index) => {
@@ -30,10 +24,7 @@ const notifyAdmins = async (newContact) => {
     try {
         const fetchAdminEmails = async () => {
             try {
-                const cacheKey = `admins-emails`;
-
-                // Check cache first
-
+                const User = await UserModel();
                 const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
                 if (!admins) throw { 'message': 'No admins found!', 'status': 404 };
                 const adminEmails = admins.map(admin => admin.email);
@@ -87,6 +78,7 @@ const expandRoomsUsers = async (chatRooms) => {
         }
         return chatRooms;
     } catch (error) {
+        console.log(error.name);
         return chatRooms;
     }
 };

@@ -1,8 +1,8 @@
 const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
-const User = require('../../users/models/User');
-const Quiz = require('../../quizzing/models/Quiz');
+const UserModel = require('../../users/models/User');
+const QuizModel = require('../../quizzing/models/Quiz');
+const ScoreModel = require('../models/Score');
 const { expandScores } = require('../helpers');
-const Score = require('../models/Score');
 const { handleError } = require('../../../utils/error');
 const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
@@ -18,9 +18,12 @@ const CACHE_KEYS = {
     POPULAR_QUIZZES: "sc:popular",
     MONTHLY_USER: "sc:monthly_user",
 };
+
 exports.getScores = async (req, res) => {
 
     try {
+        const Score = await ScoreModel();
+
         // Pagination - ENFORCE pagination to prevent memory exhaustion
         const totalScores = await Score.countDocuments({});
         var PAGE_SIZE = 20;
@@ -82,6 +85,8 @@ exports.getScoresByTaker = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.BY_TAKER(req.params.id);
+        const Score = await ScoreModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).lean();
             if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
@@ -104,6 +109,8 @@ exports.getScoresForQuizCreator = async (req, res) => {
         const skip = PAGE_SIZE * (pageNo - 1);
 
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
+        const Score = await ScoreModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const totalScores = await Score.countDocuments({});
             let scores = await Score.find().skip(skip).limit(PAGE_SIZE).sort({ test_date: -1 }).lean();
@@ -124,6 +131,10 @@ exports.getOneScore = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const Score = await ScoreModel();
+        const User = await UserModel();
+        const Quiz = await QuizModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let score = await Score.findOne({ id: req.params?.id }).lean();
             if (!score) score = await Score.findById(req.params?.id).lean();
@@ -149,6 +160,8 @@ exports.getOneScore = async (req, res) => {
 exports.getQuizRanking = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.QUIZ_RANKING(req.params.id);
+        const Score = await ScoreModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).lean();
             if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores to display' };
@@ -178,6 +191,8 @@ exports.getPopularQuizzes = async (req, res) => {
 
             // Use native MongoDB aggregation with proper options
             const aggregationOptions = { allowDiskUse: true, maxTimeMS: 30000 };
+            const Score = await ScoreModel();
+
             const topQuizzes = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
                 { $group: { _id: '$quiz', count: { $sum: 1 } } },
@@ -214,6 +229,9 @@ exports.getMonthlyUser = async (req, res) => {
 
             // Use native MongoDB aggregation with proper options
             const aggregationOptions = { allowDiskUse: true, maxTimeMS: 30000 };
+            const Score = await ScoreModel();
+            const User = await UserModel();
+
             const monthlyUser = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
                 { $group: { _id: '$taken_by', count: { $sum: 1 } } },
@@ -243,6 +261,7 @@ exports.createScore = async (req, res) => {
         const { id, out_of, category, quiz, review, taken_by } = req.body;
         const marks = req.body.marks ? req.body.marks : 0;
         var now = new Date();
+        const Score = await ScoreModel();
 
         // Simple validation
         if (!id || !out_of || !review || !taken_by) throw { status: 400, message: '400' };
@@ -267,10 +286,6 @@ exports.createScore = async (req, res) => {
             const newScore = new Score({ id, marks, out_of, test_date: now, category, quiz, review, taken_by });
             const savedScore = await newScore.save();
             if (!savedScore) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
-
-            // Clear relevant cache entries
-            const cacheKeysToDelete = [`scores_user_${taken_by}`, `ranking_${quiz}`, 'popular_quizzes', 'monthly_user'];
-            cacheKeysToDelete.forEach(key => cache?.delete(key));
 
             // Emit real-time update if socket.io is available
             if (req.io) {
@@ -310,6 +325,7 @@ exports.deleteScore = async (req, res) => {
         //Find the Score to delete by id first
         const score = await Score.findOne({ _id: req.params.id });
         if (!score) throw { 'status': 404, 'message': 'No scores found' };
+        const Score = await ScoreModel();
 
         // Delete the Score
         const removedScore = await Score.deleteOne({ _id: req.params.id });

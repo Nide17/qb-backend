@@ -1,6 +1,7 @@
-const Chapter = require('../models/Chapter');
-const Notes = require('../models/Notes');
-const User = require('../../users/models/User');
+const ChapterModel = require('../models/Chapter');
+const NotesModel = require('../models/Notes');
+const UserModel = require('../../users/models/User');
+
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -11,8 +12,10 @@ const CACHE_KEYS = {
     ONE: (id) => `cpt:${id}`,
     BY_COURSE: (id) => `cpt:by_course:${id}`
 };
+
 const findChapters = async (query, limit = 0) => {
 
+    const Chapter = await ChapterModel();
     let chaptersQuery = Chapter
         .find(query)
         .sort({ createdAt: -1 })
@@ -71,6 +74,9 @@ exports.getChaptersByCourse = async (req, res) => {
 exports.getOneChapter = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const Chapter = await ChapterModel();
+        const User = await UserModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by').lean();
             if (!chapter) throw { 'message': 'Chapter not found!', 'status': 404 };
@@ -100,6 +106,8 @@ exports.createChapter = async (req, res) => {
             { name: 'created_by', value: created_by }
         ]);
 
+        const Chapter = await ChapterModel();
+
         // Check for duplicate title
         const chapter = await Chapter.findOne({ title });
         if (chapter) throw { 'message': 'Chapter with this title already exists!', 'status': 409 };
@@ -124,6 +132,8 @@ exports.createChapter = async (req, res) => {
 
 exports.updateChapter = async (req, res) => {
     try {
+        const Chapter = await ChapterModel();
+
         const updatedChapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedChapter) throw { 'message': 'Chapter not found!', 'status': 404 };
 
@@ -136,6 +146,9 @@ exports.updateChapter = async (req, res) => {
 
 exports.deleteChapter = async (req, res) => {
     try {
+        const Chapter = await ChapterModel();
+        const Notes = await NotesModel();
+
         let chapter = await Chapter.findById(req.params.id);
         if (!chapter) throw { 'message': 'Chapter not found!', 'status': 404 };
 

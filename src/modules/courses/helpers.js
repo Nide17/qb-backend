@@ -1,9 +1,10 @@
-const CourseCategory = require('./models/CourseCategory');
-const Notes = require('./models/Notes');
+const CourseCategoryModel = require('./models/CourseCategory');
+const NotesModel = require('./models/Notes');
 
 const getBatchedCourseCategoriesMap = async (courseCategoriesIDs) => {
 
     if (!courseCategoriesIDs || courseCategoriesIDs.length === 0) return new Map();
+    const CourseCategory = await CourseCategoryModel();
 
     try {
         const courseCategories = await CourseCategory.find({ _id: { $in: courseCategoriesIDs } }).select('title');
@@ -15,14 +16,17 @@ const getBatchedCourseCategoriesMap = async (courseCategoriesIDs) => {
         }
         return courseCategoriesMap;
     } catch (err) {
+        console.log(err.name);
         return new Map();
     }
 }
 
-getBatchedNotesMap = async (notesIDs) => {
+const getBatchedNotesMap = async (notesIDs) => {
 
     try {
         if (!notesIDs || !Array.isArray(notesIDs) || notesIDs.length === 0) return new Map();
+        const Notes = await NotesModel();
+
         let notes = await Notes.find({ _id: { $in: notesIDs } }).populate('chapter course courseCategory', 'title');
         if (!notes.length) throw { 'message': 'No notes found!', 'status': 404 };
 
@@ -32,6 +36,7 @@ getBatchedNotesMap = async (notesIDs) => {
         }
         return notesMap;
     } catch (err) {
+        console.error(err.message);
         return new Map();
     }
 };

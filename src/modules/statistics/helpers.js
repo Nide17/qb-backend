@@ -2,6 +2,7 @@ const { performance } = require("perf_hooks");
 const os = require('os');
 
 async function getEventLoopLag() {
+    
     return new Promise(resolve => {
         const start = performance.now();
         setImmediate(() => {

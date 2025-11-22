@@ -1,10 +1,8 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 const slugify = require('slugify');
 
-const Schema = mongoose.Schema;
-const { getConnection } = require('../../../../utils/db-manager');
-const conn = getConnection('posts', process.env.POSTS_URI);
+const { getDB } = require('../../../../utils/db-manager');
 
 //BlogPost Schema
 const BlogPostSchema = new Schema({
@@ -45,4 +43,7 @@ BlogPostSchema.pre('validate', function (next) {
     next();
 });
 
-module.exports = conn.model('BlogPost', BlogPostSchema);
+module.exports = async function BlogPostModel() {
+    const db = await getDB("posts", process.env.POSTS_URI);
+    return db.model("BlogPost", BlogPostSchema);
+};

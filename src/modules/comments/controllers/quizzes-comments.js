@@ -1,8 +1,8 @@
-const QuizComment = require('../models/QuizComment');
 const { handleError } = require('../../../utils/error');
 const { expandComments } = require('../helpers');
-const User = require('../../users/models/User');
-const Quiz = require('../../quizzing/models/Quiz');
+const UserModel = require('../../users/models/User');
+const QuizModel = require('../../quizzing/models/Quiz');
+const QuizCommentModel = require('../models/QuizComment');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -11,10 +11,13 @@ const CACHE_KEYS = {
     ONE: (id) => `qzcmt:${id}`,
     BY_QUIZ: (quizId) => `qzcmt:quiz:${quizId}`
 };
+
 exports.getQuizzesComments = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+
+            const QuizComment = await QuizCommentModel();
 
             let quizComments = await QuizComment.find().sort({ createdAt: -1 }).lean();
             const expandedComments = await expandComments(quizComments);
@@ -35,6 +38,10 @@ exports.getOneQuizComment = async (req, res) => {
 
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+
+            const User = await UserModel();
+            const Quiz = await QuizModel();
+            const QuizComment = await QuizCommentModel();
 
             let quizComment = await QuizComment.findById(req.params.id).lean();
             if (!quizComment) throw { 'message': 'QuizComment not found!', 'status': 404 };
@@ -60,6 +67,8 @@ exports.getOneQuizComment = async (req, res) => {
 exports.getCommentsByQuiz = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_QUIZ(req.params.id);
+        const QuizComment = await QuizCommentModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             let quizComments = await QuizComment.find({ quiz: req.params.id }).sort({ createdAt: -1 }).lean();
@@ -81,6 +90,7 @@ exports.createQuizComment = async (req, res) => {
     try {
         // Validation 
         validateRequiredFields([{ name: 'comment', value: comment }, { name: 'quiz', value: quiz }, { name: 'sender', value: sender }]);
+        const QuizComment = await QuizCommentModel();
 
         // Create new QuizComment
         const newQuizComment = new QuizComment({ comment, quiz, sender });
@@ -96,6 +106,8 @@ exports.createQuizComment = async (req, res) => {
 
 exports.updateQuizComment = async (req, res) => {
     try {
+        const QuizComment = await QuizCommentModel();
+
         const quizComment = await QuizComment.findById(req.params.id);
         if (!quizComment) throw { message: 'QuizComment not found!', status: 404 };
 
@@ -113,6 +125,8 @@ exports.approveRejectComment = async (req, res) => {
     let commentID = req.params.id;
 
     try {
+        const QuizComment = await QuizCommentModel();
+
         const quizComment = await QuizComment.findById(commentID);
         if (!quizComment) throw { message: 'QuizComment not found!', status: 404 };
 
@@ -127,6 +141,8 @@ exports.approveRejectComment = async (req, res) => {
 
 exports.deleteQuizComment = async (req, res) => {
     try {
+        const QuizComment = await QuizCommentModel();
+
         const quizComment = await QuizComment.findById(req.params.id);
         if (!quizComment) throw { message: 'QuizComment not found!', status: 404 };
 

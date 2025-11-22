@@ -1,8 +1,8 @@
-const QuestionComment = require('../models/QuestionComment');
-const User = require('../../users/models/User');
+const QuestionCommentModel = require('../models/QuestionComment');
+const QuestionModel = require('../../quizzing/models/Question');
+const UserModel = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
 const { expandComments } = require('../helpers');
-const Question = require('../../quizzing/models/Question');
 const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -14,9 +14,12 @@ const CACHE_KEYS = {
     BY_QUESTION: (questionId) => `qncmt:question:${questionId}`,
     BY_QUIZ: (quizId) => `qncmt:quiz:${quizId}`
 };
+
 exports.getQuestionsComments = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
+        const QuestionComment = await QuestionCommentModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             let questionComments = await QuestionComment.find().sort({ createdAt: -1 }).lean();
@@ -37,6 +40,8 @@ exports.getPaginatedComments = async (req, res) => {
         const { page = 1, limit = 10 } = req.query;
 
         const cacheKey = CACHE_KEYS.PAGINATED(page);
+        const QuestionComment = await QuestionCommentModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             const paginatedQuestionsComments = await QuestionComment.find()
@@ -66,6 +71,8 @@ exports.getPendingComments = async (req, res) => {
     try {
 
         const cacheKey = CACHE_KEYS.PENDING;
+        const QuestionComment = await QuestionCommentModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             const questionComments = await QuestionComment.find({ status: 'Pending' }).sort({ createdAt: -1 }).lean();
@@ -84,6 +91,8 @@ exports.getPendingComments = async (req, res) => {
 exports.getCommentsByQuestion = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_QUESTION(req.params.id);
+        const QuestionComment = await QuestionCommentModel();
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
             const questionComments = await QuestionComment.find({ question: req.params.id }).sort({ createdAt: -1 }).lean();
@@ -100,19 +109,31 @@ exports.getCommentsByQuestion = async (req, res) => {
 
 exports.getOneQuestionComment = async (req, res) => {
     try {
-        let questionComment = await QuestionComment.findById(req.params.id).select('comment sender question quiz status createdAt updatedAt').lean();
-        if (!questionComment) throw { 'message': 'QuestionComment not found!', 'status': 404 };
+        const cacheKey = CACHE_KEYS.ONE(req.params.id);
 
-        if (questionComment?.sender) {
-            const user = await User.findById(questionComment?.user).select('name');
-            questionComment = { ...questionComment, user: user };
-        }
+        const QuestionComment = await QuestionCommentModel();
+        const User = await UserModel();
+        const Question = await QuestionModel();
 
-        if (questionComment?.question) {
-            const question = await Question.findById(questionComment?.question).select('question quiz');
-            questionComment = { ...questionComment, question: question, quiz: question?.quiz };
-        }
-        res.status(200).json(questionComment);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+
+            let questionComment = await QuestionComment.findById(req.params.id).select('comment sender question quiz status createdAt updatedAt').lean();
+            if (!questionComment) throw { 'message': 'QuestionComment not found!', 'status': 404 };
+
+            if (questionComment?.sender) {
+                const user = await User.findById(questionComment?.user).select('name');
+                questionComment = { ...questionComment, user: user };
+            }
+
+            if (questionComment?.question) {
+                const question = await Question.findById(questionComment?.question).select('question quiz');
+                questionComment = { ...questionComment, question: question, quiz: question?.quiz };
+            }
+            return questionComment;
+        });
+
+        res.status(200).json(data);
+
     } catch (err) {
         handleError(res, err);
     }
@@ -120,6 +141,8 @@ exports.getOneQuestionComment = async (req, res) => {
 
 exports.getCommentsByQuiz = async (req, res) => {
     try {
+        const QuestionComment = await QuestionCommentModel();
+
         const cacheKey = CACHE_KEYS.BY_QUIZ(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
@@ -143,6 +166,8 @@ exports.createQuestionComment = async (req, res) => {
     }
 
     try {
+        const QuestionComment = await QuestionCommentModel();
+
         const newQuestionComment = new QuestionComment({
             comment,
             sender,
@@ -165,6 +190,8 @@ exports.approveRejectComment = async (req, res) => {
     let commentID = req.params.id;
 
     try {
+        const QuestionComment = await QuestionCommentModel();
+
         const questionComment = await QuestionComment.findById(commentID);
         if (!questionComment) handleError(res, { status: 404, message: 'QuestionComment not found!' });
 
@@ -178,6 +205,8 @@ exports.approveRejectComment = async (req, res) => {
 
 exports.updateQuestionComment = async (req, res) => {
     try {
+        const QuestionComment = await QuestionCommentModel();
+
         const questionComment = await QuestionComment.findById(req.params.id);
         if (!questionComment) handleError(res, { status: 404, message: 'QuestionComment not found!' });
 
@@ -191,6 +220,8 @@ exports.updateQuestionComment = async (req, res) => {
 
 exports.deleteQuestionComment = async (req, res) => {
     try {
+        const QuestionComment = await QuestionCommentModel();
+
         const questionComment = await QuestionComment.findById(req.params.id);
         if (!questionComment) handleError(res, { status: 404, message: 'QuestionComment not found!' });
 

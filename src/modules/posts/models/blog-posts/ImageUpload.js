@@ -1,11 +1,7 @@
-// Bring in Mongo
 const mongoose = require('mongoose');
-
-// Initialize Mongo schema
 const Schema = mongoose.Schema;
 
-const { getConnection } = require('../../../../utils/db-manager');
-const conn = getConnection('posts', process.env.POSTS_URI);
+const { getDB } = require('../../../../utils/db-manager');
 
 // ImageUpload Schema
 const ImageUploadSchema = new Schema({
@@ -23,4 +19,7 @@ const ImageUploadSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = conn.model('ImageUpload', ImageUploadSchema);
+module.exports = async function ImageUploadModel() {
+    const db = await getDB("posts", process.env.POSTS_URI);
+    return db.model("ImageUpload", ImageUploadSchema);
+};

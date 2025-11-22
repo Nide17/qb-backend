@@ -1,8 +1,8 @@
-const Notes = require('../models/Notes');
+const NotesModel = require('../models/Notes');
+const UserModel = require('../../users/models/User');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
-const User = require('../../users/models/User');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -12,6 +12,7 @@ const CACHE_KEYS = {
     BY_COURSE: (id) => `nt:byCourse:${id}`,
     BY_CHAPTER: (id) => `nt:byChapter:${id}`,
 };
+
 const expandNotes = async (notes) => {
 
     if (!notes) throw { status: 404, message: 'No notes found!' };
@@ -33,6 +34,10 @@ const expandNotes = async (notes) => {
 };
 
 const findNotes = async (query, limit = 0) => {
+
+    // Initialize all models before any populate operations
+    const Notes = await NotesModel();
+
     let notes = await Notes.find(query).sort({ createdAt: -1 })
         .select('title description notes_file chapter course courseCategory quizes uploaded_by slug createdAt')
         .populate('course chapter courseCategory', 'title')
@@ -94,9 +99,13 @@ exports.getNotesByChapter = async (req, res) => {
 
 exports.getOneNotes = async (req, res) => {
     try {
-
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
+
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+
+            const Notes = await NotesModel();
+            const User = await UserModel();
+
             const query = req.params.id.match(/^[0-9a-fA-F]{24}$/) ? { _id: req.params.id } : { slug: req.params.id };
 
             let notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title').lean();
@@ -127,6 +136,8 @@ exports.createNotes = async (req, res) => {
             { name: 'uploaded_by', value: uploaded_by }
         ]);
 
+        const Notes = await NotesModel();
+
         const notes = await Notes.findOne({ title });
         if (notes) throw { message: 'Notes with that title arleady exists!', status: 400 };
 
@@ -153,6 +164,8 @@ exports.createNotes = async (req, res) => {
 exports.updateNotes = async (req, res) => {
     try {
         const not_file = req.file;
+        const Notes = await NotesModel();
+
         const notes = await Notes.findById(req.params.id);
         if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
 
@@ -169,6 +182,8 @@ exports.updateNotes = async (req, res) => {
 
 exports.updateNotesQuizzes = async (req, res) => {
     try {
+        const Notes = await NotesModel();
+
         const notes = await Notes.updateOne(
             { '_id': req.params.id },
             { $push: { 'quizzes': req.body.quizesState } },
@@ -183,6 +198,8 @@ exports.updateNotesQuizzes = async (req, res) => {
 
 exports.removeQuizFromNotes = async (req, res) => {
     try {
+        const Notes = await NotesModel();
+
         const note = await Notes.findOne({ _id: req.params.id });
         if (!note) throw { 'message': 'Notes not found!', 'status': 404 };
 
@@ -199,6 +216,8 @@ exports.removeQuizFromNotes = async (req, res) => {
 
 exports.deleteNotes = async (req, res) => {
     try {
+        const Notes = await NotesModel();
+
         const notes = await Notes.findById(req.params.id);
         if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
 

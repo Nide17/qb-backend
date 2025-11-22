@@ -15,23 +15,15 @@ const verifyToken = (req) => {
 };
 
 const auth = (req, res, next) => {
-  try {
-    verifyToken(req);
-    return next();
-  } catch (_err) {
-    throw _err;
-  }
+  verifyToken(req);
+  return next();
 };
 
 const authRole = (roles) => (req, res, next) => {
-  try {
-    verifyToken(req);
-    if (!req.user) throw { status: 401, message: 'Session expired' };
-    if (Array.isArray(roles) && roles.includes(req.user.role)) return next();
-    throw { status: 403, message: 'Unauthorized' };
-  } catch (_err) {
-    throw _err;
-  }
+  verifyToken(req);
+  if (!req.user) throw { status: 401, message: 'Session expired' };
+  if (Array.isArray(roles) && roles.includes(req.user.role)) return next();
+  throw { status: 403, message: 'Unauthorized' };
 };
 
 module.exports = { auth, authRole };

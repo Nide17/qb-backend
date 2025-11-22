@@ -1,103 +1,58 @@
 const mongoose = require('mongoose');
+mongoose.set("strictQuery", false);
 
-const connections = {};
-const maxRetries = 5;
-const retryDelay = 5000; // 5s
-const reconnectDelay = 5000;
-
-// Prevent simultaneous retries for the same DB
-const retryLocks = {};
-
-function log(name, msg, ...rest) {
-    console.log(`[DB:${name}] ${msg}`, ...rest);
+// Global cache (works for local + production + vercel)
+if (!global.__db_conn__) {
+    global.__db_conn__ = {};
 }
 
-function getConnection(name, uri) {
-    if (!connections[name]) {
+const cache = global.__db_conn__;
 
-        retryLocks[name] = false;
-        let retryCount = 0;
+/**
+ * Create or reuse a DB connection by name.
+ * Always returns a ready connection or a pending promise.
+ */
+function getDB(name, uri) {
 
-        const connect = () => {
-            if (retryLocks[name]) return; // Prevent double retries
-            retryLocks[name] = true;
-
-            connections[name] = mongoose.createConnection(uri, {
-                connectTimeoutMS: 60000,
-                socketTimeoutMS: 60000,
-                serverSelectionTimeoutMS: 60000,
-                maxPoolSize: 20,
-                minPoolSize: 2,
-                bufferCommands: true,
-                retryWrites: true,
-                w: "majority",
-            });
-
-            const conn = connections[name];
-
-            // -------------------------
-            // Event Listeners
-            // -------------------------
-            conn.on("connected", () => {
-                log(name, "Connected");
-                retryCount = 0;
-                retryLocks[name] = false;
-            });
-
-            conn.on("error", (err) => {
-                log(name, "Error:", err.message);
-
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    log(name, `Retrying ${retryCount}/${maxRetries} in ${retryDelay / 1000}s...`);
-
-                    setTimeout(() => {
-                        safeClose(conn).then(() => {
-                            retryLocks[name] = false;
-                            connect();
-                        });
-                    }, retryDelay);
-
-                } else {
-                    log(name, `Max retries reached. No further attempts will be made.`);
-                    retryLocks[name] = false;
-                }
-            });
-
-            conn.on("disconnected", () => {
-                log(name, "Disconnected");
-
-                if (!retryLocks[name] && retryCount < maxRetries) {
-                    retryLocks[name] = true;
-                    log(name, `Reconnecting in ${reconnectDelay / 1000}s...`);
-
-                    setTimeout(() => {
-                        retryLocks[name] = false;
-                        connect();
-                    }, reconnectDelay);
-                }
-            });
-
-            conn.on("reconnected", () => {
-                log(name, "Reconnected");
-            });
-        };
-
-        connect();
+    if (!uri) {
+        throw new Error(`Missing MongoDB URI for database: ${name}`);
     }
 
-    return connections[name];
-}
-
-// Safely close a connection before a retry
-async function safeClose(conn) {
-    try {
-        if (conn && conn.readyState !== 0) {
-            await conn.close();
-        }
-    } catch (err) {
-        // ignore
+    // Already connected?
+    if (cache[name]?.conn) {
+        return cache[name].conn;
     }
+
+    // Already connecting?
+    if (cache[name]?.promise) {
+        return cache[name].promise;
+    }
+
+    console.log(`[DB:${name}] Connecting...`);
+
+    const promise = mongoose
+        .createConnection(uri, {
+            maxPoolSize: 10,
+            serverSelectionTimeoutMS: 15000,
+            socketTimeoutMS: 30000,
+            retryWrites: true,
+        })
+        .asPromise()
+        .then((connection) => {
+            cache[name].conn = connection;
+
+            console.log(`[DB:${name}] Connected`);
+            return connection;
+        })
+        .catch((err) => {
+            console.error(`[DB:${name}] Error:`, err.message);
+            delete cache[name];
+            throw err;
+        });
+
+    cache[name] = { promise };
+
+    return promise;
 }
 
-module.exports = { getConnection, };
+module.exports = { getDB };
