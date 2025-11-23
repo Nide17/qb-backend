@@ -53,9 +53,16 @@ app.use((err, req, res, next) => {  // eslint-disable-line no-unused-vars
         stack: process.env.NODE_ENV === "production" ? undefined : err.stack
     };
     handleError(res, safeError);
-
-    handleError(res, safeError);
 });
 
-// Start server
-bootstrap(server);
+// Vercel
+// ❗ Export Express app for Vercel Serverless
+module.exports = app;
+
+// ❗ ALSO export a server handler (needed when using Socket.IO)
+module.exports.handler = (req, res) => {
+    app(req, res);
+};
+
+// Start server if env is not vercel
+if (process.env.NODE_ENV !== "VERCEL") bootstrap(server);
