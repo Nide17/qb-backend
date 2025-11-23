@@ -7,25 +7,27 @@ const initializeModels = async () => {
         SubscribedUser: await require('../modules/users/models/SubscribedUser')(),
         PswdResetToken: await require('../modules/users/models/PswdResetToken')(),
 
-        Category: await require('../modules/quizzing/models/Category')(),
-        Quiz: await require('../modules/quizzing/models/Quiz')(),
-        Question: await require('../modules/quizzing/models/Question')(),
-
-        Advert: await require('../modules/posts/models/Advert')(),
-        Faq: await require('../modules/posts/models/Faq')(),
-        BlogPost: await require('../modules/posts/models/blog-posts/BlogPost')(),
-        PostCategory: await require('../modules/posts/models/blog-posts/PostCategory')(),
-        ImageUpload: await require('../modules/posts/models/blog-posts/ImageUpload')(),
-        BlogPostsView: await require('../modules/posts/models/blog-posts/BlogPostsView')(),
-
-        School: await require('../modules/schools/models/School')(),
-        Level: await require('../modules/schools/models/Level')(),
-        Faculty: await require('../modules/schools/models/Faculty')(),
-
+        // Category heavily depends on CourseCategory population, so it must be initialized first
         CourseCategory: await require('../modules/courses/models/CourseCategory')(),
         Course: await require('../modules/courses/models/Course')(),
         Chapter: await require('../modules/courses/models/Chapter')(),
         Notes: await require('../modules/courses/models/Notes')(),
+
+        Category: await require('../modules/quizzing/models/Category')(),
+        // Quiz heavily depends on Question population, so it must be initialized first
+        Question: await require('../modules/quizzing/models/Question')(),
+        Quiz: await require('../modules/quizzing/models/Quiz')(),
+
+        Advert: await require('../modules/posts/models/Advert')(),
+        Faq: await require('../modules/posts/models/Faq')(),
+        PostCategory: await require('../modules/posts/models/blog-posts/PostCategory')(),
+        BlogPost: await require('../modules/posts/models/blog-posts/BlogPost')(),
+        BlogPostsView: await require('../modules/posts/models/blog-posts/BlogPostsView')(),
+        ImageUpload: await require('../modules/posts/models/blog-posts/ImageUpload')(),
+
+        School: await require('../modules/schools/models/School')(),
+        Level: await require('../modules/schools/models/Level')(),
+        Faculty: await require('../modules/schools/models/Faculty')(),
 
         Score: await require('../modules/scores/models/Score')(),
 
