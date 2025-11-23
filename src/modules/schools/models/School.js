@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getDB } = require('../../../utils/db-manager');
-
 //create a schema object
 const SchoolSchema = new Schema({
     title: {
@@ -20,7 +18,4 @@ const SchoolSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = async function SchoolModel() {
-    const db = await getDB("schools", process.env.SCHOOLS_URI);
-    return db.model("School", SchoolSchema);
-};
+module.exports.schema = SchoolSchema;

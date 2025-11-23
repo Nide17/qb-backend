@@ -1,6 +1,4 @@
-const ChapterModel = require('../models/Chapter');
-const NotesModel = require('../models/Notes');
-const UserModel = require('../../users/models/User');
+const { getModels } = require('../../../utils/db-manager');
 
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
@@ -15,7 +13,7 @@ const CACHE_KEYS = {
 
 const findChapters = async (query, limit = 0) => {
 
-    const Chapter = await ChapterModel();
+    const { Chapter } = await getModels('courses');
     let chaptersQuery = Chapter
         .find(query)
         .sort({ createdAt: -1 })
@@ -74,8 +72,8 @@ exports.getChaptersByCourse = async (req, res) => {
 exports.getOneChapter = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Chapter = await ChapterModel();
-        const User = await UserModel();
+        const { Chapter } = await getModels('courses');
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const chapter = await Chapter.findById(req.params.id).populate('course courseCategory', 'title description course courseCategory created_by').lean();
@@ -106,7 +104,7 @@ exports.createChapter = async (req, res) => {
             { name: 'created_by', value: created_by }
         ]);
 
-        const Chapter = await ChapterModel();
+        const { Chapter } = await getModels('courses');
 
         // Check for duplicate title
         const chapter = await Chapter.findOne({ title });
@@ -132,7 +130,7 @@ exports.createChapter = async (req, res) => {
 
 exports.updateChapter = async (req, res) => {
     try {
-        const Chapter = await ChapterModel();
+        const { Chapter } = await getModels('courses');
 
         const updatedChapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedChapter) throw { 'message': 'Chapter not found!', 'status': 404 };
@@ -146,8 +144,7 @@ exports.updateChapter = async (req, res) => {
 
 exports.deleteChapter = async (req, res) => {
     try {
-        const Chapter = await ChapterModel();
-        const Notes = await NotesModel();
+        const { Chapter, Notes } = await getModels('courses');
 
         let chapter = await Chapter.findById(req.params.id);
         if (!chapter) throw { 'message': 'Chapter not found!', 'status': 404 };

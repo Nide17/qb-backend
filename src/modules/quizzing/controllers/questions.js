@@ -1,4 +1,4 @@
-const QuestionModel = require('../models/Question');
+const { getModels } = require('../../../utils/db-manager');
 const slugify = require('slugify');
 const { handleError } = require('../../../utils/error');
 const { updateQuizQuestions } = require('../helpers');
@@ -16,7 +16,7 @@ exports.getQuestions = async (req, res) => {
         const cacheKey = CACHE_KEYS.ALL;
 
         // Initialize all models before any populate operations
-        const Question = await QuestionModel();
+        const { Question } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const questions = await Question.find().sort({ creation_date: -1 }).lean();
@@ -34,7 +34,7 @@ exports.getQuestions = async (req, res) => {
 exports.getOneQuestion = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Question = await QuestionModel();
+        const { Question } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const question = await Question.findOne({ _id: req.params.id }).populate('category quiz');
@@ -67,7 +67,7 @@ exports.createQuestion = async (req, res) => {
             { name: 'duration', value: duration }
         ]);
 
-        const Question = await QuestionModel();
+        const { Question } = await getModels('quizzing');
 
         // Check for duplicate questionText
         let existingQtn = await Question.findOne({ questionText });
@@ -114,7 +114,7 @@ exports.updateQuestion = async (req, res) => {
         const { questionText, answerOptions, newQuiz, oldQuizID, last_updated_by, duration } = req.body;
         const qnImage = req.file;
 
-        const Question = await QuestionModel();
+        const { Question } = await getModels('quizzing');
 
         // Find the Question by id
         const qtn = await Question.findOne({ _id: req.params.id });
@@ -165,7 +165,7 @@ exports.updateQuestion = async (req, res) => {
 
 exports.deleteQuestion = async (req, res) => {
     try {
-        const Question = await QuestionModel();
+        const { Question } = await getModels('quizzing');
 
         // Find the Question to delete by id first
         const question = await Question.findById(req.params.id);

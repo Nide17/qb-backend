@@ -1,9 +1,7 @@
 const { handleError } = require('../../../utils/error');
 const { cacheManager, cacheWrapper, validateRequiredFields } = require('../../../utils/global-helpers');
 const { expandDownloads } = require('../helpers');
-const UserModel = require('../../users/models/User');
-const NotesModel = require('../../courses/models/Notes');
-const DownloadModel = require('../models/Download');
+const { getModels } = require('../../../utils/db-manager');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -20,7 +18,7 @@ exports.getDownloads = async (req, res) => {
 
     try {
         // Pagination - ENFORCE pagination to prevent memory exhaustion
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
         const totalDownloads = await Download.countDocuments({});
         var PAGE_SIZE = 20;
         var pageNo = parseInt(req.query.pageNo || '1');
@@ -83,9 +81,9 @@ exports.getOneDownload = async (req, res) => {
     try {
 
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Download = await DownloadModel();
-        const User = await UserModel();
-        const Notes = await NotesModel();
+        const { Download } = await getModels('downloads');
+        const { User } = await getModels('users');
+        const { Notes } = await getModels('courses');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let download = await Download.findById(req.params.id).lean();
@@ -121,7 +119,7 @@ exports.getOneDownload = async (req, res) => {
 exports.getDownloadsByUser = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_DOWNLOADER(req.params.id);
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
@@ -144,7 +142,7 @@ exports.getDownloadsByUser = async (req, res) => {
 exports.getDownloadsByCreator = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let downloads = await Download.find().lean();
@@ -179,7 +177,7 @@ exports.createDownload = async (req, res) => {
             { name: 'downloaded_by', value: downloaded_by }
         ]);
 
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
 
         const recentDownExist = await Download.find({ downloaded_by }, {}, { sort: { 'createdAt': -1 } });
 
@@ -209,7 +207,7 @@ exports.createDownload = async (req, res) => {
 
 exports.deleteDownload = async (req, res) => {
     try {
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
 
         const download = await Download.findById(req.params.id);
         if (!download) throw { message: 'Download not found!', status: 404 };
@@ -227,7 +225,7 @@ exports.deleteDownload = async (req, res) => {
 exports.getDatabaseStats = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.DB_STATS;
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const db = Download.db;

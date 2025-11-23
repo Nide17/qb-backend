@@ -1,13 +1,11 @@
-const QuizModel = require('./models/Quiz');
-const QuestionModel = require('./models/Question');
-const CourseCategoryModel = require('../courses/models/CourseCategory');
-const UserModel = require('../users/models/User');
+const { getModels } = require('../../utils/db-manager');
+// models will be loaded via getModels(dbName) when needed
 const { getBatchedCourseCategoriesMap } = require('../courses/helpers');
 
 const updateQuizQuestions = async (quizId, questionId, action) => {
 
     try {
-        const Quiz = await QuizModel();
+        const { Quiz } = await getModels('quizzing');
         const quiz = await Quiz.findById(quizId);
 
         if (!quiz) throw { 'message': 'Quiz not found while updating questions!', 'status': 404 };
@@ -31,7 +29,7 @@ const getBatchedQuizzesMap = async (quizzesIds) => {
     try {
         if (!quizzesIds || !Array.isArray(quizzesIds) || quizzesIds.length === 0) return new Map();
 
-        const Quiz = await QuizModel();
+        const { Quiz } = await getModels('quizzing');
 
         const quizzes = await Quiz.find({ _id: { $in: quizzesIds } }).populate('category questions', 'title questionText').select('title slug');
         if (!quizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
@@ -49,7 +47,7 @@ const getBatchedQuestionsMap = async (questionsIds) => {
     try {
         if (!questionsIds || !Array.isArray(questionsIds) || questionsIds.length === 0) return new Map();
 
-        const Question = await QuestionModel();
+        const { Question } = await getModels('quizzing');
 
         const questions = await Question.find({ _id: { $in: questionsIds } }).populate('quiz', 'questionText title');
         if (!questions.length) throw { 'message': 'No questions found!', 'status': 404 };
@@ -106,8 +104,8 @@ const expandCategories = async (categories) => {
 
 const expandCategory = async (category) => {
     try {
-        const CourseCategory = await CourseCategoryModel();
-        const User = await UserModel();
+        const { CourseCategory } = await getModels('courses');
+        const { User } = await getModels('users');
 
         const courseCategory = await CourseCategory.findById(category.courseCategory).select('title');
         const created_by = await User.findById(category.created_by).select('name email');

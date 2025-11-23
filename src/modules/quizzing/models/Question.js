@@ -2,10 +2,7 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const slugify = require('slugify');
 
-const { getDB } = require('../../../utils/db-manager');
-
-
-//create a schema object
+// create a schema object
 const QuestionSchema = new Schema({
     questionText: {
         type: String,
@@ -70,7 +67,4 @@ QuestionSchema.pre('validate', function (next) {
     next();
 });
 
-module.exports = async function QuestionModel() {
-    const db = await getDB("quizzing", process.env.QUIZZING_URI);
-    return db.model("Question", QuestionSchema);
-};
+module.exports.schema = QuestionSchema;

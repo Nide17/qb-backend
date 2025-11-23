@@ -1,4 +1,5 @@
 const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
+const { getModels } = require('../../../utils/db-manager');
 const UserModel = require('../../users/models/User');
 const QuizModel = require('../../quizzing/models/Quiz');
 const ScoreModel = require('../models/Score');
@@ -22,7 +23,7 @@ const CACHE_KEYS = {
 exports.getScores = async (req, res) => {
 
     try {
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         // Pagination - ENFORCE pagination to prevent memory exhaustion
         const totalScores = await Score.countDocuments({});
@@ -85,7 +86,7 @@ exports.getScoresByTaker = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.BY_TAKER(req.params.id);
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).lean();
@@ -109,7 +110,7 @@ exports.getScoresForQuizCreator = async (req, res) => {
         const skip = PAGE_SIZE * (pageNo - 1);
 
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const totalScores = await Score.countDocuments({});
@@ -131,9 +132,9 @@ exports.getOneScore = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Score = await ScoreModel();
-        const User = await UserModel();
-        const Quiz = await QuizModel();
+        const { Score } = await getModels('scores');
+        const { User } = await getModels('users');
+        const { Quiz } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let score = await Score.findOne({ id: req.params?.id }).lean();
@@ -160,7 +161,7 @@ exports.getOneScore = async (req, res) => {
 exports.getQuizRanking = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.QUIZ_RANKING(req.params.id);
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).lean();
@@ -191,7 +192,7 @@ exports.getPopularQuizzes = async (req, res) => {
 
             // Use native MongoDB aggregation with proper options
             const aggregationOptions = { allowDiskUse: true, maxTimeMS: 30000 };
-            const Score = await ScoreModel();
+            const { Score } = await getModels('scores');
 
             const topQuizzes = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfDay, $lte: endOfDay } } },
@@ -229,8 +230,8 @@ exports.getMonthlyUser = async (req, res) => {
 
             // Use native MongoDB aggregation with proper options
             const aggregationOptions = { allowDiskUse: true, maxTimeMS: 30000 };
-            const Score = await ScoreModel();
-            const User = await UserModel();
+            const { Score } = await getModels('scores');
+            const { User } = await getModels('users');
 
             const monthlyUser = await Score.aggregate([
                 { $match: { test_date: { $gte: startOfMonth, $lte: endOfMonth } } },
@@ -261,7 +262,7 @@ exports.createScore = async (req, res) => {
         const { id, out_of, category, quiz, review, taken_by } = req.body;
         const marks = req.body.marks ? req.body.marks : 0;
         var now = new Date();
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         // Simple validation
         if (!id || !out_of || !review || !taken_by) throw { status: 400, message: '400' };
@@ -325,7 +326,7 @@ exports.deleteScore = async (req, res) => {
         //Find the Score to delete by id first
         const score = await Score.findOne({ _id: req.params.id });
         if (!score) throw { 'status': 404, 'message': 'No scores found' };
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         // Delete the Score
         const removedScore = await Score.deleteOne({ _id: req.params.id });

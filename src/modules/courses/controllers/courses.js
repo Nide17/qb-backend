@@ -1,7 +1,4 @@
-const CourseModel = require('../models/Course');
-const ChapterModel = require('../models/Chapter');
-const NotesModel = require('../models/Notes');
-const UserModel = require('../../users/models/User');
+const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -15,7 +12,7 @@ const CACHE_KEYS = {
 
 const findCourses = async (query, limit = 0) => {
 
-    const Course = await CourseModel();
+    const { Course } = await getModels('courses');
 
     let coursesQuery = Course.find(query).sort({ createdAt: -1 })
         .select('-__v -updatedAt -last_updated_by')
@@ -58,8 +55,8 @@ exports.getOneCourse = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Course = await CourseModel();
-        const User = await UserModel();
+        const { Course } = await getModels('courses');
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let course = await Course
@@ -105,7 +102,7 @@ exports.createCourse = async (req, res) => {
             { name: 'created_by', value: created_by }
         ]);
 
-        const Course = await CourseModel();
+        const { Course } = await getModels('courses');
 
         const course = await Course.findOne({ title });
         if (course) throw { 'message': 'Course with this title already exists!', 'status': 409 };
@@ -129,7 +126,7 @@ exports.createCourse = async (req, res) => {
 
 exports.updateCourse = async (req, res) => {
     try {
-        const Course = await CourseModel();
+        const { Course } = await getModels('courses');
 
         let course = await Course.findById(req.params.id);
         if (!course) throw { 'message': 'Course not found!', 'status': 404 };
@@ -146,9 +143,7 @@ exports.updateCourse = async (req, res) => {
 
 exports.deleteCourse = async (req, res) => {
     try {
-        const Course = await CourseModel();
-        const Chapter = await ChapterModel();
-        const Notes = await NotesModel();
+        const { Course, Chapter, Notes } = await getModels('courses');
 
         let course = await Course.findById(req.params.id);
         if (!course) throw { 'message': 'Course not found!', 'status': 404 };

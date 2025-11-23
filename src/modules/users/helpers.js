@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const UserModel = require('./models/User');
+const { getModels } = require('../../utils/db-manager');
 const { sendEmail } = require('../../utils/emails/sendEmail');
 
 // Helper functions
@@ -10,7 +10,7 @@ const generateToken = (user) => {
 
 const updateUserToken = async (user) => {
     const token = generateToken(user);
-    const User = await UserModel();
+    const { User } = await getModels('users');
     return await User.findByIdAndUpdate({ _id: user._id }, { $set: { current_token: token } }, { new: true });
 };
 
@@ -50,7 +50,7 @@ const getBatchedUsersMap = async (usersIDs) => {
     try {
         if (!usersIDs || !Array.isArray(usersIDs) || usersIDs.length === 0) return new Map();
 
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const users = await User.find({ _id: { $in: usersIDs } }).select('name email');
         if (!users.length) throw { 'message': 'No users found!', 'status': 404 };

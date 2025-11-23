@@ -1,4 +1,4 @@
-const ContactModel = require('../models/Contact');
+const { getModels } = require('../../../utils/db-manager');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
 const { convertFromRaw } = require('draft-js');
 const { stateToHTML } = require('draft-js-export-html');
@@ -19,7 +19,7 @@ exports.getContacts = async (req, res) => {
 
     try {
         // Pagination
-        const Contact = await ContactModel();
+        const { Contact } = await getModels('contacts');
         const totalPages = await Contact.countDocuments({});
         const PAGE_SIZE = 10;
         const pageNo = parseInt(req.query.pageNo || '0');
@@ -51,7 +51,7 @@ exports.getContacts = async (req, res) => {
 exports.getContactsBySender = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_SENDER(req.params.id);
-        const Contact = await ContactModel();
+        const { Contact } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const contacts = await Contact.find({ sent_by: req.params.id });
@@ -67,7 +67,7 @@ exports.getOneContact = async (req, res) => {
     try {
 
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Contact = await ContactModel();
+        const { Contact } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const contact = await Contact.findById(req.params.id);
@@ -81,7 +81,7 @@ exports.getOneContact = async (req, res) => {
 
 exports.createContact = async (req, res) => {
     try {
-        const Contact = await ContactModel();
+        const { Contact } = await getModels('contacts');
         const newContact = await Contact.create(req.body);
         if (!newContact) {
             throw { 'status': 500, 'message': 'Something went wrong!' };
@@ -109,7 +109,7 @@ exports.updateContact = async (req, res) => {
         const rawContent = JSON.parse(req.body.message);
         const contentState = convertFromRaw(rawContent);
         const htmlMessage = stateToHTML(contentState);
-        const Contact = await ContactModel();
+        const { Contact } = await getModels('contacts');
 
         // Update the Quiz on Contact updating
         const newMessage = await Contact.updateOne(
@@ -142,7 +142,7 @@ exports.updateContact = async (req, res) => {
 
 exports.deleteContact = async (req, res) => {
     try {
-        const Contact = await ContactModel();
+        const { Contact } = await getModels('contacts');
         const contact = await Contact.findByIdAndDelete(req.params.id);
         if (!contact) throw { message: 'Contact not found!', status: 404 };
         await cacheManager.invalidatePattern("ctc:*");
@@ -156,7 +156,7 @@ exports.deleteContact = async (req, res) => {
 exports.getDatabaseStats = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.DB_STATS;
-        const Contact = await ContactModel();
+        const { Contact } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const db = Contact.db;

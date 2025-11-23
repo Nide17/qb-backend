@@ -2,9 +2,7 @@
 // const twilioToken = process.env.TWILIO_AUTH_TOKEN
 // const client = require('twilio')(twilioSID, twilioToken)
 
-// BlogPostsView Model
-const UserModel = require('../users/models/User');
-const BlogPostsViewModel = require('./models/blog-posts/BlogPostsView');
+const { getModels } = require('../../utils/db-manager');
 const { sendHtmlEmail } = require('../../utils/emails/sendEmail');
 
 // const _from = 'whatsapp:+14155238886'; // Twilio WhatsApp Sandbox number
@@ -15,7 +13,7 @@ const getDailyReport = async () => {
         const today = new Date();
         const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-        const BlogPostsView = await BlogPostsViewModel();
+        const { BlogPostsView } = await getModels('posts');
 
         const result = await BlogPostsView.aggregate([
             { $match: { createdAt: { $gte: todayDate } } },
@@ -108,7 +106,7 @@ const fetchAdminEmails = async () => {
     const maxAttempts = 2;
     const retryDelay = 60000; // 1 minute in ms
 
-    const User = await UserModel();
+    const { User } = await getModels('users');
 
     while (attempts < maxAttempts) {
         try {

@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getDB } = require('../../../utils/db-manager');
-
 //create a schema object
 const LevelSchema = new Schema({
     title: {
@@ -15,7 +13,4 @@ const LevelSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = async function LevelModel() {
-    const db = await getDB("schools", process.env.SCHOOLS_URI);
-    return db.model("Level", LevelSchema);
-};
+module.exports.schema = LevelSchema;

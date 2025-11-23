@@ -2,8 +2,7 @@ const process = require("process");
 const { handleError } = require('../../../utils/error');
 const { notifyAdmins, sendEmails } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
-const SubscribedUserModel = require('../../users/models/SubscribedUser');
-const BroadcastModel = require('../models/Broadcast');
+const { getModels } = require('../../../utils/db-manager');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -13,7 +12,7 @@ const CACHE_KEYS = {
 
 exports.getBroadcasts = async (req, res) => {
     try {
-        const Broadcast = await BroadcastModel();
+        const { Broadcast } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(CACHE_KEYS.ALL, CACHE_TTL, async () => {
             const broadcasts = await Broadcast.find().sort({ createdAt: -1 });
@@ -28,7 +27,7 @@ exports.getBroadcasts = async (req, res) => {
 exports.getOneBroadcast = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Broadcast = await BroadcastModel();
+        const { Broadcast } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const broadcast = await Broadcast.findById(req.params.id);
@@ -54,9 +53,9 @@ exports.createBroadcast = async (req, res) => {
 
         const clientURL = process.env.NODE_ENV === 'production' ? 'https://quizblog.rw' : 'http://localhost:5173';
 
-        const Broadcast = await BroadcastModel();
-        const SubscribedUser = await SubscribedUserModel();
-        // const User = await UserModel();
+        const { Broadcast } = await getModels('contacts');
+        const { SubscribedUser } = await getModels('users');
+        // previously used UserModel; use `const { User } = await getModels('users')` if needed
 
         const newBroadcast = new Broadcast({ title, sent_by, message });
         const savedBroadcast = await newBroadcast.save();
@@ -80,7 +79,7 @@ exports.createBroadcast = async (req, res) => {
 
 exports.updateBroadcast = async (req, res) => {
     try {
-        const Broadcast = await BroadcastModel();
+        const { Broadcast } = await getModels('contacts');
 
         const broadcast = await Broadcast.findById(req.params.id);
         if (!broadcast) return;
@@ -95,7 +94,7 @@ exports.updateBroadcast = async (req, res) => {
 
 exports.deleteBroadcast = async (req, res) => {
     try {
-        const Broadcast = await BroadcastModel();
+        const { Broadcast } = await getModels('contacts');
 
         const broadcast = await Broadcast.findById(req.params.id);
         if (!broadcast) return;

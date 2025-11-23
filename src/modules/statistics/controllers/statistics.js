@@ -9,6 +9,7 @@ const { getBatchedUsersMap } = require('../../users/helpers');
 const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
 const { getBatchedNotesMap } = require('../../courses/helpers');
 
+const { getModels } = require('../../../utils/db-manager');
 const UserModel = require('../../users/models/User');
 const QuizModel = require('../../quizzing/models/Quiz');
 const DownloadModel = require('../../downloads/models/Download');
@@ -216,10 +217,10 @@ exports.getSummaryStats = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.SUMMARY_STATS;
-        const User = await UserModel();
-        const Quiz = await QuizModel();
-        const Download = await DownloadModel();
-        const Score = await ScoreModel();
+        const { User } = await getModels('users');
+        const { Quiz } = await getModels('quizzing');
+        const { Download } = await getModels('downloads');
+        const { Score } = await getModels('scores');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
@@ -319,7 +320,7 @@ exports.get50NewUsers = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('new50');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({}).sort({ register_date: -1 }).limit(50).lean();
@@ -334,7 +335,7 @@ exports.get50NewUsers = async (req, res) => {
 exports.getAllUsers = async (req, res) => {
     try {
         const cacheKey = 'usr:all';
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({}).lean();
@@ -349,7 +350,7 @@ exports.getAllUsers = async (req, res) => {
 exports.getUsersWithImage = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('image');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ image: { $exists: true, $ne: '' } }).lean();
@@ -363,7 +364,7 @@ exports.getUsersWithImage = async (req, res) => {
 exports.getUsersWithSchool = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('school');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ school: { $exists: true, $ne: null } }).lean();
@@ -377,7 +378,7 @@ exports.getUsersWithSchool = async (req, res) => {
 exports.getUsersWithLevel = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('level');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ level: { $exists: true, $ne: null } }).lean();
@@ -391,7 +392,7 @@ exports.getUsersWithLevel = async (req, res) => {
 exports.getUsersWithFaculty = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('faculty');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ faculty: { $exists: true, $ne: null } }).lean();
@@ -405,7 +406,7 @@ exports.getUsersWithFaculty = async (req, res) => {
 exports.getUsersWithYear = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('year');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ year: { $exists: true, $ne: null } }).lean();
@@ -419,7 +420,7 @@ exports.getUsersWithYear = async (req, res) => {
 exports.getUsersWithInterests = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('interests');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ interests: { $exists: true, $ne: [] } }).lean();
@@ -433,7 +434,7 @@ exports.getUsersWithInterests = async (req, res) => {
 exports.getUsersWithAbout = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('about');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await User.find({ about: { $exists: true, $ne: '' } }).lean();
@@ -448,7 +449,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('top10quizzing');
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
@@ -481,7 +482,7 @@ exports.getTop10Quizzes = async (req, res) => {
             // Get top quizzes
             let topQuizzes = [];
 
-            const Score = await ScoreModel();
+            const { Score } = await getModels('scores');
 
             const topQuizzesData = await Score.aggregate([
                 { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
@@ -507,7 +508,7 @@ exports.getTop10Downloaders = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.DOWNLOADS_STATS('top10');
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
@@ -545,7 +546,7 @@ exports.getTop10Downloaders = async (req, res) => {
 exports.getTop10Notes = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.NOTES_STATS('top10');
-        const Download = await DownloadModel();
+        const { Download } = await getModels('downloads');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
@@ -587,7 +588,7 @@ exports.getDailyUserRegistration = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.USERS_STATS('dailyRegistration');
-        const User = await UserModel();
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const usersStats = await User.aggregate([
@@ -632,9 +633,9 @@ exports.getLiveAnalytics = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.LIVE
-        const User = await UserModel();
-        const Download = await DownloadModel();
-        const Score = await ScoreModel();
+        const { User } = await getModels('users');
+        const { Download } = await getModels('downloads');
+        const { Score } = await getModels('scores');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
