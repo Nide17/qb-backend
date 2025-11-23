@@ -1,20 +1,16 @@
-const { getDB } = require("./db-manager");
 const { cacheManager } = require("./global-helpers");
+const { getDB } = require("./db-manager");
 
 const initializeModels = async () => {
     return {
-
-        // Users
         User: await require('../modules/users/models/User')(),
         SubscribedUser: await require('../modules/users/models/SubscribedUser')(),
         PswdResetToken: await require('../modules/users/models/PswdResetToken')(),
 
-        // Quizzing
         Category: await require('../modules/quizzing/models/Category')(),
         Quiz: await require('../modules/quizzing/models/Quiz')(),
         Question: await require('../modules/quizzing/models/Question')(),
 
-        // Posts
         Advert: await require('../modules/posts/models/Advert')(),
         Faq: await require('../modules/posts/models/Faq')(),
         BlogPost: await require('../modules/posts/models/blog-posts/BlogPost')(),
@@ -22,33 +18,26 @@ const initializeModels = async () => {
         ImageUpload: await require('../modules/posts/models/blog-posts/ImageUpload')(),
         BlogPostsView: await require('../modules/posts/models/blog-posts/BlogPostsView')(),
 
-        // Schools
         School: await require('../modules/schools/models/School')(),
         Level: await require('../modules/schools/models/Level')(),
         Faculty: await require('../modules/schools/models/Faculty')(),
 
-        // Courses
         CourseCategory: await require('../modules/courses/models/CourseCategory')(),
         Course: await require('../modules/courses/models/Course')(),
         Chapter: await require('../modules/courses/models/Chapter')(),
         Notes: await require('../modules/courses/models/Notes')(),
 
-        // Scores
         Score: await require('../modules/scores/models/Score')(),
 
-        // Downloads
         Download: await require('../modules/downloads/models/Download')(),
 
-        // Contacts
         Contact: await require('../modules/contacts/models/Contact')(),
         Broadcast: await require('../modules/contacts/models/Broadcast')(),
         ChatRoom: await require('../modules/contacts/models/ChatRoom')(),
         RoomMessage: await require('../modules/contacts/models/RoomMessage')(),
 
-        // Feedbacks
         Feedback: await require('../modules/feedbacks/models/Feedback')(),
 
-        // Comments
         QuizComment: await require('../modules/comments/models/QuizComment')(),
         QuestionComment: await require('../modules/comments/models/QuestionComment')(),
     };
@@ -76,23 +65,18 @@ const initializeDatabases = async () => {
         }
     }
 
-    // Initialize models
     await initializeModels();
-    console.log('✅ Databases & models initialized');
-}
+};
 
-const bootstrap = async (server) => {
+const bootstrap = async () => {
     try {
         await cacheManager.connect();
         await initializeDatabases();
-        await initializeModels();
 
-        server.listen(process.env.PORT || 5000, () =>
-            console.log(`🚀 Server running on port ${process.env.PORT}`)
-        );
+        console.log("✅ Bootstrap complete: Redis + DB + Models initialized");
 
     } catch (err) {
-        console.error("❌ Server failed to start:", err);
+        console.error("❌ Bootstrap failed:", err);
         process.exit(1);
     }
 };

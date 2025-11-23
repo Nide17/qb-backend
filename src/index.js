@@ -25,10 +25,8 @@ app.use((req, res, next) => { req.io = io; next(); });
 // Routes
 mountRoutes(app);
 
-// Root Route
 app.get("/", (req, res) => res.json({ status: "OK" }));
 
-// Health Check
 app.get("/api/health", async (req, res) => {
     res.json({
         status: "OK",
@@ -38,31 +36,33 @@ app.get("/api/health", async (req, res) => {
     });
 });
 
-// Global 404
+// 404
 app.use((req, res) => handleError(res, { status: 404, message: `Route ${req.url} not found` }));
 
-// Error Handler
-app.use((err, req, res, next) => {  // eslint-disable-line no-unused-vars
+// Error handler
+app.use((err, req, res, next) => {
     console.error("❌ Error:", err);
-
-    const safeError = {
+    const safe = {
         message: err.message,
         name: err.name,
         status: err.status,
         code: err.code,
         stack: process.env.NODE_ENV === "production" ? undefined : err.stack
     };
-    handleError(res, safeError);
+    handleError(res, safe);
 });
 
-// Vercel
-// ❗ Export Express app for Vercel Serverless
+// Initialize DB + redis + models
+bootstrap();
+
+// Start the server if not on vercel
+if (!process.env.VERCEL && process.env.NODE_ENV !== "test" && process.env.NODE_ENV !== "VERCEL") {
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () =>
+        console.log(`🚀 Server running on port ${PORT}`)
+    );
+}
+
+// Serverless - Vercel
 module.exports = app;
-
-// ❗ ALSO export a server handler (needed when using Socket.IO)
-module.exports.handler = (req, res) => {
-    app(req, res);
-};
-
-// Start server if env is not vercel
-if (process.env.NODE_ENV !== "VERCEL") bootstrap(server);
+module.exports.handler = (req, res) => app(req, res);
