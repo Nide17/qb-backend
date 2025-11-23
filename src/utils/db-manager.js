@@ -1,58 +1,62 @@
-const mongoose = require('mongoose');
+// utils/db-manager.js
+const mongoose = require("mongoose");
 mongoose.set("strictQuery", false);
 
-// Global cache (works for local + production + vercel)
-if (!global.__db_conn__) {
-    global.__db_conn__ = {};
-}
-
+if (!global.__db_conn__) global.__db_conn__ = {};
 const cache = global.__db_conn__;
 
-/**
- * Create or reuse a DB connection by name.
- * Always returns a ready connection or a pending promise.
- */
-function getDB(name, uri) {
+const registry = require("./model-registry");
 
-    if (!uri) {
-        throw new Error(`Missing MongoDB URI for database: ${name}`);
+function attachModels(dbName, conn) {
+    if (conn.__modelsAttached) return conn.models;
+
+    const models = registry[dbName];
+    if (!models) throw new Error(`No model registry entry for DB: ${dbName}`);
+
+    for (const [modelName, schema] of Object.entries(models)) {
+        if (!conn.models[modelName]) {
+            conn.model(modelName, schema);
+        }
     }
 
-    // Already connected?
-    if (cache[name]?.conn) {
-        return cache[name].conn;
-    }
+    conn.__modelsAttached = true;
+    return conn.models;
+}
 
-    // Already connecting?
-    if (cache[name]?.promise) {
-        return cache[name].promise;
-    }
+async function getDB(dbName, uri) {
+    if (!uri) throw new Error(`Missing MongoDB URI for: ${dbName}`);
 
-    console.log(`[DB:${name}] Connecting...`);
+    if (cache[dbName]?.conn) return cache[dbName].conn;
+    if (cache[dbName]?.promise) return cache[dbName].promise;
+
+    console.log(`[DB:${dbName}] Connecting...`);
 
     const promise = mongoose
         .createConnection(uri, {
-            maxPoolSize: 10,
-            serverSelectionTimeoutMS: 15000,
-            socketTimeoutMS: 30000,
+            maxPoolSize: 15,
             retryWrites: true,
+            serverSelectionTimeoutMS: 20000,
         })
         .asPromise()
-        .then((connection) => {
-            cache[name].conn = connection;
-
-            console.log(`[DB:${name}] Connected`);
-            return connection;
+        .then((conn) => {
+            console.log(`[DB:${dbName}] Connected`);
+            cache[dbName].conn = conn;
+            attachModels(dbName, conn);
+            return conn;
         })
         .catch((err) => {
-            console.error(`[DB:${name}] Error:`, err.message);
-            delete cache[name];
+            delete cache[dbName];
             throw err;
         });
 
-    cache[name] = { promise };
-
+    cache[dbName] = { promise };
     return promise;
 }
 
-module.exports = { getDB };
+async function getModels(dbName) {
+    const uri = process.env[`${dbName.toUpperCase()}_URI`];
+    const conn = await getDB(dbName, uri);
+    return conn.models;
+}
+
+module.exports = { getDB, getModels };

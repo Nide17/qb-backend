@@ -1,5 +1,4 @@
-const LevelModel = require('../models/Level');
-const FacultyModel = require('../models/Faculty');
+const { getModels } = require('../../../utils/db-manager');
 
 const { handleError } = require('../../../utils/error');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -15,7 +14,7 @@ exports.getLevels = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const Level = await LevelModel();
+        const { Level } = await getModels('schools');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Level.find().sort({ createdAt: -1 }).populate('school', 'title');
@@ -30,7 +29,7 @@ exports.getLevels = async (req, res) => {
 exports.getLevelsBySchool = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_SCHOOL(req.params.id);
-        const Level = await LevelModel();
+        const { Level } = await getModels('schools');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Level.find({ school: req.params.id }).sort({ createdAt: -1 }).populate('school', 'title');
@@ -44,7 +43,7 @@ exports.getLevelsBySchool = async (req, res) => {
 exports.getOneLevel = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
-        const Level = await LevelModel();
+        const { Level } = await getModels('schools');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Level.findById(req.params.id).populate('school', 'title');
@@ -62,7 +61,7 @@ exports.createLevel = async (req, res) => {
     try {
         // Validation
         validateRequiredFields([{ name: 'title', value: title }, { name: 'school', value: school }]);
-        const Level = await LevelModel();
+        const { Level } = await getModels('schools');
 
         // Check if level with same title exists in the same school
         const level = await Level.findOne({ title, school });
@@ -83,7 +82,7 @@ exports.createLevel = async (req, res) => {
 
 exports.updateLevel = async (req, res) => {
     try {
-        const Level = await LevelModel();
+        const { Level } = await getModels('schools');
 
         const level = await Level.findById(req.params.id);
         if (!level) throw { 'status': 404, 'message': 'Level not found!' };
@@ -97,8 +96,7 @@ exports.updateLevel = async (req, res) => {
 
 exports.deleteLevel = async (req, res) => {
     try {
-        const Level = await LevelModel();
-        const Faculty = await FacultyModel();
+        const { Level, Faculty } = await getModels('schools');
 
         const level = await Level.findById(req.params.id);
         if (!level) throw { 'status': 404, 'message': 'Level not found!' };

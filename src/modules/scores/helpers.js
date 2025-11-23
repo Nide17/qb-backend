@@ -1,5 +1,6 @@
 const { getBatchedQuizzesMap } = require('../quizzing/helpers');
 const { getBatchedUsersMap } = require('../users/helpers');
+const { getModels } = require('../../utils/db-manager');
 const ScoreModel = require('./models/Score');
 
 const getBatchedScoresMap = async (scoresIDs) => {
@@ -8,7 +9,7 @@ const getBatchedScoresMap = async (scoresIDs) => {
 
     try {
 
-        const Score = await ScoreModel();
+        const { Score } = await getModels('scores');
 
         const scores = await Score.find({ _id: { $in: scoresIDs } });
         if (!scores.length) throw { 'message': 'No scores found!', 'status': 404 };

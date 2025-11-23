@@ -1,5 +1,4 @@
-const ImageUploadModel = require('../../models/blog-posts/ImageUpload');
-const UserModel = require('../../../users/models/User');
+const { getModels } = require('../../../../utils/db-manager');
 const { getBatchedUsersMap } = require('../../../users/helpers');
 const { deleteImageFromS3, cacheManager, cacheWrapper, validateRequiredFields } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
@@ -14,7 +13,7 @@ const CACHE_KEYS = {
 exports.getImageUploads = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const ImageUpload = await ImageUploadModel();
+        const { ImageUpload } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let imageUploads = await ImageUpload.find().sort({ createdAt: -1 }).lean();
@@ -44,8 +43,8 @@ exports.getImageUploads = async (req, res) => {
 exports.getOneImageUpload = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
-        const ImageUpload = await ImageUploadModel();
-        const User = await UserModel();
+        const { ImageUpload } = await getModels('posts');
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let imageUpload = await ImageUpload.findById(req.params.id).lean();
@@ -66,7 +65,7 @@ exports.getOneImageUpload = async (req, res) => {
 exports.getImageUploadsByOwner = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_OWNER(req.params.id);
-        const ImageUpload = await ImageUploadModel();
+        const { ImageUpload } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
@@ -106,7 +105,7 @@ exports.createImageUpload = async (req, res) => {
             { name: 'owner', value: owner },
             { name: 'uploadImage', value: imgUp_file }
         ]);
-        const ImageUpload = await ImageUploadModel();
+        const { ImageUpload } = await getModels('posts');
 
         // Check for duplicate imageTitle
         const imgUp = await ImageUpload.findOne({ imageTitle });
@@ -129,7 +128,7 @@ exports.createImageUpload = async (req, res) => {
 
 exports.updateImageUpload = async (req, res) => {
     try {
-        const ImageUpload = await ImageUploadModel();
+        const { ImageUpload } = await getModels('posts');
 
         const imageUpload = await ImageUpload.findById(req.params.id);
         if (!imageUpload) throw { 'message': 'Image upload not found!', 'status': 404 };
@@ -145,7 +144,7 @@ exports.updateImageUpload = async (req, res) => {
 exports.deleteImageUpload = async (req, res) => {
 
     try {
-        const ImageUpload = await ImageUploadModel();
+        const { ImageUpload } = await getModels('posts');
 
         const imageUpload = await ImageUpload.findById(req.params.id);
         if (!imageUpload) throw { 'message': 'Image upload is not found!', 'status': 404 };

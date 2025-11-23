@@ -1,8 +1,7 @@
 const { getBatchedUsersMap } = require('../../../users/helpers');
 const { handleError } = require('../../../../utils/error');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
-const UserModel = require('../../../users/models/User');
-const PostCategoryModel = require('../../models/blog-posts/PostCategory');
+const { getModels } = require('../../../../utils/db-manager');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -13,7 +12,7 @@ const CACHE_KEYS = {
 // Refactored code to use reusable utilities and align with patterns from other services.
 exports.getPostCategories = async (req, res) => {
     try {
-        const PostCategory = await PostCategoryModel();
+        const { PostCategory } = await getModels('posts');
 
         const cacheKey = CACHE_KEYS.ALL;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
@@ -47,8 +46,8 @@ exports.getOnePostCategory = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id)
-        const PostCategory = await PostCategoryModel();
-        const User = await UserModel();
+        const { PostCategory } = await getModels('posts');
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let postCategory = await PostCategory.findById(req.params.id).lean();
@@ -78,7 +77,7 @@ exports.createPostCategory = async (req, res) => {
             { name: 'creator', value: creator }
         ]);
 
-        const PostCategory = await PostCategoryModel();
+        const { PostCategory } = await getModels('posts');
 
         // Check for duplicate title
         const postCat = await PostCategory.findOne({ title });
@@ -98,7 +97,7 @@ exports.createPostCategory = async (req, res) => {
 
 exports.updatePostCategory = async (req, res) => {
     try {
-        const PostCategory = await PostCategoryModel();
+        const { PostCategory } = await getModels('posts');
 
         const updatedPostCategory = await PostCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedPostCategory) throw { status: 404, message: 'PostCategory not found!' };
@@ -111,7 +110,7 @@ exports.updatePostCategory = async (req, res) => {
 
 exports.deletePostCategory = async (req, res) => {
     try {
-        const PostCategory = await PostCategoryModel();
+        const { PostCategory } = await getModels('posts');
 
         const postCategory = await PostCategory.findById(req.params.id);
         if (!postCategory) throw { status: 404, message: 'PostCategory not found!' };

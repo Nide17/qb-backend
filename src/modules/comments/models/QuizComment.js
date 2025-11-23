@@ -1,8 +1,5 @@
-const process = require("process");
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
-
-const { getDB } = require('../../../utils/db-manager');
 
 //create a schema object
 const QuizCommentSchema = new Schema({
@@ -18,7 +15,4 @@ const QuizCommentSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = async function QuizCommentModel() {
-    const db = await getDB("comments", process.env.COMMENTS_URI);
-    return db.model("QuizComment", QuizCommentSchema);
-};
+module.exports.schema = QuizCommentSchema;

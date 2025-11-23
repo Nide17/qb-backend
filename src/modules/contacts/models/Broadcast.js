@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getDB } = require('../../../utils/db-manager');
-
 //create a schema object
 const BroadcastSchema = new Schema({
     title: {
@@ -19,7 +17,4 @@ const BroadcastSchema = new Schema({
 },
     { timestamps: true });
 
-module.exports = async function BroadcastModel() {
-    const db = await getDB("contacts", process.env.CONTACTS_URI);
-    return db.model("Broadcast", BroadcastSchema);
-};
+module.exports.schema = BroadcastSchema;

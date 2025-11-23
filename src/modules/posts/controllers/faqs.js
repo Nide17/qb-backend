@@ -1,4 +1,4 @@
-const FaqModel = require('../models/Faq');
+const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
@@ -10,7 +10,7 @@ const CACHE_KEYS = {
 };
 
 const handleFindByIdAndUpdate = async (id, update) => {
-    const Faq = await FaqModel();
+    const { Faq } = await getModels('posts');
 
     const faq = await Faq.findById(id);
     if (!faq) throw { status: 404, message: 'Faq not found!' };
@@ -21,7 +21,7 @@ const handleFindByIdAndUpdate = async (id, update) => {
 
 exports.getFaqs = async (req, res) => {
     try {
-        const Faq = await FaqModel();
+        const { Faq } = await getModels('posts');
 
         const cacheKey = CACHE_KEYS.ALL;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
@@ -35,7 +35,7 @@ exports.getFaqs = async (req, res) => {
 
 exports.getOneFaq = async (req, res) => {
     try {
-        const Faq = await FaqModel();
+        const { Faq } = await getModels('posts');
 
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
@@ -49,7 +49,7 @@ exports.getOneFaq = async (req, res) => {
 
 exports.getCreatedBy = async (req, res) => {
     try {
-        const Faq = await FaqModel();
+        const { Faq } = await getModels('posts');
 
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
@@ -72,7 +72,7 @@ exports.createFaq = async (req, res) => {
             { name: 'created_by', value: created_by }
         ]);
 
-        const Faq = await FaqModel();
+        const { Faq } = await getModels('posts');
 
         const newFaq = new Faq({ title, answer, created_by });
         const savedFaq = await newFaq.save();
@@ -106,7 +106,7 @@ exports.updateFaq = async (req, res) => {
 
 exports.deleteFaq = async (req, res) => {
     try {
-        const Faq = await FaqModel();
+        const { Faq } = await getModels('posts');
 
         const faq = await Faq.findById(req.params.id);
         if (!faq) throw { status: 404, message: 'Faq not found!' };

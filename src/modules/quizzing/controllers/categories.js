@@ -1,6 +1,4 @@
-const CategoryModel = require('../models/Category');
-const QuizModel = require('../models/Quiz');
-const QuestionModel = require('../models/Question');
+const { getModels } = require('../../../utils/db-manager');
 
 const { handleError } = require('../../../utils/error');
 const { expandCategories, expandCategory } = require('../helpers');
@@ -18,7 +16,7 @@ const CACHE_KEYS = {
 exports.getCategories = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const Category = await CategoryModel();
+        const { Category } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let categories = await Category.find()
@@ -50,7 +48,7 @@ exports.getOneCategory = async (req, res) => {
             : { slug: id };
 
         const cacheKey = CACHE_KEYS.ONE(id);
-        const Category = await CategoryModel();
+        const { Category } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let category = await Category.findOne(query)
@@ -78,7 +76,7 @@ exports.createCategory = async (req, res) => {
             { name: 'title', value: req.body.title },
             { name: 'description', value: req.body.description }
         ]);
-        const Category = await CategoryModel();
+        const Category = (await getModels('quizzing')).Category;
 
         const exists = await Category.findOne({ title: req.body.title });
         if (exists)
@@ -99,7 +97,7 @@ exports.createCategory = async (req, res) => {
 // ---------------------------------------------------------------------------
 exports.updateCategory = async (req, res) => {
     try {
-        const Category = await CategoryModel();
+        const { Category } = await getModels('quizzing');
         const updated = await Category.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -123,9 +121,7 @@ exports.updateCategory = async (req, res) => {
 // ---------------------------------------------------------------------------
 exports.deleteCategory = async (req, res) => {
     try {
-        const Category = await CategoryModel();
-        const Quiz = await QuizModel();
-        const Question = await QuestionModel();
+        const { Category, Quiz, Question } = await getModels('quizzing');
 
         const category = await Category.findById(req.params.id).lean();
         if (!category)

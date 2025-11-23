@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getDB } = require('../../../utils/db-manager');
-
 const PswdResetTokenSchema = new Schema({
     userId: {
         type: Schema.Types.ObjectId,
@@ -20,7 +18,4 @@ const PswdResetTokenSchema = new Schema({
     },
 });
 
-module.exports = async function PswdResetTokenModel() {
-    const db = await getDB("users", process.env.USERS_URI);
-    return db.model("PswdResetToken", PswdResetTokenSchema);
-};
+module.exports.schema = PswdResetTokenSchema;

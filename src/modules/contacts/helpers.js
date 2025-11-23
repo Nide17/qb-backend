@@ -1,4 +1,4 @@
-const UserModel = require('../users/models/User');
+const { getModels } = require('../../utils/db-manager');
 const { getBatchedUsersMap } = require('../users/helpers');
 const { sendEmail } = require('../../utils/emails/sendEmail');
 
@@ -24,7 +24,7 @@ const notifyAdmins = async (newContact) => {
     try {
         const fetchAdminEmails = async () => {
             try {
-                const User = await UserModel();
+                const { User } = await getModels('users');
                 const admins = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email');
                 if (!admins) throw { 'message': 'No admins found!', 'status': 404 };
                 const adminEmails = admins.map(admin => admin.email);

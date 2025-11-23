@@ -2,8 +2,6 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const slugify = require('slugify');
 
-const { getDB } = require('../../../../utils/db-manager');
-
 //BlogPost Schema
 const BlogPostSchema = new Schema({
     title: {
@@ -43,7 +41,4 @@ BlogPostSchema.pre('validate', function (next) {
     next();
 });
 
-module.exports = async function BlogPostModel() {
-    const db = await getDB("posts", process.env.POSTS_URI);
-    return db.model("BlogPost", BlogPostSchema);
-};
+module.exports.schema = BlogPostSchema;

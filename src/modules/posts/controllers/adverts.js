@@ -1,4 +1,4 @@
-const AdvertModel = require('../models/Advert');
+const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
 const { deleteImageFromS3, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
@@ -12,7 +12,7 @@ const CACHE_KEYS = {
 
 exports.getAdverts = async (req, res) => {
     try {
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const cacheKey = CACHE_KEYS.ALL;
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
@@ -27,7 +27,7 @@ exports.getAdverts = async (req, res) => {
 exports.getOneAdvert = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Advert.findById(req.params.id);
@@ -41,7 +41,7 @@ exports.getOneAdvert = async (req, res) => {
 exports.getActiveAdverts = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ACTIVE;
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Advert.find({ status: 'Active' }).sort({ createdAt: -1 }).select('-__v -updatedAt');
@@ -55,7 +55,7 @@ exports.getActiveAdverts = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await Advert.find({ owner: req.params.id }).sort({ createdAt: -1 });
@@ -81,7 +81,7 @@ exports.createAdvert = async (req, res) => {
 
         if (!req.file) throw { message: 'Advert image file is required!', status: 400 };
 
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const newAdvert = new Advert({
             caption,
@@ -105,7 +105,7 @@ exports.createAdvert = async (req, res) => {
 
 exports.updateAdvert = async (req, res) => {
     try {
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
@@ -120,7 +120,7 @@ exports.updateAdvert = async (req, res) => {
 
 exports.updateAdvertStatus = async (req, res) => {
     try {
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
@@ -134,7 +134,7 @@ exports.updateAdvertStatus = async (req, res) => {
 
 exports.deleteAdvert = async (req, res) => {
     try {
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { message: 'Advert not found!', status: 404 };
@@ -151,7 +151,7 @@ exports.deleteAdvert = async (req, res) => {
 
 exports.deleteAdvertImage = async (req, res) => {
     try {
-        const Advert = await AdvertModel();
+        const { Advert } = await getModels('posts');
 
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };

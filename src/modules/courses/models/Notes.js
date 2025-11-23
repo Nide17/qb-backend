@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const slugify = require('slugify');
-const { getDB } = require('../../../utils/db-manager');
 
 const NotesSchema = new Schema({
     title: {
@@ -51,7 +50,4 @@ NotesSchema.pre('validate', function (next) {
     next();
 });
 
-module.exports = async function NotesModel() {
-    const db = await getDB("courses", process.env.COURSES_URI);
-    return db.model("Notes", NotesSchema);
-};
+module.exports.schema = NotesSchema;

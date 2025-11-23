@@ -1,86 +1,21 @@
-const { cacheManager } = require("./global-helpers");
+// utils/bootstrap.js
 const { getDB } = require("./db-manager");
 
-const initializeModels = async () => {
-    return {
-        User: await require('../modules/users/models/User')(),
-        SubscribedUser: await require('../modules/users/models/SubscribedUser')(),
-        PswdResetToken: await require('../modules/users/models/PswdResetToken')(),
+async function bootstrap() {
+    await Promise.all([
+        getDB("users", process.env.USERS_URI),
+        getDB("quizzing", process.env.QUIZZING_URI),
+        getDB("courses", process.env.COURSES_URI),
+        getDB("posts", process.env.POSTS_URI),
+        getDB("schools", process.env.SCHOOLS_URI),
+        getDB("scores", process.env.SCORES_URI),
+        getDB("downloads", process.env.DOWNLOADS_URI),
+        getDB("contacts", process.env.CONTACTS_URI),
+        getDB("feedbacks", process.env.FEEDBACKS_URI),
+        getDB("comments", process.env.COMMENTS_URI),
+    ]);
 
-        // Category heavily depends on CourseCategory population, so it must be initialized first
-        CourseCategory: await require('../modules/courses/models/CourseCategory')(),
-        Course: await require('../modules/courses/models/Course')(),
-        Chapter: await require('../modules/courses/models/Chapter')(),
-        Notes: await require('../modules/courses/models/Notes')(),
-
-        Category: await require('../modules/quizzing/models/Category')(),
-        // Quiz heavily depends on Question population, so it must be initialized first
-        Question: await require('../modules/quizzing/models/Question')(),
-        Quiz: await require('../modules/quizzing/models/Quiz')(),
-
-        Advert: await require('../modules/posts/models/Advert')(),
-        Faq: await require('../modules/posts/models/Faq')(),
-        PostCategory: await require('../modules/posts/models/blog-posts/PostCategory')(),
-        BlogPost: await require('../modules/posts/models/blog-posts/BlogPost')(),
-        BlogPostsView: await require('../modules/posts/models/blog-posts/BlogPostsView')(),
-        ImageUpload: await require('../modules/posts/models/blog-posts/ImageUpload')(),
-
-        School: await require('../modules/schools/models/School')(),
-        Level: await require('../modules/schools/models/Level')(),
-        Faculty: await require('../modules/schools/models/Faculty')(),
-
-        Score: await require('../modules/scores/models/Score')(),
-
-        Download: await require('../modules/downloads/models/Download')(),
-
-        Contact: await require('../modules/contacts/models/Contact')(),
-        Broadcast: await require('../modules/contacts/models/Broadcast')(),
-        ChatRoom: await require('../modules/contacts/models/ChatRoom')(),
-        RoomMessage: await require('../modules/contacts/models/RoomMessage')(),
-
-        Feedback: await require('../modules/feedbacks/models/Feedback')(),
-
-        QuizComment: await require('../modules/comments/models/QuizComment')(),
-        QuestionComment: await require('../modules/comments/models/QuestionComment')(),
-    };
-};
-
-const initializeDatabases = async () => {
-    const databases = [
-        { name: 'users', uri: process.env.USERS_URI },
-        { name: 'posts', uri: process.env.POSTS_URI },
-        { name: 'quizzing', uri: process.env.QUIZZING_URI },
-        { name: 'scores', uri: process.env.SCORES_URI },
-        { name: 'schools', uri: process.env.SCHOOLS_URI },
-        { name: 'courses', uri: process.env.COURSES_URI },
-        { name: 'downloads', uri: process.env.DOWNLOADS_URI },
-        { name: 'contacts', uri: process.env.CONTACTS_URI },
-        { name: 'feedbacks', uri: process.env.FEEDBACKS_URI },
-        { name: 'comments', uri: process.env.COMMENTS_URI }
-    ];
-
-    for (const db of databases) {
-        try {
-            await getDB(db.name, db.uri);
-        } catch (err) {
-            console.error(`Failed to connect to ${db.name}:`, err.message);
-        }
-    }
-
-    await initializeModels();
-};
-
-const bootstrap = async () => {
-    try {
-        await cacheManager.connect();
-        await initializeDatabases();
-
-        console.log("✅ Bootstrap complete: Redis + DB + Models initialized");
-
-    } catch (err) {
-        console.error("❌ Bootstrap failed:", err);
-        process.exit(1);
-    }
-};
+    console.log("✔ All databases initialized & models attached");
+}
 
 module.exports = bootstrap;

@@ -1,5 +1,4 @@
-const UserModel = require('../../../users/models/User');
-const BlogPostModel = require('../../models/blog-posts/BlogPost');
+const { getModels } = require('../../../../utils/db-manager');
 const { handleError } = require('../../../../utils/error');
 const { deleteImageFromS3, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
 const { getBatchedUsersMap } = require('../../../users/helpers');
@@ -16,7 +15,7 @@ exports.getBlogPosts = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const BlogPost = await BlogPostModel();
+        const { BlogPost } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let blogPosts = await BlogPost.find().sort({ createdAt: -1 }).populate('postCategory', 'title').lean();
@@ -48,8 +47,8 @@ exports.getOneBlogPost = async (req, res) => {
     try {
         const id = req.params.id;
         const cacheKey = CACHE_KEYS.ONE(id)
-        const BlogPost = await BlogPostModel();
-        const User = await UserModel();
+        const { BlogPost } = await getModels('posts');
+        const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
@@ -74,7 +73,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.BY_CATEGORY(req.params.id);
-        const BlogPost = await BlogPostModel();
+        const { BlogPost } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let blogPosts = await BlogPost.find({ postCategory: req.params.id }).sort({ createdAt: -1 })
@@ -108,7 +107,7 @@ exports.getBlogPostsByCategory = async (req, res) => {
 exports.getCreatedBy = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
-        const BlogPost = await BlogPostModel();
+        const { BlogPost } = await getModels('posts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const blogPosts = await BlogPost.find({ creator: req.params.id }).sort({ createdAt: -1 });
@@ -136,7 +135,7 @@ exports.createBlogPost = async (req, res) => {
             { name: 'postCategory', value: postCategory },
             { name: 'creator', value: creator }
         ]);
-        const BlogPost = await BlogPostModel();
+        const { BlogPost } = await getModels('posts');
 
         const newBlogPost = new BlogPost({
             title,
@@ -158,9 +157,9 @@ exports.createBlogPost = async (req, res) => {
 
 exports.updateBlogPost = async (req, res) => {
     try {
+        const { BlogPost } = await getModels('posts');
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
-        const BlogPost = await BlogPostModel();
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, req.body, { new: true });
         await cacheManager.invalidatePattern("bp:*");
@@ -172,10 +171,9 @@ exports.updateBlogPost = async (req, res) => {
 
 exports.updateBlogPostStatus = async (req, res) => {
     try {
+        const { BlogPost } = await getModels('posts');
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
-
-        const BlogPost = await BlogPostModel();
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
         await cacheManager.invalidatePattern("bp:*");
@@ -188,8 +186,7 @@ exports.updateBlogPostStatus = async (req, res) => {
 exports.deleteBlogPost = async (req, res) => {
 
     try {
-        const BlogPost = await BlogPostModel();
-
+        const { BlogPost } = await getModels('posts');
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost is not found!', 'status': 404 };
 
@@ -206,7 +203,7 @@ exports.deleteBlogPost = async (req, res) => {
 
 exports.deleteBlogPostImage = async (req, res) => {
     try {
-        const BlogPost = await BlogPostModel();
+        const { BlogPost } = await getModels('posts');
 
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };

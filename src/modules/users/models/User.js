@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getDB } = require('../../../utils/db-manager');
-
 // Create a schema object
 const UserSchema = new Schema({
   name: {
@@ -71,8 +69,5 @@ const UserSchema = new Schema({
   }
 });
 
-// IMPORTANT: export a function that returns the model
-module.exports = async function UserModel() {
-  const db = await getDB("users", process.env.USERS_URI);
-  return db.model("User", UserSchema);
-};
+// Provide schema for registry/attachModels usage
+module.exports.schema = UserSchema;

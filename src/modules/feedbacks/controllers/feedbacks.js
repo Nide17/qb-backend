@@ -1,7 +1,4 @@
-const FeedbackModel = require('../models/Feedback');
-const QuizModel = require('../../quizzing/models/Quiz');
-const UserModel = require('../../users/models/User');
-const ScoreModel = require('../../scores/models/Score');
+const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
 const { expandFeedbacks } = require('../helpers');
 const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -23,7 +20,7 @@ exports.getFeedbacks = async (req, res) => {
 
         query.limit = PAGE_SIZE;
         query.skip = PAGE_SIZE * (pageNo - 1);
-        const Feedback = await FeedbackModel();
+        const { Feedback } = await getModels('feedbacks');
 
         if (pageNo && pageNo > 0) {
             const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
@@ -56,10 +53,10 @@ exports.getOneFeedback = async (req, res) => {
 
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
 
-        const Feedback = await FeedbackModel();
-        const Quiz = await QuizModel();
-        const User = await UserModel();
-        const Score = await ScoreModel();
+        const { Feedback } = await getModels('feedbacks');
+        const { Quiz } = await getModels('quizzing');
+        const { User } = await getModels('users');
+        const { Score } = await getModels('scores');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let feedback = await Feedback.findById(req.params.id).select('quiz score user comment rating').lean();
@@ -88,7 +85,7 @@ exports.getOneFeedback = async (req, res) => {
 
 exports.createFeedback = async (req, res) => {
     try {
-        const Feedback = await FeedbackModel();
+        const { Feedback } = await getModels('feedbacks');
 
         const newFeedback = new Feedback(req.body);
         const savedFeedback = await newFeedback.save();
@@ -101,7 +98,7 @@ exports.createFeedback = async (req, res) => {
 
 exports.updateFeedback = async (req, res) => {
     try {
-        const Feedback = await FeedbackModel();
+        const { Feedback } = await getModels('feedbacks');
 
         const updatedFeedback = await Feedback.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedFeedback) throw { 'message': 'Feedback not found!', 'status': 404 };
@@ -115,7 +112,7 @@ exports.updateFeedback = async (req, res) => {
 
 exports.deleteFeedback = async (req, res) => {
     try {
-        const Feedback = await FeedbackModel();
+        const { Feedback } = await getModels('feedbacks');
 
         const feedback = await Feedback.findById(req.params.id);
         if (!feedback) throw { 'message': 'Feedback not found!', 'status': 404 };

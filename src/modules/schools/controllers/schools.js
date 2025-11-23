@@ -1,6 +1,4 @@
-const SchoolModel = require('../models/School');
-const LevelModel = require('../models/Level');
-const FacultyModel = require('../models/Faculty');
+const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
@@ -13,7 +11,7 @@ const CACHE_KEYS = {
 exports.getSchools = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ALL;
-        const School = await SchoolModel();
+        const { School } = await getModels('schools');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await School.find().sort({ createdAt: -1 });
@@ -27,7 +25,7 @@ exports.getSchools = async (req, res) => {
 exports.getOneSchool = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.ONE(req.params.id);
-        const School = await SchoolModel();
+        const { School } = await getModels('schools');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             return await School.findById(req.params.id).select('_id title');
@@ -42,7 +40,7 @@ exports.createSchool = async (req, res) => {
     try {
         const { title, location, website } = req.body;
         validateRequiredFields([{ name: 'title', value: title }]);
-        const School = await SchoolModel();
+        const { School } = await getModels('schools');
 
         // Check if school with same title exists
         const existingSchool = await School.findOne({ title });
@@ -60,7 +58,7 @@ exports.createSchool = async (req, res) => {
 
 exports.updateSchool = async (req, res) => {
     try {
-        const School = await SchoolModel();
+        const { School } = await getModels('schools');
 
         const updatedSchool = await School.findByIdAndUpdate(req.params.id, req.body, { new: true });
         await cacheManager.invalidatePattern("skl:*");
@@ -72,10 +70,7 @@ exports.updateSchool = async (req, res) => {
 
 exports.deleteSchool = async (req, res) => {
     try {
-        
-        const School = await SchoolModel();
-        const Level = await LevelModel();
-        const Faculty = await FacultyModel();
+        const { School, Level, Faculty } = await getModels('schools');
 
         const school = await School.findById(req.params.id);
         if (!school) throw { 'status': 404, 'message': 'School not found!' };

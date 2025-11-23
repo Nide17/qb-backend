@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getDB } = require('../../../utils/db-manager');
-
 //create a schema object
 const ChapterSchema = new Schema({
     title: {
@@ -30,7 +28,4 @@ const ChapterSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = async function ChapterModel() {
-    const db = await getDB("courses", process.env.COURSES_URI);
-    return db.model("Chapter", ChapterSchema);
-};
+module.exports.schema = ChapterSchema;

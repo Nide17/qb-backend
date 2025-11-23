@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const { getDB } = require('../../../utils/db-manager');
-
 // The alternative to the export model pattern is the export schema pattern.
 const ScoreSchema = new Schema({
     id: {
@@ -78,7 +76,4 @@ const ScoreSchema = new Schema({
     }
 });
 
-module.exports = async function ScoreModel() {
-    const db = await getDB("scores", process.env.SCORES_URI);
-    return db.model("Score", ScoreSchema);
-};
+module.exports.schema = ScoreSchema;

@@ -1,8 +1,4 @@
-const QuizModel = require('../models/Quiz');
-const CategoryModel = require('../models/Category');
-const QuestionModel = require('../models/Question');
-const UserModel = require('../../users/models/User');
-const SubscribedUserModel = require('../../users/models/SubscribedUser');
+const { getModels } = require('../../../utils/db-manager');
 
 const { handleError } = require('../../../utils/error');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
@@ -25,7 +21,7 @@ exports.getQuizzes = async (req, res) => {
     // res.set('Cache-Control', 'public, max-age=3600');
 
     // Initialize all models before any populate operations
-    const Quiz = await QuizModel();
+    const { Quiz } = await getModels('quizzing');
 
     try {
         const pageNo = parseInt(req.query.pageNo);
@@ -127,7 +123,7 @@ exports.getOneQuiz = async (req, res) => {
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
 
-            const Quiz = await QuizModel();
+            const { Quiz } = await getModels('quizzing');
             let quiz = await Quiz.findOne(query)
                 .populate('category questions', 'title question_image questionText answerOptions duration slug')
                 .select('-__v')
@@ -135,7 +131,7 @@ exports.getOneQuiz = async (req, res) => {
 
             if (!quiz) throw { status: 404, message: `Quiz with id ${id} not found` };
 
-            const User = await UserModel();
+            const { User } = await getModels('users');
             const owner = await User.findById(quiz.created_by).select('name image').lean();
             quiz.created_by = owner || quiz.created_by;
             return quiz;
@@ -153,7 +149,7 @@ exports.getOneQuiz = async (req, res) => {
 exports.getQuizzesByCategory = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CATEGORY(req.params.id);
-        const Quiz = await QuizModel();
+        const { Quiz } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let quizzes = await Quiz.find({ category: req.params.id })
@@ -180,8 +176,7 @@ exports.getQuizzesByCategory = async (req, res) => {
 exports.getQuizzesByNotes = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_NOTES(req.params.id);
-        const Quiz = await QuizModel();
-        const Category = await CategoryModel();
+        const { Quiz, Category } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             const categories = await Category.find({ category: req.params.id });
@@ -211,8 +206,7 @@ exports.createQuiz = async (req, res) => {
 
         if (!title || !description || !category)
             throw { message: 'Missing required fields', status: 400 };
-        const Category = await CategoryModel();
-        const Quiz = await QuizModel();
+        const { Category, Quiz } = await getModels('quizzing');
 
         const exists = await Quiz.findOne({ title });
         if (exists) throw { message: 'Quiz already exists!', status: 400 };
@@ -244,7 +238,7 @@ exports.createQuiz = async (req, res) => {
 exports.notifying = async (req, res) => {
     try {
         const cacheKey = 'subscribed_users';
-        const SubscribedUser = await SubscribedUserModel();
+        const { SubscribedUser } = await getModels('users');
 
         const subscribers = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () =>
             SubscribedUser.find({})
@@ -280,8 +274,7 @@ exports.notifying = async (req, res) => {
 // ------------------------------------------------------------------------------
 exports.updateQuiz = async (req, res) => {
     try {
-        const Category = await CategoryModel();
-        const Quiz = await QuizModel();
+        const { Category, Quiz } = await getModels('quizzing');
 
         const quiz = await Quiz.findById(req.params.id);
         if (!quiz) throw { message: 'Quiz not found', status: 404 };
@@ -318,7 +311,7 @@ exports.updateQuiz = async (req, res) => {
 // ------------------------------------------------------------------------------
 exports.addVidLink = async (req, res) => {
     try {
-        const Quiz = await QuizModel();
+        const { Quiz } = await getModels('quizzing');
 
         const quiz = await Quiz.findById(req.params.id);
         if (!quiz) throw { message: 'Quiz not found', status: 404 };
@@ -340,9 +333,7 @@ exports.addVidLink = async (req, res) => {
 // ------------------------------------------------------------------------------
 exports.deleteQuiz = async (req, res) => {
     try {
-        const Category = await CategoryModel();
-        const Quiz = await QuizModel();
-        const Question = await QuestionModel();
+        const { Category, Quiz, Question } = await getModels('quizzing');
 
         const quiz = await Quiz.findById(req.params.id);
         if (!quiz) throw { message: 'Quiz not found', status: 404 };
@@ -369,7 +360,7 @@ exports.deleteQuiz = async (req, res) => {
 // ------------------------------------------------------------------------------
 exports.deleteVideo = async (req, res) => {
     try {
-        const Quiz = await QuizModel();
+        const { Quiz } = await getModels('quizzing');
         const quiz = await Quiz.findById(req.params.id);
         if (!quiz) throw { message: 'Quiz not found', status: 404 };
 
@@ -390,7 +381,7 @@ exports.deleteVideo = async (req, res) => {
 // ------------------------------------------------------------------------------
 exports.getDatabaseStats = async (req, res) => {
     try {
-        const Quiz = await QuizModel();
+        const { Quiz } = await getModels('quizzing');
         const cacheKey = 'quizzes_db_stats';
 
         const data = await cacheWrapper.wrap(cacheKey, 900, async () => {
