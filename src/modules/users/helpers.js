@@ -9,9 +9,38 @@ const generateToken = (user) => {
 };
 
 const updateUserToken = async (user) => {
+
     const token = generateToken(user);
+
     const { User } = await getModels('users');
-    return await User.findByIdAndUpdate({ _id: user._id }, { $set: { current_token: token } }, { new: true });
+    const { Faculty } = await getModels('schools');
+
+    const usr = await User.findByIdAndUpdate({ _id: user._id }, { $set: { current_token: token } }, { new: true });
+    const userObj = usr.toObject();
+    if (userObj && userObj.school && userObj.level && userObj.faculty) {
+
+        const faculty = await Faculty
+            .findById(userObj.faculty)
+            .populate('level school', 'title')
+            .select('title level school')
+            .lean();
+
+        if (faculty) {
+            userObj.faculty = { _id: faculty?._id, title: faculty?.title };
+            userObj.level = { _id: faculty?.level?._id, title: faculty?.level?.title };
+            userObj.school = { _id: faculty?.school?._id, title: faculty?.school?.title };
+        }
+    }
+
+    delete userObj.password;
+    delete userObj.otp;
+    delete userObj.otpExpires;
+    delete userObj.__v;
+    delete userObj.last_login;
+    delete userObj.register_date;
+    delete userObj.verified;
+    userObj.current_token = usr.current_token;
+    return userObj;
 };
 
 const sendOtpEmail = async (user, otp) => {
@@ -43,7 +72,6 @@ const sendSubscriptionEmail = (subscriber) => {
         './template/subscribe.handlebars'
     );
 };
-
 
 const getBatchedUsersMap = async (usersIDs) => {
 

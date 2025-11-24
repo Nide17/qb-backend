@@ -1,7 +1,6 @@
 const { getBatchedQuizzesMap } = require('../quizzing/helpers');
 const { getBatchedUsersMap } = require('../users/helpers');
 const { getModels } = require('../../utils/db-manager');
-const ScoreModel = require('./models/Score');
 
 const getBatchedScoresMap = async (scoresIDs) => {
 

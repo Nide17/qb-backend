@@ -61,6 +61,14 @@ const handleError = (res, err, statusOverride) => {
     }
 
     // JWT Errors
+    if (normalized.name === "NoTokenLoadUserError") {
+        return res.status(401).json({
+            success: false,
+            message: "No authentication token provided",
+            code: "NO_TOKEN_LOAD_USER_ERROR",
+            timestamp
+        });
+    }
     if (normalized.name === "JsonWebTokenError") {
         return res.status(401).json({
             success: false,

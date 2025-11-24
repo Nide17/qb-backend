@@ -4,27 +4,24 @@ const jwt = require("jsonwebtoken");
  * Verifies JWT from header and attaches decoded user to req.user
  */
 function verifyToken(req) {
+
   const token = req.header("x-auth-token");
 
   if (!token) {
-    let error = new Error("Token missing: Authorization denied!");
+    const error = new Error("No authentication token provided");
     error.status = 401;
+    if (req.url === "/loadUser") {
+      error.name = "NoTokenLoadUserError";
+    }
     throw error;
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
-      algorithms: ["HS256"],
-    });
+  const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+    algorithms: ["HS256"],
+  });
 
-    req.user = decoded;
-    return decoded;
-  } catch (err) {  // eslint-disable-line no-unused-vars
-    let error = new Error("Token is not valid or expired");
-    error.status = 401;
-    error.code = "TOKEN_EXPIRED";
-    throw error;
-  }
+  req.user = decoded;
+  return decoded;
 }
 
 /**

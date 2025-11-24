@@ -39,8 +39,8 @@ app.get("/api/health", async (req, res) => {
 // 404
 app.use((req, res) => handleError(res, { status: 404, message: `Route ${req.url} not found` }));
 
-// Error handler
-app.use((err, req, res) => {
+// Error handler: keep 'next' to handle auth middleware errors, ...
+app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
     console.error("❌ Error:", err);
     const safe = {
         message: err.message,

@@ -22,7 +22,7 @@ exports.getCategories = async (req, res) => {
             let categories = await Category.find()
                 .sort({ creation_date: -1 })
                 .select('_id title description quizes courseCategory')
-                .populate('quizes', '_id title slug')
+                .populate('quizes', '_id title slug questions')
                 .lean();
 
             if (!categories || !categories.length)
