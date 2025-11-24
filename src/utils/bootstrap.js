@@ -1,5 +1,6 @@
 // utils/bootstrap.js
 const { getDB } = require("./db-manager");
+const { cacheManager } = require("./global-helpers");
 
 async function bootstrap() {
     await Promise.all([
@@ -15,7 +16,9 @@ async function bootstrap() {
         getDB("comments", process.env.COMMENTS_URI),
     ]);
 
-    console.log("✔ All databases initialized & models attached");
+    await cacheManager.connect();
+
+    console.log("✔ All databases initialized & Redis connected & models attached");
 }
 
 module.exports = bootstrap;

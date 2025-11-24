@@ -1,8 +1,5 @@
 const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
 const { getModels } = require('../../../utils/db-manager');
-const UserModel = require('../../users/models/User');
-const QuizModel = require('../../quizzing/models/Quiz');
-const ScoreModel = require('../models/Score');
 const { expandScores } = require('../helpers');
 const { handleError } = require('../../../utils/error');
 const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
@@ -131,14 +128,17 @@ exports.getScoresForQuizCreator = async (req, res) => {
 exports.getOneScore = async (req, res) => {
 
     try {
-        const cacheKey = CACHE_KEYS.ONE(req.params.id);
+        const id = req.params.id;
+        const query = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { id: id };
+
+        const cacheKey = CACHE_KEYS.ONE(id);
+
         const { Score } = await getModels('scores');
         const { User } = await getModels('users');
         const { Quiz } = await getModels('quizzing');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            let score = await Score.findOne({ id: req.params?.id }).lean();
-            if (!score) score = await Score.findById(req.params?.id).lean();
+            let score = await Score.findOne(query).lean();
             if (!score) throw { status: 404, message: 'Score not found!' };
 
             if (score.taken_by) {
@@ -259,9 +259,7 @@ exports.getMonthlyUser = async (req, res) => {
 exports.createScore = async (req, res) => {
 
     try {
-        const { id, out_of, category, quiz, review, taken_by } = req.body;
-        const marks = req.body.marks ? req.body.marks : 0;
-        var now = new Date();
+        const { id, out_of, marks, category, quiz, review, taken_by } = req.body;
         const { Score } = await getModels('scores');
 
         // Simple validation
@@ -279,40 +277,14 @@ exports.createScore = async (req, res) => {
             if (recentScoreExist.length > 0) {
                 // Check if the score was saved within 60 seconds
                 let testDate = new Date(recentScoreExist[0].test_date);
-                let seconds = Math.round((now - testDate) / 1000);
+                let seconds = Math.round((new Date() - testDate) / 1000);
 
                 if (seconds < 60) throw { 'status': 400, 'message': 'Score duplicate! You took this quiz in less than a minute ago!' };
             }
 
-            const newScore = new Score({ id, marks, out_of, test_date: now, category, quiz, review, taken_by });
+            const newScore = new Score({ id, marks, out_of, category, quiz, review, taken_by });
             const savedScore = await newScore.save();
             if (!savedScore) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
-
-            // Emit real-time update if socket.io is available
-            if (req.io) {
-                req.io.to(`user-${taken_by}`).emit('score-updated', {
-                    score: savedScore,
-                    type: 'new_score'
-                });
-
-                // Broadcast to quiz room for leaderboard updates
-                req.io.to(`quiz-${quiz}`).emit('leaderboard-update', {
-                    quizId: quiz,
-                    newScore: {
-                        userId: taken_by,
-                        marks,
-                        out_of,
-                        test_date: now
-                    }
-                });
-
-                // Broadcast summary stats update
-                req.io.emit('summary-stats-update', {
-                    type: 'new_score',
-                    data: { quiz, marks, out_of, taken_by }
-                });
-            }
-
             await cacheManager.invalidatePattern("sc:*");
             res.status(200).json(savedScore);
         }

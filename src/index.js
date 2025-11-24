@@ -40,7 +40,7 @@ app.get("/api/health", async (req, res) => {
 app.use((req, res) => handleError(res, { status: 404, message: `Route ${req.url} not found` }));
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
     console.error("❌ Error:", err);
     const safe = {
         message: err.message,

@@ -10,10 +10,12 @@ const ScoreSchema = new Schema({
     },
     marks: {
         type: Number,
+        default: 0,
         required: true
     },
     out_of: {
         type: Number,
+        default: 0,
         required: true
     },
     test_date: {
