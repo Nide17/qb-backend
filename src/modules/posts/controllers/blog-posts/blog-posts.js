@@ -59,7 +59,7 @@ exports.getOneBlogPost = async (req, res) => {
 
             if (!blogPost) throw { 'message': 'Blog post not found', 'status': 404 };
 
-            blogPost.creator = await User.findById(blogPost.creator).select('-password -__v -createdAt -updatedAt').lean();
+            blogPost.creator = await User.findById(blogPost.creator).select('name image').lean();
 
             return blogPost;
         });
