@@ -28,7 +28,7 @@ const getDailyReport = async () => {
 
         return processReportData(result);
     } catch (err) {
-        console.error(err);
+        console.error(err?.message);
         return null;
     }
 };

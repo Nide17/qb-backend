@@ -250,7 +250,7 @@ exports.notifying = async (req, res) => {
         subscribers.forEach(sub => {
             sendEmail(
                 sub.email,
-                `Updates!! new ${category} quiz that may interest you`,
+                `Updates! new ${category} quiz that may interest you`,
                 {
                     name: sub.name,
                     author: created_by,

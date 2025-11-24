@@ -93,7 +93,7 @@ exports.createQuizComment = async (req, res) => {
         // Create new QuizComment
         const newQuizComment = new QuizComment({ comment, quiz, sender });
         const savedQuizComment = await newQuizComment.save();
-        if (!savedQuizComment) throw { message: 'Something went wrong while creating!!', status: 500 };
+        if (!savedQuizComment) throw { message: 'Something went wrong while creating.', status: 500 };
 
         await cacheManager.invalidatePattern("qzcmt:*");
         res.status(200).json(savedQuizComment);
