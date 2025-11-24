@@ -38,7 +38,7 @@ exports.getQuizzes = async (req, res) => {
                     $expr: { $gt: [{ $size: "$questions" }, 5] }
                 })
                     .sort({ creation_date: -1 })
-                    .select('title slug category questions creation_date')
+                    .select('title description slug category questions creation_date')
                     .populate("category questions", 'title questionText')
                     .limit(limit)
                     .skip(skip);
@@ -66,7 +66,7 @@ exports.getQuizzes = async (req, res) => {
                     .sort({ creation_date: -1 })
                     .limit(PAGE_SIZE)
                     .skip(PAGE_SIZE * (pageNo - 1))
-                    .select('title slug category questions creation_date')
+                    .select('title description slug category questions creation_date')
                     .populate('category questions', 'title questionText')
                     .lean();
 
