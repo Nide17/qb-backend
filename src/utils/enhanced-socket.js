@@ -21,12 +21,15 @@ class SocketManager {
 
     initialize(httpServer) {
 
+        // Use explicit allowed origin when available to avoid credentials + '*' conflict
+        const allowedOrigin = process.env.FRONTEND_URL || process.env.CLIENT_URL || '*';
+
         this.io = socketIO(httpServer, {
             cors: {
                 allowedHeaders: ["Content-Type", "Authorization", "x-auth-token", "Access-Control-Allow-Origin", "Access-Control-Allow-Methods", "Access-Control-Allow-Headers"],
                 methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-                origin: "*",
-                credentials: true
+                origin: allowedOrigin,
+                credentials: !!(process.env.FRONTEND_URL || process.env.CLIENT_URL)
             },
             transports: ['websocket', 'polling'],
             pingTimeout: 600000,
