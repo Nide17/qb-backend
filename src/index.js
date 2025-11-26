@@ -13,13 +13,16 @@ const bootstrap = require('./utils/bootstrap');
 
 const app = express();
 const server = http.createServer(app);
+
+// Track bootstrap state for serverless graceful degradation
+let bootstrapDone = false;
+let bootstrapError = null;
+
 // Middleware (basic)
 app.use(express.json());
 app.use(cors());
 app.use(compression());
 app.use(morgan("dev"));
-
-// We'll initialize DBs and then initialize sockets so socket handlers see ready models
 
 app.get("/", (req, res) => res.json({ status: "OK" }));
 
@@ -28,38 +31,53 @@ app.get("/api/health", async (req, res) => {
         status: "OK",
         uptime: process.uptime(),
         redis: cacheManager.isConnected(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        bootstrapDone,
+        bootstrapError: bootstrapError ? bootstrapError.message : null
     });
 });
 
-// Initialize DB + redis + models, then start socket manager and mount routes
+// Middleware to ensure DB is ready before allowing API calls
+app.use("/api", (req, res, next) => {
+    if (!bootstrapDone) {
+        return res.status(503).json({
+            status: "Service Unavailable",
+            message: "Database initialization in progress",
+            bootstrapError: bootstrapError ? bootstrapError.message : null
+        });
+    }
+    next();
+});
+
+// Initialize socket.io (can work without full DB in some cases)
+const io = socketManager.initialize(server);
+app.use((req, res, next) => { req.io = io; next(); });
+
+// Routes (mounted after req.io middleware)
+mountRoutes(app);
+
+// 404 - must be after routes
+app.use((req, res) => handleError(res, { status: 404, message: `Route ${req.url} not found` }));
+
+// Error handler: keep 'next' to handle auth middleware errors, ...
+app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
+    console.error("❌ Error:", err);
+    const safe = {
+        message: err.message,
+        name: err.name,
+        status: err.status,
+        code: err.code,
+        stack: process.env.NODE_ENV === "production" ? undefined : err.stack
+    };
+    handleError(res, safe);
+});
+
+// Start bootstrap asynchronously (don't block app initialization)
 bootstrap().then(() => {
-    // initialize sockets after DBs/models are ready
-    const io = socketManager.initialize(server);
+    bootstrapDone = true;
+    console.log("✅ Bootstrap complete");
 
-    // attach io to requests so route handlers can emit events
-    app.use((req, res, next) => { req.io = io; next(); });
-
-    // Routes (mounted after req.io middleware)
-    mountRoutes(app);
-
-    // 404 - must be after routes
-    app.use((req, res) => handleError(res, { status: 404, message: `Route ${req.url} not found` }));
-
-    // Error handler: keep 'next' to handle auth middleware errors, ...
-    app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-        console.error("❌ Error:", err);
-        const safe = {
-            message: err.message,
-            name: err.name,
-            status: err.status,
-            code: err.code,
-            stack: process.env.NODE_ENV === "production" ? undefined : err.stack
-        };
-        handleError(res, safe);
-    });
-
-    // Start the server if not on vercel
+    // Start the server if not on vercel (i.e., local node)
     if (!process.env.VERCEL && process.env.NODE_ENV !== "test" && process.env.NODE_ENV !== "VERCEL") {
         const PORT = process.env.PORT || 5000;
         server.listen(PORT, () =>
@@ -67,7 +85,19 @@ bootstrap().then(() => {
         );
     }
 }).catch(err => {
-    console.error('❌ Bootstrap failed, aborting startup:', err);
+
+    // If port is already in use, don't exit; increment and try again
+    if (err.code === "EADDRINUSE") {
+        const PORT = process.env.PORT || 5000;
+        server.listen(PORT + 1, () =>
+            console.log(`🚀 Server running on port ${PORT + 1}`)
+        );
+        bootstrapDone = true;
+        return;
+    }
+
+    bootstrapError = err;
+    console.error("❌ Bootstrap error:", err);
     process.exit(1);
 });
 
