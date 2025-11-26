@@ -20,7 +20,7 @@ const server = http.createServer(app);
 const isVercel =
     process.env.VERCEL ||
     process.env.NODE_ENV === "VERCEL" ||
-    process.env.NODE_ENV === "test";
+    process.env.MODE === "test";
 
 // Bootstrap State
 let bootstrapDone = false;
