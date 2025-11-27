@@ -46,7 +46,17 @@ class SocketManager {
         this.setupQuizFeatures();
         this.setupHealthMonitoring();
 
+        console.log(`\n🔌 Socket.IO initialized with allowed origin: ${allowedOrigin}`);
         return this.io;
+    }
+
+    isReady() {
+        if (!this.io) {
+            console.log('Socket.IO not initialized yet!');
+            return false;
+        }
+        console.log('Socket.IO is ready!');
+        return true;
     }
 
     setupMiddleware() {
