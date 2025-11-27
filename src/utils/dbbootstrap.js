@@ -2,7 +2,7 @@
 const { getDB } = require("./db-manager");
 const { cacheManager } = require("./global-helpers");
 
-async function bootstrap() {
+async function dbbootstrap() {
     await Promise.all([
         getDB("users", process.env.USERS_URI),
         getDB("quizzing", process.env.QUIZZING_URI),
@@ -21,4 +21,4 @@ async function bootstrap() {
     console.log("✔ All databases initialized & Redis connected & models attached");
 }
 
-module.exports = bootstrap;
+module.exports = dbbootstrap;
