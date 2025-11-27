@@ -11,128 +11,228 @@ const socketManager = require("./utils/enhanced-socket");
 const { cacheManager } = require("./utils/global-helpers");
 const { handleError } = require("./utils/error");
 const mountRoutes = require("./utils/mount-routes");
-const bootstrap = require("./utils/bootstrap");
+const dbbootstrap = require("./utils/dbbootstrap");
 
-// App & Server Setup
-const app = express();
-const server = http.createServer(app);
-
-const isVercel =
+// Platform Detection
+const isVercel = !!(
     process.env.VERCEL ||
-    process.env.NODE_ENV === "VERCEL" ||
-    process.env.MODE === "test";
+    process.env.VERCEL_ENV ||
+    process.env.NOW_REGION
+);
+const isHeroku = !!(process.env.DYNO);
+const isServerless = isVercel;
 
-// Bootstrap State
-let bootstrapDone = false;
-let bootstrapError = null;
-
-// Global Middlewares
-app.use(express.json());
-app.use(cors());
-app.use(compression());
-app.use(morgan("dev"));
-
-// Health Check Routes
-app.get("/", (req, res) => res.json({ status: "OK" }));
-
-app.get("/api/health", (req, res) => {
-    res.json({
-        status: "OK",
-        uptime: process.uptime(),
-        redis: cacheManager.isConnected(),
-        timestamp: Date.now(),
-        bootstrapDone,
-        bootstrapError: bootstrapError?.message || null,
-    });
-});
-
-// Block API routes until bootstrap is ready
-const ensureBootstrap = (req, res, next) => {
-    if (!bootstrapDone) {
-        return res.status(503).json({
-            status: "Service Unavailable",
-            message: "Database initialization in progress",
-            bootstrapError: bootstrapError?.message || null,
-        });
-    }
-    next();
+// Bootstrap State Management
+const dbBootstrapState = {
+    done: false,
+    error: null,
+    promise: null,
 };
 
-app.use("/api", ensureBootstrap);
-
-// Socket.io Setup
-if (!isVercel) {
-    const io = socketManager.initialize(server);
-    app.use((req, res, next) => {
-        req.io = io;
-        next();
-    });
+// Initialize Bootstrap (singleton pattern for serverless)
+function initializeDBBootstrap() {
+    if (!dbBootstrapState.promise) {
+        dbBootstrapState.promise = dbbootstrap()
+            .then(() => {
+                dbBootstrapState.done = true;
+                console.log("✅ Bootstrap complete");
+            })
+            .catch((error) => {
+                dbBootstrapState.error = error;
+                console.error("❌ Bootstrap error:", error);
+                throw error;
+            });
+    }
+    return dbBootstrapState.promise;
 }
 
-// Routes
-mountRoutes(app);
+// Create Express App
+function createApp() {
+    const app = express();
 
-// 404 Handler (after routes)
-app.use((req, res) =>
-    handleError(res, {
-        status: 404,
-        message: `Route ${req.url} not found`,
-    })
-);
+    // Middleware - Order matters!
+    app.use(express.json({ limit: "10mb" }));
+    app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Error Handler
-app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-    console.error("❌ Error:", err);
+    // CORS Configuration
+    const corsOptions = {
+        origin: process.env.CORS_ORIGIN || "*",
+        credentials: true,
+        optionsSuccessStatus: 200,
+    };
+    app.use(cors(corsOptions));
 
-    const safe = {
-        name: err.name,
-        message: err.message,
-        status: err.status,
-        code: err.code,
-        stack: process.env.NODE_ENV === "production" ? undefined : err.stack,
+    app.use(compression());
+
+    // Logging - lighter in production
+    app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+    // Trust proxy for Heroku/Vercel
+    if (isHeroku || isVercel) {
+        app.set("trust proxy", 1);
+    }
+
+    // Health Check Routes (before bootstrap check)
+    app.get("/", (req, res) =>
+        res.json({
+            status: "OK",
+            platform: isVercel ? "vercel" : isHeroku ? "heroku" : "local",
+        })
+    );
+
+    app.get("/api/health", (req, res) => {
+        res.json({
+            status: dbBootstrapState.done ? "OK" : "INITIALIZING",
+            platform: isVercel ? "vercel" : isHeroku ? "heroku" : "local",
+            uptime: process.uptime(),
+            redis: dbBootstrapState.done ? cacheManager.isReady() : false,
+            timestamp: Date.now(),
+            env: process.env.NODE_ENV,
+            bootstrapDone: dbBootstrapState.done,
+            bootstrapError: dbBootstrapState.error?.message || null,
+        });
+    });
+
+    // Bootstrap Middleware - Wait for initialization
+    const ensureDBBootstrap = async (req, res, next) => {
+        if (dbBootstrapState.done) {
+            return next();
+        }
+
+        try {
+            await initializeDBBootstrap();
+            next();
+        } catch (error) {
+            return res.status(503).json({
+                status: "Service Unavailable",
+                message: "Database initialization failed",
+                error: error.message,
+            });
+        }
     };
 
-    handleError(res, safe);
-});
+    // Apply to all API routes
+    app.use("/api", ensureDBBootstrap);
 
-// Bootstrap Logic & Server Start
+    // Socket.io Setup (only for non-serverless environments)
+    if (!isServerless) {
+        const server = http.createServer(app);
+        const io = socketManager.initialize(server);
+
+        app.use((req, res, next) => {
+            req.io = io;
+            next();
+        });
+
+        app.locals.server = server;
+    }
+
+    // Mount API Routes
+    mountRoutes(app);
+
+    // 404 Handler
+    app.use((req, res) =>
+        handleError(res, {
+            status: 404,
+            message: `Route ${req.url} not found`,
+        })
+    );
+
+    // Global Error Handler
+    app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
+        console.error("❌ Error:", err);
+
+        const isDev = process.env.NODE_ENV !== "production";
+
+        const safeError = {
+            name: err.name || "Error",
+            message: err.message || "Internal Server Error",
+            status: err.status || 500,
+            code: err.code,
+            ...(isDev && { stack: err.stack }),
+        };
+
+        handleError(res, safeError);
+    });
+
+    return app;
+}
+
+// Server Startup (for non-serverless environments)
 async function startServer() {
+    const app = createApp();
+    const server = app.locals.server || http.createServer(app);
+
     try {
-        await bootstrap();
-        bootstrapDone = true;
+        // Initialize bootstrap before starting server
+        await initializeDBBootstrap();
 
-        console.log("✅ Bootstrap complete");
+        const port = Number(process.env.PORT || 5000);
 
-        if (isVercel) return; // Vercel uses exported handler
-
-        let port = Number(process.env.PORT || 5000);
-
-        const tryStart = () =>
-            server.listen(port, () =>
-                console.log(`🚀 Server running on port ${port}`)
-            );
+        const startListening = (currentPort) => {
+            server.listen(currentPort, () => {
+                console.log(`🚀 Server running on port ${currentPort}`);
+                console.log(`   Platform: ${isHeroku ? "Heroku" : "Local"}`);
+                console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
+            });
+        };
 
         server.on("error", (err) => {
             if (err.code === "EADDRINUSE") {
-                console.warn(`⚠️ Port ${port} in use. Retrying on ${port + 1}...`);
-                port++;
-                return tryStart();
+                console.warn(`⚠️  Port ${port} in use`);
+                if (!isHeroku) {
+                    const newPort = port + 1;
+                    console.log(`   Retrying on port ${newPort}...`);
+                    return startListening(newPort);
+                }
             }
-
             console.error("❌ Server error:", err);
             process.exit(1);
         });
 
-        tryStart();
+        startListening(port);
+
     } catch (error) {
-        bootstrapError = error;
-        console.error("❌ Bootstrap error:", error);
+        console.error("❌ Failed to start server:", error);
         process.exit(1);
     }
 }
 
-startServer();
+// Graceful Shutdown
+function setupGracefulShutdown(server) {
+    const shutdown = async (signal) => {
+        console.log(`\n${signal} received. Starting graceful shutdown...`);
 
-// Vercel Serverless Export
-module.exports = app;
-module.exports.handler = (req, res) => app(req, res);
+        server.close(() => {
+            console.log("✅ HTTP server closed");
+        });
+
+        // Close connections
+        if (cacheManager && typeof cacheManager.disconnect === "function") {
+            await cacheManager.disconnect();
+        }
+
+        setTimeout(() => {
+            console.error("⚠️  Forced shutdown after timeout");
+            process.exit(1);
+        }, 10000);
+    };
+
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+// Execution Logic
+if (isServerless) {
+    // Vercel: Export app directly, bootstrap on first request
+    module.exports = createApp();
+} else {
+    // Heroku/Local: Start traditional server
+    const app = createApp();
+    const server = app.locals.server || http.createServer(app);
+
+    setupGracefulShutdown(server);
+    startServer();
+
+    module.exports = app;
+}
