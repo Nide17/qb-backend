@@ -34,7 +34,7 @@ class RedisCacheManager {
             });
 
             this.redis.on("connect", () => {
-                console.log("🔗 Redis socket connected");
+                console.log("🔗 Redis connected");
             });
 
             this.redis.on("error", async (err) => {

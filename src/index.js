@@ -86,6 +86,7 @@ function createApp() {
             platform: isVercel ? "vercel" : isHeroku ? "heroku" : "local",
             uptime: process.uptime(),
             redis: dbBootstrapState.done ? cacheManager.isReady() : false,
+            socketIO: socketManager.isReady(),
             timestamp: Date.now(),
             env: process.env.NODE_ENV,
             bootstrapDone: dbBootstrapState.done,
@@ -116,8 +117,12 @@ function createApp() {
 
     // Socket.io Setup (only for non-serverless environments)
     if (!isServerless) {
+        
         const server = http.createServer(app);
         const io = socketManager.initialize(server);
+
+        // Add socket.io to app.locals for use in routes
+        app.locals.io = io;
 
         app.use((req, res, next) => {
             req.io = io;

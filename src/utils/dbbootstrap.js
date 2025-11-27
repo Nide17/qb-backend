@@ -18,7 +18,7 @@ async function dbbootstrap() {
 
     await cacheManager.connect();
 
-    console.log("✔ All databases initialized & Redis connected & models attached");
+    console.log("✔️ All databases initialized & Redis connected & models attached");
 }
 
 module.exports = dbbootstrap;
