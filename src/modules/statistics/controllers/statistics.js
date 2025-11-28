@@ -10,10 +10,6 @@ const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
 const { getBatchedNotesMap } = require('../../courses/helpers');
 
 const { getModels } = require('../../../utils/db-manager');
-const UserModel = require('../../users/models/User');
-const QuizModel = require('../../quizzing/models/Quiz');
-const DownloadModel = require('../../downloads/models/Download');
-const ScoreModel = require('../../scores/models/Score');
 
 const CACHE_TTL = 300; // 5 minutes
 const CACHE_KEYS = {

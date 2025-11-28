@@ -13,6 +13,7 @@ const CACHE_KEYS = {
 exports.getFeedbacks = async (req, res) => {
 
     try {
+        const { Feedback } = await getModels('feedbacks');
         const totalPages = await Feedback.countDocuments({});
         const PAGE_SIZE = 20;
         var pageNo = parseInt(req.query.pageNo || '1');
@@ -20,7 +21,6 @@ exports.getFeedbacks = async (req, res) => {
 
         query.limit = PAGE_SIZE;
         query.skip = PAGE_SIZE * (pageNo - 1);
-        const { Feedback } = await getModels('feedbacks');
 
         if (pageNo && pageNo > 0) {
             const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
