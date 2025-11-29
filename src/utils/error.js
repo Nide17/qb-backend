@@ -162,6 +162,15 @@ function handleAxiosError(res, err, timestamp) {
         });
     }
 
+    if (err.code === "ECONNABORTED") {
+        return res.status(503).json({
+            success: false,
+            message: err.message || "Request timed out. Refresh and try again.",
+            code: "REQUEST_TIMEOUT",
+            timestamp
+        });
+    }
+
     if (err.response?.data?.errors) {
         const list = err.response.data.errors.map(e => e.message);
         return res.status(err.response.status).json({

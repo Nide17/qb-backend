@@ -1,6 +1,7 @@
 const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
+const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -18,14 +19,26 @@ const expandNotes = async (notes) => {
 
     // Extract unique IDs
     const usersIDs = [...new Set(notes.map(n => n.uploaded_by?.toString()))];
+    const quizesIDs = [...new Set(notes.map(n => {
+        let quizIDs = n.quizes?.map(q => q.toString());
+        return quizIDs;
+    }).flat())];
 
-    // Get users details as a Map
+    // Get details as a Map
     const usersMap = await getBatchedUsersMap(usersIDs);
+    const quizesMap = await getBatchedQuizzesMap(quizesIDs);
 
     // Map notes to expanded objects
-    const expandedNotes = notes.map(nt => {
+    const expandedNotesUsers = notes.map(nt => {
         const expandedNote = { ...nt };
         if (nt.uploaded_by) expandedNote.uploaded_by = usersMap.get(nt.uploaded_by.toString());
+        return expandedNote;
+    });
+
+    // Merge both maps
+    const expandedNotes = expandedNotesUsers.map(nt => {
+        const expandedNote = { ...nt };
+        if (nt.quizes) expandedNote.quizes = nt.quizes.map(q => quizesMap.get(q.toString()));
         return expandedNote;
     });
 
@@ -107,7 +120,7 @@ exports.getOneNotes = async (req, res) => {
 
             const query = req.params.id.match(/^[0-9a-fA-F]{24}$/) ? { _id: req.params.id } : { slug: req.params.id };
 
-            let notes = await Notes.findOne(query).populate('course chapter courseCategory', 'title').lean();
+            let notes = await Notes.findOne(query).populate('course chapter quizes courseCategory', 'title').lean();
             if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
             if (notes.uploaded_by) notes.uploaded_by = await User.findById(notes.uploaded_by).select('name');
             return notes;
@@ -179,13 +192,20 @@ exports.updateNotes = async (req, res) => {
     }
 };
 
-exports.updateNotesQuizzes = async (req, res) => {
+exports.addQuizToNotes = async (req, res) => {
     try {
         const { Notes } = await getModels('courses');
 
-        const notes = await Notes.updateOne(
+        const note = await Notes.findOne({ _id: req.params.id });
+        if (!note) throw { 'message': 'Notes not found!', 'status': 404 };
+
+        // if quiz is already in the notes, raise an error
+        if (note.quizes.includes(req.body.quizID)) throw { 'message': 'Quiz is already in the notes!', 'status': 400 };
+
+        // Add this quiz to the notes
+        const notes = await Notes.findOneAndUpdate(
             { '_id': req.params.id },
-            { $push: { 'quizzes': req.body.quizesState } },
+            { $push: { 'quizes': req.body.quizID } },
             { new: true }
         );
         await cacheManager.invalidatePattern("nt:*");
@@ -202,12 +222,12 @@ exports.removeQuizFromNotes = async (req, res) => {
         const note = await Notes.findOne({ _id: req.params.id });
         if (!note) throw { 'message': 'Notes not found!', 'status': 404 };
 
-        await Notes.updateOne(
+        await Notes.findOneAndUpdate(
             { _id: note._id },
             { $pull: { quizes: req.body.quizID } }
         );
         await cacheManager.invalidatePattern("nt:*");
-        res.status(200).json({ message: 'Deleted!' });
+        res.status(200).json(note);
     } catch (err) {
         handleError(res, err);
     }

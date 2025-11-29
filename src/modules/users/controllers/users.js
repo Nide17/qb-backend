@@ -23,9 +23,7 @@ const CACHE_KEYS = {
     ADMINSCREATORS: 'usr:adminscreators',
 };
 
-// -----------------------
 // Utility helpers
-// -----------------------
 const safeUserForResponse = (userObj) => {
     if (!userObj) return null;
     // Select only safe/public fields to return (and to cache)
@@ -66,9 +64,7 @@ const isValidEmail = (email) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
-// -----------------------
 // Controller actions
-// -----------------------
 
 exports.getUsers = async (req, res) => {
     try {

@@ -11,6 +11,7 @@ const CACHE_KEYS = {
     LIMITED: (limit, skip) => `qz:limited:${limit}:${skip}`,
     PAGINATED: (pageNo) => `qz:paginated:${pageNo}`,
     BY_CATEGORY: (categoryId) => `qz:by_category:${categoryId}`,
+    BY_COURSE_CATEGORY: (ccID) => `qz:by_course_category:${ccID}`,
     BY_USER: (userId) => `qz:by_user:${userId}`,
     BY_NOTES: (notes) => `qz:by_notes:${notes}`,
     ONE: (id) => `qz:${id}`,
@@ -111,9 +112,7 @@ exports.getQuizzes = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // GET ONE QUIZ
-// ------------------------------------------------------------------------------
 exports.getOneQuiz = async (req, res) => {
     try {
         const id = req.params.id;
@@ -143,9 +142,7 @@ exports.getOneQuiz = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // GET QUIZZES BY CATEGORY
-// ------------------------------------------------------------------------------
 exports.getQuizzesByCategory = async (req, res) => {
     try {
         const cacheKey = CACHE_KEYS.BY_CATEGORY(req.params.id);
@@ -170,26 +167,21 @@ exports.getQuizzesByCategory = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
-// GET QUIZZES BY NOTES CATEGORY
-// ------------------------------------------------------------------------------
-exports.getQuizzesByNotes = async (req, res) => {
+// GET QUIZZES BY COURSE CATEGORY
+exports.getQuizzesByCourseCategory = async (req, res) => {
     try {
-        const cacheKey = CACHE_KEYS.BY_NOTES(req.params.id);
-        const { Quiz, Category } = await getModels('quizzing');
+        const cacheKey = CACHE_KEYS.BY_COURSE_CATEGORY(req.params.id);
+        const { Category, Quiz } = await getModels('quizzing');
+
+        if (!req.params.id) throw { message: 'Missing required fields', status: 400 };
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            const categories = await Category.find({ category: req.params.id });
-            const quizzes = await Quiz.find({ category: { $in: categories } })
-                .populate('category questions', 'title questionText');
 
-            if (!quizzes.length) throw { message: 'No quizzes found!', status: 404, };
+            const category = await Category.findOne({ courseCategory: req.params.id });
 
-            const ids = quizzes.map(q => q._id);
-            const map = await getBatchedQuizzesMap(ids);
-            return quizzes.map(q => map.get(q._id.toString()) || q);
+            return await Quiz.find({ category: category._id })
+                .select('title slug category')
         });
-
         res.status(200).json(data);
 
     } catch (err) {
@@ -197,9 +189,7 @@ exports.getQuizzesByNotes = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // CREATE QUIZ
-// ------------------------------------------------------------------------------
 exports.createQuiz = async (req, res) => {
     try {
         const { title, description, category, created_by } = req.body;
@@ -232,9 +222,7 @@ exports.createQuiz = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // SEND NOTIFICATIONS
-// ------------------------------------------------------------------------------
 exports.notifying = async (req, res) => {
     try {
         const cacheKey = 'subscribed_users';
@@ -269,9 +257,7 @@ exports.notifying = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // UPDATE QUIZ
-// ------------------------------------------------------------------------------
 exports.updateQuiz = async (req, res) => {
     try {
         const { Category, Quiz } = await getModels('quizzing');
@@ -306,9 +292,7 @@ exports.updateQuiz = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // ADD VIDEO LINK
-// ------------------------------------------------------------------------------
 exports.addVidLink = async (req, res) => {
     try {
         const { Quiz } = await getModels('quizzing');
@@ -328,9 +312,7 @@ exports.addVidLink = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // DELETE QUIZ
-// ------------------------------------------------------------------------------
 exports.deleteQuiz = async (req, res) => {
     try {
         const { Category, Quiz, Question } = await getModels('quizzing');
@@ -355,9 +337,7 @@ exports.deleteQuiz = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // DELETE VIDEO
-// ------------------------------------------------------------------------------
 exports.deleteVideo = async (req, res) => {
     try {
         const { Quiz } = await getModels('quizzing');
@@ -376,9 +356,7 @@ exports.deleteVideo = async (req, res) => {
     }
 };
 
-// ------------------------------------------------------------------------------
 // DATABASE STATS
-// ------------------------------------------------------------------------------
 exports.getDatabaseStats = async (req, res) => {
     try {
         const { Quiz } = await getModels('quizzing');

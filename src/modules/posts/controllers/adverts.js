@@ -92,8 +92,6 @@ exports.createAdvert = async (req, res) => {
             advert_image: req.file.location ? req.file.location : req.file.path
         });
 
-        console.log('File exist.');
-
         const savedAdvert = await newAdvert.save();
         if (!savedAdvert) throw { message: 'Something went wrong during creation!', status: 500 };
         await cacheManager.invalidatePattern("ad:*");
