@@ -1,5 +1,5 @@
 const express = require('express');
-const { getNotes, getLimitedNotes, getNotesByCategory, getNotesByChapter, getOneNotes, createNotes, updateNotesQuizzes, updateNotes, removeQuizFromNotes, deleteNotes } = require('../controllers/notes');
+const { getNotes, getLimitedNotes, getNotesByCategory, getNotesByChapter, getOneNotes, createNotes, addQuizToNotes, updateNotes, removeQuizFromNotes, deleteNotes } = require('../controllers/notes');
 const { authRole } = require('../../../middlewares/auth.js');
 const { notesUpload } = require('../../../middlewares/notesUpload');
 const router = express.Router();
@@ -16,7 +16,7 @@ router.post('/', authRole(['Creator', 'Admin', 'SuperAdmin']), notesUpload.singl
 
 // PUT routes
 router.put('/notes-quizzes/remove/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), removeQuizFromNotes);
-router.put('/notes-quizzes/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), updateNotesQuizzes);
+router.put('/notes-quizzes/add/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), addQuizToNotes);
 router.put('/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), notesUpload.single('notes_file'), updateNotes);
 
 // DELETE routes

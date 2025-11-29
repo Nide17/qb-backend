@@ -139,7 +139,7 @@ exports.getOneScore = async (req, res) => {
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let score = await Score.findOne(query).lean();
-            if (!score) throw { status: 404, message: 'Score not found!' };
+            if (!score) throw { status: 404, message: 'Score not found. Save it first.' };
 
             if (score.taken_by) {
                 const user = await User.findById(score.taken_by).select('name image').lean();
@@ -263,7 +263,7 @@ exports.createScore = async (req, res) => {
         const { Score } = await getModels('scores');
 
         // Simple validation
-        if (!id || !out_of || !review || !taken_by) throw { status: 400, message: '400' };
+        if (!id || !out_of || !marks || !category || !quiz || !review || !taken_by) throw { status: 400, message: 'Missing required fields!' };
         else {
             // Use Promise.all for parallel queries to improve performance
             const [existingScore, recentScoreExist] = await Promise.all([
