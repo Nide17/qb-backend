@@ -1,5 +1,5 @@
 const express = require('express');
-const { getSubscribedUsers, getOneSubscribedUser, createSubscribedUser, updateSubscribedUser, deleteSubscribedUser } = require('../controllers/subscribed-users');
+const { getSubscribedUsers, getOneSubscribedUser, createSubscribedUser, updateSubscribedUser, deleteSubscribedUser, unsubscribe } = require('../controllers/subscribed-users');
 const { authRole } = require('../../../middlewares/auth.js');
 
 const router = express.Router();
@@ -15,6 +15,7 @@ router.post('/', createSubscribedUser);
 router.put('/:id', authRole(['SuperAdmin']), updateSubscribedUser);
 
 // DELETE routes
+router.delete('/unsubscribe', unsubscribe);
 router.delete('/:id', authRole(['SuperAdmin']), deleteSubscribedUser);
 
 module.exports = router;

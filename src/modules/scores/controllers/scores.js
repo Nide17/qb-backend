@@ -87,7 +87,7 @@ exports.getScoresByTaker = async (req, res) => {
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let scores = await Score.find({ taken_by: req.params.id }).sort({ test_date: -1 }).lean();
-            if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You have no scores. Take some quizzes!' };
+            if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'You need to take some quizzes!' };
 
             // Expand scores
             const result = await expandScores(scores) || scores;

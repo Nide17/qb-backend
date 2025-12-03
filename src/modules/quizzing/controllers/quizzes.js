@@ -244,7 +244,7 @@ exports.notifying = async (req, res) => {
                     author: created_by,
                     quizTitle: title,
                     quizLink: `${clientURL}/view-quiz/${slug}`,
-                    unsubLink: `${clientURL}/unsubscribe`
+                    unsubLink: `${clientURL}/unsubscribe?id=${sub?._id}&email=${sub?.email}`
                 },
                 './template/newquiz.handlebars'
             );

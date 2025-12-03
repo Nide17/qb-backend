@@ -8,11 +8,7 @@ const { getModels } = require('../../../utils/db-manager');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
 const { handleError } = require('../../../utils/error');
 const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
-
-const {
-    hashPassword,
-    updateUserToken,
-} = require('../helpers');
+const { safeUserForResponse, isValidEmail, expandSchoolData, hashPassword, updateUserToken } = require('../helpers');
 
 const CACHE_TTL = 600; // seconds
 const CACHE_KEYS = {
@@ -23,49 +19,11 @@ const CACHE_KEYS = {
     ADMINSCREATORS: 'usr:adminscreators',
 };
 
-// Utility helpers
-const safeUserForResponse = (userObj) => {
-    if (!userObj) return null;
-    // Select only safe/public fields to return (and to cache)
-    const { _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date, } = userObj;
-    return {
-        _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date,
-    };
-};
-
-const expandSchoolData = async (rawUser) => {
-    if (!rawUser) return rawUser;
-    if (!(rawUser.school && rawUser.level && rawUser.faculty)) return rawUser;
-
-    const { Faculty } = await getModels('schools');
-    const faculty = await Faculty
-        .findById(rawUser.faculty)
-        .populate('level school', 'title')
-        .select('title level school')
-        .lean();
-
-    if (faculty) {
-        rawUser.faculty = { _id: faculty._id, title: faculty.title };
-        rawUser.level = { _id: faculty.level?._id, title: faculty.level?.title };
-        rawUser.school = { _id: faculty.school?._id, title: faculty.school?.title };
-    }
-    return rawUser;
-};
-
 const invalidateAllUserCaches = async () => {
-    // Keep it broad: updates often affect multiple cached lists
     await cacheManager.invalidatePattern('usr:*');
 };
 
-// simple email validation (permissive but practical)
-const isValidEmail = (email) => {
-    if (!email) return false;
-    // as a pragmatic check allow valid patterns (avoid rejecting long new TLDs)
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-};
-
 // Controller actions
-
 exports.getUsers = async (req, res) => {
     try {
         const limit = req.query.limit ? parseInt(req.query.limit, 10) : 0;
@@ -168,7 +126,7 @@ exports.loadUser = async (req, res, next) => {
             return safeUserForResponse(user);
         });
 
-        if (!data) return res.status(404).json({ message: 'User not found' });
+        if (!data) return res.status(404).json({ message: 'Invalid email and/or password' });
         res.status(200).json(data);
     } catch (err) {
         next(err);
@@ -182,10 +140,10 @@ exports.login = async (req, res) => {
 
         const { User } = await getModels('users');
         const user = await User.findOne({ email }).lean();
-        if (!user) throw { status: 404, message: 'User not found' };
+        if (!user) throw { status: 404, message: 'Invalid email and/or password' };
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) throw { status: 400, message: 'Incorrect email or password' };
+        if (!isMatch) throw { status: 400, message: 'Invalid email and/or password' };
 
         // If account unverified and registered after a date, send OTP
         if (!user.verified && new Date(user.register_date) > new Date('2024-12-09')) {
@@ -253,7 +211,7 @@ exports.register = async (req, res) => {
         if (!isValidEmail(email)) throw { status: 400, message: 'Please provide a valid email' };
 
         const { User } = await getModels('users');
-        const existing = await User.findOne({ email });
+        const existing = await User.findOne({ email })
 
         const hash = await hashPassword(password);
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -268,7 +226,7 @@ exports.register = async (req, res) => {
             await User.findByIdAndUpdate(existing._id, { name, password: hash, otp, otpExpires }, { new: true });
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
             await cacheManager.invalidatePattern('usr:*');
-            return res.status(200).json({ message: 'Verification OTP sent to your email' });
+            return res.status(200).json({ message: 'Verification OTP sent to your email', user: safeUserForResponse(existing.toObject()) });
         }
 
         // New user flow
@@ -292,29 +250,47 @@ exports.verifyOTP = async (req, res) => {
         if (!email || !otp) throw { status: 400, message: 'Email and OTP are required' };
 
         const { User } = await getModels('users');
-        const usr = await User.findOne({ email });
+        const usr = await User.findOne({ email }).lean();
         if (!usr) throw { status: 400, message: 'User does not exist' };
+
         if (!usr.otp || !usr.otpExpires || Date.now() > usr.otpExpires) {
             throw { status: 400, message: 'OTP expired. Request a new one.' };
         }
-        if (String(otp) !== String(usr.otp)) throw { status: 400, message: 'Invalid OTP' };
 
-        // mark as verified and issue token
-        await User.findByIdAndUpdate(usr._id, { verified: true, otp: null, otpExpires: null });
-        const updatedUser = await updateUserToken(usr); // uses your helper
+        if (String(otp) !== String(usr.otp)) throw { status: 400, message: 'Invalid OTP. Request a new one.' };
+
+        const updatedUser = await updateUserToken(usr);
         if (!updatedUser) throw { status: 500, message: 'Could not verify user' };
 
-        await cacheManager.invalidatePattern('usr:*');
+        // mark as verified
+        await User.findByIdAndUpdate(usr._id, { verified: true, otp: null, otpExpires: null });
 
-        res.status(200).json({
-            current_token: updatedUser.current_token,
-            user: {
-                _id: updatedUser._id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                role: updatedUser.role
-            }
-        });
+        await cacheManager.invalidatePattern('usr:*');
+        res.status(200).json(safeUserForResponse(updatedUser));
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+exports.resendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) throw { status: 400, message: 'Email is required' };
+
+        // Validate email
+        if (!isValidEmail(email)) throw { status: 400, message: 'Please provide a valid email: ' + email + '.' };
+
+        const { User } = await getModels('users');
+        const user = await User.findOne({ email });
+        if (!user) throw { status: 400, message: 'User does not exist' };
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = Date.now() + (10 * 60 * 1000); // 10 minutes TTL
+
+        await User.findOneAndUpdate({ email }, { otp, otpExpires });
+        await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name: user.name, otp }, './template/otp.handlebars');
+
+        res.status(200).json({ message: 'New verification OTP sent to your email', user: safeUserForResponse(user.toObject()) });
     } catch (err) {
         handleError(res, err);
     }
