@@ -8,6 +8,23 @@ const generateToken = (user) => {
     return jwt.sign({ _id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' });
 };
 
+// Utility helpers
+const safeUserForResponse = (userObj) => {
+    if (!userObj) return null;
+    // Select only safe/public fields to return (and to cache)
+    const { _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date, } = userObj;
+    return {
+        _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date,
+    };
+};
+
+// simple email validation (permissive but practical)
+const isValidEmail = (email) => {
+    if (!email) return false;
+    // as a pragmatic check allow valid patterns (avoid rejecting long new TLDs)
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
 const updateUserToken = async (user) => {
 
     const token = generateToken(user);
@@ -95,11 +112,33 @@ const getBatchedUsersMap = async (usersIDs) => {
     }
 };
 
+const expandSchoolData = async (rawUser) => {
+    if (!rawUser) return rawUser;
+    if (!(rawUser.school && rawUser.level && rawUser.faculty)) return rawUser;
+
+    const { Faculty } = await getModels('schools');
+    const faculty = await Faculty
+        .findById(rawUser.faculty)
+        .populate('level school', 'title')
+        .select('title level school')
+        .lean();
+
+    if (faculty) {
+        rawUser.faculty = { _id: faculty._id, title: faculty.title };
+        rawUser.level = { _id: faculty.level?._id, title: faculty.level?.title };
+        rawUser.school = { _id: faculty.school?._id, title: faculty.school?.title };
+    }
+    return rawUser;
+};
+
 module.exports = {
     generateToken,
     updateUserToken,
+    safeUserForResponse,
+    isValidEmail,
     sendOtpEmail,
     hashPassword,
     sendSubscriptionEmail,
     getBatchedUsersMap,
+    expandSchoolData,
 };

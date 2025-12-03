@@ -78,13 +78,27 @@ exports.deleteSubscribedUser = async (req, res) => {
     try {
         const { SubscribedUser } = await getModels('users');
         const subscribedUser = await SubscribedUser.findById(req.params.id);
-        if (!subscribedUser) throw { 'message': 'Subscribed user not found!', 'status': 404 };
+        if (!subscribedUser) throw { 'message': 'Subscriber not found!', 'status': 404 };
 
         const removedSubscribedUser = await subscribedUser.deleteOne();
         if (removedSubscribedUser.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
 
         await cacheManager.invalidatePattern("sub:*");
         res.status(200).json(subscribedUser);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+exports.unsubscribe = async (req, res) => {
+    try {
+        const { SubscribedUser } = await getModels('users');
+        const { id, email } = req.query;
+
+        const unsubscribedUser = await SubscribedUser.findOneAndDelete({ _id: id, email });
+        if (!unsubscribedUser) throw { 'message': 'Subscriber not found!', 'status': 404 };
+        await cacheManager.invalidatePattern("sub:*");
+        res.status(200).json(unsubscribedUser);
     } catch (err) {
         handleError(res, err);
     }
