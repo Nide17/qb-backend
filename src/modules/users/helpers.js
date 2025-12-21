@@ -5,7 +5,7 @@ const { sendEmail } = require('../../utils/emails/sendEmail');
 
 // Helper functions
 const generateToken = (user) => {
-    return jwt.sign({ _id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' });
+    return jwt.sign({ _id: user._id, name: user.name, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' });
 };
 
 // Utility helpers

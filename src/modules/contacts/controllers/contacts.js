@@ -1,17 +1,17 @@
 const { getModels } = require('../../../utils/db-manager');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
-const { convertFromRaw } = require('draft-js');
-const { stateToHTML } = require('draft-js-export-html');
+// const { convertFromRaw } = require('draft-js');
+// const { stateToHTML } = require('draft-js-export-html');
 const { handleError } = require('../../../utils/error');
-const { notifyAdmins } = require('../helpers');
-const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
+// const { notifyAdmins } = require('../helpers');
+const { cacheManager, cacheWrapper, validateRequiredFields } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
     ALL: "ctc:all",
     ONE: (id) => `ctc:${id}`,
     PAGINATED: (pageNo) => `ctc:paginated:${pageNo}`,
-    BY_SENDER: (senderId) => `ctc:by_sender:${senderId}`,
+    BY_SENDER: (sender) => `ctc:by_sender:${sender}`,
     DB_STATS: "ctc:db_stats"
 };
 
@@ -22,13 +22,35 @@ exports.getContacts = async (req, res) => {
         const { Contact } = await getModels('contacts');
         const totalPages = await Contact.countDocuments({});
         const PAGE_SIZE = 10;
-        const pageNo = parseInt(req.query.pageNo || '0');
-        const query = { limit: PAGE_SIZE, skip: PAGE_SIZE * (pageNo - 1) };
+        const pageNo = parseInt(req.query.pageNo || "0", 10);
 
         if (pageNo > 0) {
             const cacheKey = CACHE_KEYS.PAGINATED(pageNo);
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-                const contacts = await Contact.find({}, {}, query).sort({ contact_date: -1 }).lean();
+
+                const contacts = await Contact.aggregate([
+                    {
+                        // 1. Compute last reply date
+                        $addFields: {
+                            lastReplyDate: { $max: "$replies.reply_date" }
+                        }
+                    },
+                    {
+                        // 2. Sort by last reply, fallback to contact date
+                        $sort: {
+                            lastReplyDate: -1,
+                            contact_date: -1
+                        }
+                    },
+                    {
+                        // 3. Pagination
+                        $skip: PAGE_SIZE * (pageNo - 1)
+                    },
+                    {
+                        $limit: PAGE_SIZE
+                    }
+                ]);
+
                 const result = { contacts, totalPages: Math.ceil(totalPages / PAGE_SIZE), currentPage: pageNo };
                 return result;
             })
@@ -38,7 +60,22 @@ exports.getContacts = async (req, res) => {
         else {
             const cacheKey = CACHE_KEYS.ALL;
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-                const contacts = await Contact.find().sort({ contact_date: -1 });
+                const contacts = await Contact.aggregate([
+                    {
+                        // Compute lastReplyDate from replies array
+                        $addFields: {
+                            lastReplyDate: { $max: "$replies.reply_date" }
+                        }
+                    },
+                    {
+                        // Sort by last reply date (fallback to contact_date if no replies)
+                        $sort: {
+                            lastReplyDate: -1,
+                            contact_date: -1
+                        }
+                    }
+                ]);
+
                 return contacts;
             })
             return res.status(200).json(data);
@@ -50,11 +87,33 @@ exports.getContacts = async (req, res) => {
 
 exports.getContactsBySender = async (req, res) => {
     try {
-        const cacheKey = CACHE_KEYS.BY_SENDER(req.params.id);
+        const cacheKey = CACHE_KEYS.BY_SENDER(req.params.email);
         const { Contact } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            const contacts = await Contact.find({ sent_by: req.params.id });
+
+            const contacts = await Contact.aggregate([
+                {
+                    // 1. Filter by email
+                    $match: {
+                        email: req.params.email
+                    }
+                },
+                {
+                    // 2. Compute lastReplyDate from replies array
+                    $addFields: {
+                        lastReplyDate: { $max: "$replies.reply_date" }
+                    }
+                },
+                {
+                    // 3. Sort by last reply, fallback to contact_date
+                    $sort: {
+                        lastReplyDate: -1,
+                        contact_date: -1
+                    }
+                }
+            ]);
+
             return contacts;
         })
         res.status(200).json(data);
@@ -70,7 +129,14 @@ exports.getOneContact = async (req, res) => {
         const { Contact } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            const contact = await Contact.findById(req.params.id);
+            let contact = await Contact.findById(req.params.id).lean();
+
+            if (contact?.replies?.length) {
+                contact.replies.sort(
+                    (a, b) => new Date(b.reply_date) - new Date(a.reply_date)
+                );
+            }
+
             return contact;
         })
         res.status(200).json(data);
@@ -81,60 +147,74 @@ exports.getOneContact = async (req, res) => {
 
 exports.createContact = async (req, res) => {
     try {
+
+        const { contact_name, email, message, contact_date } = req.body;
+
+        // Validation
+        validateRequiredFields([
+            { name: 'contact_name', value: contact_name },
+            { name: 'email', value: email },
+            { name: 'message', value: message },
+            { name: 'contact_date', value: contact_date },
+        ]);
+
         const { Contact } = await getModels('contacts');
-        const newContact = await Contact.create(req.body);
-        if (!newContact) {
+        let newContact = await new Contact({ contact_name, email, message, contact_date });
+
+        const savedContact = await newContact.save();
+        if (!savedContact) {
             throw { 'status': 500, 'message': 'Something went wrong!' };
         }
 
         // Sending e-mail to contacted user
         sendEmail(
-            newContact.email,
+            savedContact.email,
             'Thank you for contacting Quiz-Blog!',
-            { name: newContact.contact_name },
+            { name: savedContact.contact_name },
             './template/contact.handlebars'
         );
         // Notify admins
-        await notifyAdmins(newContact);
+        // await notifyAdmins(savedContact);
         await cacheManager.invalidatePattern("ctc:*");
-        res.status(200).json(newContact);
+        res.status(200).json(savedContact);
     } catch (err) {
         handleError(res, err);
     }
 };
 
-exports.updateContact = async (req, res) => {
+exports.addContactReply = async (req, res) => {
     try {
         // Convert message from raw to HTML
-        const rawContent = JSON.parse(req.body.message);
-        const contentState = convertFromRaw(rawContent);
-        const htmlMessage = stateToHTML(contentState);
+        // const rawContent = JSON.parse(req.body.message);
+        // const contentState = convertFromRaw(rawContent);
+        // const htmlMessage = stateToHTML(contentState);
         const { Contact } = await getModels('contacts');
 
         // Update the Quiz on Contact updating
-        const newMessage = await Contact.updateOne(
+        const updatedMessage = await Contact.findOneAndUpdate(
             { '_id': req.params.id },
             { $push: { 'replies': req.body } },
             { new: true }
         );
 
-        if (!newMessage) {
+        if (!updatedMessage) {
             throw { 'status': 500, 'message': 'Something went wrong while trying to update the contact' };
         }
 
-        // Send Reply email
-        sendEmail(
-            req.body.to_contact,
-            'New reply',
-            {
-                name: req.body.to_contact_name,
-                question: req.body.contact_question,
-                answer: htmlMessage,
-            },
-            './template/reply.handlebars'
-        );
+        // // Send Reply email
+        // sendEmail(
+        //     req.body.to_contact,
+        //     'New reply',
+        //     {
+        //         name: req.body.to_contact_name,
+        //         question: req.body.contact_question,
+        //         answer: htmlMessage,
+        //     },
+        //     './template/reply.handlebars'
+        // );
+        console.log("updatedMessage: ", updatedMessage);
         await cacheManager.invalidatePattern("ctc:*");
-        res.status(200).json(newMessage);
+        res.status(200).json(updatedMessage);
     } catch (err) {
         handleError(res, err);
     }

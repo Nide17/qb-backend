@@ -279,7 +279,7 @@ class RedisCacheManager {
             const keys = await this.scan(pattern);
             if (keys.length > 0) {
                 await this.redis.del(...keys);
-                console.log(`🗑 Deleted ${keys.length} keys for pattern "${pattern}"`);
+                console.log(`🗑  Deleted ${keys.length} keys for pattern "${pattern}"`);
             }
             return true;
         } catch (err) {

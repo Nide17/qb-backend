@@ -93,7 +93,7 @@ const cacheWrapper = {
         try {
             // 1️⃣ Try Redis
             const cached = await getCachedData(key);
-            if (cached !== undefined && cached !== null) return cached;
+            // if (cached !== undefined && cached !== null) return cached;
             // if (cached !== undefined && cached !== null) console.log(cached);
 
             // 2️⃣ Cache MISS → Fetch from DB

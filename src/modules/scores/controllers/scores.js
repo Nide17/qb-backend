@@ -25,12 +25,12 @@ exports.getScores = async (req, res) => {
         // Pagination - ENFORCE pagination to prevent memory exhaustion
         const totalScores = await Score.countDocuments({});
         var PAGE_SIZE = 20;
-        var pageNo = parseInt(req.query.pageNo || '1'); // Default to at most 1 page to avoid mem leak
+        var pageNo = parseInt(req.query.pageNo || '0'); // Default to at most 1 page to avoid mem leak
         var query = {};
 
         // Always enforce pagination - never load all scores
         query.limit = PAGE_SIZE;
-        query.skip = PAGE_SIZE * (pageNo - 1);
+        query.skip = pageNo > 0 ? (pageNo - 1) * PAGE_SIZE : 0;
 
         if (req.query?.filter === 'stats') return res.status(200).json(totalScores);
 
@@ -103,8 +103,8 @@ exports.getScoresForQuizCreator = async (req, res) => {
     try {
         // Add pagination to prevent memory exhaustion
         const PAGE_SIZE = 50; // Larger page size for creators but still limited
-        const pageNo = parseInt(req.query.pageNo || '1');
-        const skip = PAGE_SIZE * (pageNo - 1);
+        const pageNo = parseInt(req.query.pageNo || '0');
+        const skip = pageNo > 0 ? (pageNo - 1) * PAGE_SIZE : 0;
 
         const cacheKey = CACHE_KEYS.BY_CREATOR(req.params.id);
         const { Score } = await getModels('scores');
