@@ -7,7 +7,7 @@ const cors = require("cors");
 const compression = require("compression");
 const morgan = require("morgan");
 
-const socketManager = require("./utils/enhanced-socket");
+const initSocket = require("./utils/socket");
 const { cacheManager } = require("./utils/global-helpers");
 const { handleError } = require("./utils/error");
 const mountRoutes = require("./utils/mount-routes");
@@ -81,12 +81,16 @@ function createApp() {
     );
 
     app.get("/api/health", (req, res) => {
+        const io = app.locals.io;
         res.json({
             status: dbBootstrapState.done ? "OK" : "INITIALIZING",
             platform: isVercel ? "vercel" : isHeroku ? "heroku" : "local",
             uptime: process.uptime(),
             redis: dbBootstrapState.done ? cacheManager.isReady() : false,
-            socketIO: socketManager.isReady(),
+            socketIO: !!io,
+            socketMetrics: io ? {
+                users: io.userStore.list(),
+            } : null,
             timestamp: Date.now(),
             env: process.env.NODE_ENV,
             bootstrapDone: dbBootstrapState.done,
@@ -117,9 +121,9 @@ function createApp() {
 
     // Socket.io Setup (only for non-serverless environments)
     if (!isServerless) {
-        
+
         const server = http.createServer(app);
-        const io = socketManager.initialize(server);
+        const io = initSocket(server);
 
         // Add socket.io to app.locals for use in routes
         app.locals.io = io;
@@ -145,7 +149,7 @@ function createApp() {
 
     // Global Error Handler
     app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-        console.error("❌ Error:", err);
+        // console.error("❌ Error:", err);
 
         const isDev = process.env.NODE_ENV !== "production";
 

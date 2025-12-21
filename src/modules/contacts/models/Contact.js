@@ -44,4 +44,3 @@ const ContactSchema = new Schema({
 });
 
 module.exports.schema = ContactSchema;
-

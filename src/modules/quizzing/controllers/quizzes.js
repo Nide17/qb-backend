@@ -25,7 +25,7 @@ exports.getQuizzes = async (req, res) => {
     const { Quiz } = await getModels('quizzing');
 
     try {
-        const pageNo = parseInt(req.query.pageNo);
+        const pageNo = parseInt(req.query.pageNo || '0');
         const limit = parseInt(req.query.limit);
         const skip = parseInt(req.query.skip) || 0;
 

@@ -1,5 +1,5 @@
 const handleError = (res, err, statusOverride) => {
-    console.error("🔥 ERROR:", err);
+    // console.error("🔥 ERROR:", err);
 
     const timestamp = new Date().toISOString();
 

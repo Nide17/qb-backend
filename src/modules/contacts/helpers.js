@@ -52,7 +52,7 @@ const notifyAdmins = async (newContact) => {
 // Lightweight validator for room message payloads used by room-messages controller
 const validateRoomMessageData = (data) => {
     if (!data) throw { message: 'No data provided', status: 400 };
-    const required = ['senderID', 'receiverID', 'content', 'roomID'];
+    const required = ['sender', 'receiver', 'content', 'room'];
     required.forEach((key) => {
         if (!data[key]) throw { message: `Missing required field: ${key}`, status: 400 };
     });
@@ -69,7 +69,7 @@ const expandRoomsUsers = async (chatRooms) => {
         if (usersIDs.length > 0) {
             const usersMap = await getBatchedUsersMap(usersIDs);
             chatRooms.forEach(room => {
-                room.users = room.users.map(userId => usersMap[userId]);
+                room.users = room.users.map(userId => usersMap.get(userId.toString()));
             });
         } else {
             chatRooms.forEach(room => {
@@ -83,9 +83,28 @@ const expandRoomsUsers = async (chatRooms) => {
     }
 };
 
+const expandOneRoomUsers = async (chatRoom) => {
+
+    const usersIDs = [...new Set(chatRoom.users)].filter(id => id);
+    
+    try {
+        if (usersIDs.length > 0) {
+            const usersMap = await getBatchedUsersMap(usersIDs);
+            chatRoom.users = chatRoom.users.map(userId => usersMap.get(userId.toString()));
+        } else {
+            chatRoom.users = [];
+        }
+        return chatRoom;
+    } catch (error) {
+        console.log(error.name);
+        return chatRoom;
+    }
+};
+
 module.exports = {
     notifyAdmins,
     sendEmails,
     validateRoomMessageData,
     expandRoomsUsers,
+    expandOneRoomUsers,
 };

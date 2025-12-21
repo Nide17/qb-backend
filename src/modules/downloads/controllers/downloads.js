@@ -21,11 +21,11 @@ exports.getDownloads = async (req, res) => {
         const { Download } = await getModels('downloads');
         const totalDownloads = await Download.countDocuments({});
         var PAGE_SIZE = 20;
-        var pageNo = parseInt(req.query.pageNo || '1');
+        var pageNo = parseInt(req.query.pageNo || '0');
         var query = {};
 
         query.limit = PAGE_SIZE;
-        query.skip = PAGE_SIZE * (pageNo - 1);
+        query.skip = pageNo > 0 ? (pageNo - 1) * PAGE_SIZE : 0;
 
         // Return stats only if requested
         if (req.query?.filter === 'stats') return res.status(200).json(totalDownloads);

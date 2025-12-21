@@ -1,13 +1,14 @@
 const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
-const { notifyAdmins, validateRoomMessageData } = require('../helpers');
+const { validateRoomMessageData } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
     ALL: "rmsg:all",
     ONE: (id) => `rmsg:${id}`,
-    BY_ROOM: (id) => `rmsg:room:${id}`
+    BY_ROOM: (id) => `rmsg:room:${id}`,
+    BATCHED: (id) => `rmsg:batched:${id}`,
 };
 
 exports.getRoomMessages = async (req, res) => {
@@ -51,9 +52,35 @@ exports.getRoomMessageByRoom = async (req, res) => {
         const { RoomMessage } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            const roomMessages = await RoomMessage.find({ room: req.params.id });
+            const roomMessages = await RoomMessage.find({ room: req.params.id })
+                .sort({ createdAt: 1 })
+                .lean();
             return roomMessages;
         })
+        res.status(200).json(data);
+    } catch (err) {
+        handleError(res, err);
+    }
+};
+
+exports.getBatchedRoomMessages = async (req, res) => {
+    try {
+        const roomIds = req.body.roomIds;
+        const cacheKey = CACHE_KEYS.BATCHED(roomIds[0]);
+        const { RoomMessage } = await getModels('contacts');
+
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const roomMessages = await RoomMessage.find({ room: { $in: roomIds } })
+                .sort({ createdAt: 1 })
+                .lean();
+
+            if (!roomMessages || roomMessages.length === 0) {
+                return [];
+            }
+
+            return roomMessages;
+        });
+
         res.status(200).json(data);
     } catch (err) {
         handleError(res, err);
@@ -66,7 +93,11 @@ exports.getOneRoomMessage = async (req, res) => {
         const { RoomMessage } = await getModels('contacts');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            const roomMessage = await RoomMessage.findById(req.params.id);
+            const roomMessage = await RoomMessage.findById(req.params.id)
+                .sort({ createdAt: 1 })
+                .lean();
+
+            if (!roomMessage) throw { 'status': 404, 'message': 'Room message not found' };
             return roomMessage;
         })
         res.status(200).json(data);
@@ -75,26 +106,22 @@ exports.getOneRoomMessage = async (req, res) => {
     }
 };
 
-exports.createRoomMessage = async (req, res) => {
+exports.sendRoomMessage = async (req, res) => {
     try {
-        const { senderID, senderName, receiverID, content, roomID } = req.body;
+        const { sender, receiver, content, roomID, roomName } = req.body;
 
         // Validation
         validateRequiredFields([
-            { name: 'senderID', value: senderID },
-            { name: 'receiverID', value: receiverID },
+            { name: 'sender', value: sender },
+            { name: 'receiver', value: receiver },
             { name: 'content', value: content },
-            { name: 'roomID', value: roomID }
+            { name: 'roomID', value: roomID },
+            { name: 'roomName', value: roomName },
         ]);
 
         const { RoomMessage } = await getModels('contacts');
 
-        const newRoomMessage = new RoomMessage({
-            sender: senderID,
-            receiver: receiverID,
-            content,
-            room: roomID
-        });
+        const newRoomMessage = new RoomMessage({ sender, receiver, content, room: roomID });
 
         const savedMessage = await newRoomMessage.save();
         if (!savedMessage) {
@@ -102,12 +129,12 @@ exports.createRoomMessage = async (req, res) => {
         }
 
         // Notify admins about the new room message
-        await notifyAdmins(newRoomMessage);
         await cacheManager.invalidatePattern("rmsg:*");
         const result = {
-            ...savedMessage,
-            senderName,
+            ...savedMessage._doc,
+            roomName,
         };
+        // await notifyAdmins(result);
         res.status(200).json(result);
     } catch (err) {
         handleError(res, err);
