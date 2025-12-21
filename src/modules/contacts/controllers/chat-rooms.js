@@ -191,6 +191,7 @@ exports.createOpenChatRoom = async (req, res) => {
         return res.status(201).json(expandedRoom);
 
     } catch (err) {
+        console.log(err);
         handleError(res, err);
     }
 };
