@@ -1,6 +1,6 @@
 const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
-const { notifyAdmins, expandRoomsUsers, expandOneRoomUsers } = require('../helpers');
+const { expandRoomsUsers, expandOneRoomUsers, createChatRoom } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -136,55 +136,61 @@ exports.getOneChatRoom = async (req, res) => {
 
 exports.createChatRoom = async (req, res) => {
     try {
-        const { name, users } = req.body;
-
-        // Validation
-        validateRequiredFields([{ name: 'name', value: name }, { name: 'users', value: users }]);
-
+        const { name, users, anonymous = false } = req.body;
         const { ChatRoom } = await getModels('contacts');
 
-        const newRoom = new ChatRoom({ name, users });
-        const savedRoom = await newRoom.save();
-        if (!savedRoom) {
-            throw { 'status': 500, 'message': 'Something went wrong during creation!' };
+        // Validation
+        if (!anonymous) {
+            validateRequiredFields([
+                { name: 'name', value: name },
+                { name: 'users', value: users }
+            ]);
         }
 
-        // Notify admins about the new chat room
-        await notifyAdmins(savedRoom);
-        await cacheManager.invalidatePattern("crm:*");
-        res.status(200).json(savedRoom);
+        // Build payload explicitly
+        const roomPayload = anonymous
+            ? { name, anonymous }
+            : { name, users };
+
+        const savedRoom = await ChatRoom.create(roomPayload);
+
+        if (!savedRoom) {
+            const error = new Error('Failed to create chat room');
+            error.status = 500;
+            throw error;
+        }
+
+        await cacheManager.invalidatePattern('crm:*');
+
+        return res.status(201).json(savedRoom);
+
     } catch (err) {
         handleError(res, err);
     }
 };
 
 exports.createOpenChatRoom = async (req, res) => {
-    const name = req.params.roomToOpen;
-    const bodyUsers = req.body.users;
-
     try {
+        const { roomToOpen: name } = req.params;
+        const { users } = req.body;
+
         const { ChatRoom } = await getModels('contacts');
 
-        // 1. Check if room exists
-        let chatroom = await ChatRoom.findOne({ name });
-
-        if (chatroom) {
-            chatroom = await expandOneRoomUsers(chatroom);
-            return res.status(200).json(chatroom);
+        // Return existing room (idempotent behavior)
+        const existingRoom = await ChatRoom.findOne({ name });
+        if (existingRoom) {
+            const expanded = await expandOneRoomUsers(existingRoom);
+            return res.status(200).json(expanded);
         }
 
-        // 2. Create new room
-        if (!Array.isArray(bodyUsers) || bodyUsers.length < 2) {
-            throw { message: "Room must have two users", status: 400 };
-        }
+        // Create room
+        const createdRoom = await createChatRoom({ name, users, anonymous: false });
 
-        const newRoom = new ChatRoom({ name, users: bodyUsers });
-        const savedRoom = await newRoom.save();
+        const expandedRoom = await expandOneRoomUsers(createdRoom);
 
-        let created = await expandOneRoomUsers(savedRoom);
-        res.status(200).json(created);
+        return res.status(201).json(expandedRoom);
+
     } catch (err) {
-        console.log(err);
         handleError(res, err);
     }
 };
