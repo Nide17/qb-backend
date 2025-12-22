@@ -1,6 +1,7 @@
 const { getModels } = require('../../utils/db-manager');
 const { getBatchedUsersMap } = require('../users/helpers');
 const { sendEmail } = require('../../utils/emails/sendEmail');
+const { validateRequiredFields } = require('../../utils/global-helpers');
 
 // Helper function to send emails
 const sendEmails = (recipients, title, message, clientURL) => {
@@ -101,10 +102,42 @@ const expandOneRoomUsers = async (chatRoom) => {
     }
 };
 
+const createChatRoom = async ({ name, users = [], anonymous = false }) => {
+    
+    const { ChatRoom } = await getModels('contacts');
+
+    validateRequiredFields([
+        { name: 'name', value: name }
+    ]);
+
+    if (!anonymous) {
+        if (!Array.isArray(users) || users.length < 2) {
+            const error = new Error('Room must contain at least two users');
+            error.status = 400;
+            throw error;
+        }
+    }
+
+    const roomPayload = anonymous
+        ? { name, anonymous }
+        : { name, users };
+
+    const room = await ChatRoom.create(roomPayload);
+
+    if (!room) {
+        const error = new Error('Failed to create chat room');
+        error.status = 500;
+        throw error;
+    }
+
+    return room;
+};
+
 module.exports = {
     notifyAdmins,
     sendEmails,
     validateRoomMessageData,
     expandRoomsUsers,
     expandOneRoomUsers,
+    createChatRoom,
 };

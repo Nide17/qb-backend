@@ -10,7 +10,7 @@ router.get('/:id', auth, getOneRoomMessage);
 router.get('/room/:id', auth, getRoomMessageByRoom);
 
 // POST routes
-router.post('/', auth, sendRoomMessage);
+router.post('/', sendRoomMessage);
 router.post('/batched', auth, getBatchedRoomMessages);
 
 // PUT routes

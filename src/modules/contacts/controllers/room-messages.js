@@ -1,6 +1,6 @@
 const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
-const { validateRoomMessageData } = require('../helpers');
+const { validateRoomMessageData, createChatRoom } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -108,38 +108,58 @@ exports.getOneRoomMessage = async (req, res) => {
 
 exports.sendRoomMessage = async (req, res) => {
     try {
-        const { sender, receiver, content, roomID, roomName } = req.body;
+        const {
+            sender,
+            receiver,
+            content,
+            roomID,
+            anonymous,
+        } = req.body;
 
-        // Validation
-        validateRequiredFields([
-            { name: 'sender', value: sender },
-            { name: 'receiver', value: receiver },
-            { name: 'content', value: content },
-            { name: 'roomID', value: roomID },
-            { name: 'roomName', value: roomName },
-        ]);
-
-        const { RoomMessage } = await getModels('contacts');
-
-        const newRoomMessage = new RoomMessage({ sender, receiver, content, room: roomID });
-
-        const savedMessage = await newRoomMessage.save();
-        if (!savedMessage) {
-            throw { 'status': 500, 'message': 'Something went wrong during creation!' };
+        if (!content || content.trim().length < 10) {
+            return res.status(400).json({ error: 'Invalid content' });
         }
 
-        // Notify admins about the new room message
-        await cacheManager.invalidatePattern("rmsg:*");
-        const result = {
-            ...savedMessage._doc,
-            roomName,
-        };
-        // await notifyAdmins(result);
-        res.status(200).json(result);
+        const isAnonymous = !!anonymous;
+        const ADMIN_ID = process.env.ADMIN_ID;
+        const ADMIN_EMAIL = process.env.EMAIL_USER;
+
+        let room;
+
+        const { RoomMessage, ChatRoom } = await getModels('contacts');
+
+        if (isAnonymous) {
+            validateRequiredFields([
+                { name: 'anonymous.name', value: anonymous.name },
+                { name: 'anonymous.email', value: anonymous.email },
+            ]);
+
+            const roomKey = [ADMIN_EMAIL, anonymous.email].sort().join('_');
+
+            const existingRoom = await ChatRoom.findOne({ name: roomKey });
+            room = existingRoom
+                ? existingRoom._id
+                : (await createChatRoom({ name: roomKey, anonymous }))._id;
+        } else {
+            validateRequiredFields([{ name: 'roomID', value: roomID }]);
+            room = roomID;
+        }
+
+        const message = await RoomMessage.create({
+            sender: sender || null,
+            receiver: receiver || ADMIN_ID,
+            content,
+            room,
+        });
+
+        await cacheManager.invalidatePattern(`rmsg:${room}:*`);
+
+        return res.status(201).json(message);
     } catch (err) {
         handleError(res, err);
     }
 };
+
 
 // Ensure updateRoomMessage is defined
 exports.updateRoomMessage = async (req, res) => {
