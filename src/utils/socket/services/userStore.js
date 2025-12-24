@@ -1,34 +1,56 @@
-const onlineUsers = new Map();
+const users = new Map(); // userId -> { user, sockets: Set, lastActivity }
 
 module.exports = {
     add(socket) {
-        onlineUsers.set(socket.id, {
-            socketId: socket.id,
-            _id: socket.user?._id,
-            name: socket.user?.name,
-            email: socket.user?.email,
-            role: socket.user?.role,
-            lastActivity: new Date()
-        });
+        const userId = socket.user._id;
+
+        if (!users.has(userId)) {
+            users.set(userId, {
+                _id: userId,
+                name: socket.user.name,
+                email: socket.user.email,
+                role: socket.user.role,
+                sockets: new Set(),
+                lastActivity: new Date()
+            });
+        }
+
+        users.get(userId).sockets.add(socket.id);
     },
 
     remove(socket) {
-        onlineUsers.delete(socket.id);
+        const userId = socket.user._id;
+        const user = users.get(userId);
+        if (!user) return;
+
+        user.sockets.delete(socket.id);
+
+        if (user.sockets.size === 0) {
+            users.delete(userId);
+        }
+    },
+
+    hasUser(userId) {
+        return users.has(userId);
     },
 
     list() {
-        return Array.from(onlineUsers.values());
+        return Array.from(users.values()).map(u => ({
+            _id: u._id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            socketCount: u.sockets.size,
+            lastActivity: u.lastActivity
+        }));
     },
 
-    findByUserId(_id) {
-        for (const u of onlineUsers.values()) {
-            if (u._id === _id) return u;
-        }
-        return null;
+    findByUserId(userId) {
+        return users.get(userId) || null;
     },
 
     findByEmail(email) {
-        for (const u of onlineUsers.values()) {
+        for (const u of users.values()) {
             if (u.email === email) return u;
         }
         return null;

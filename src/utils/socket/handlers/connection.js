@@ -1,37 +1,46 @@
 const UserStore = require('../services/userStore');
 
 module.exports = function connectionHandler(io, socket) {
-    // Only log if socket passed authentication
     if (!socket.user) return;
 
-    // Add authenticated user to stores
+    // ✅ Check BEFORE adding socket
+    const wasOffline = !UserStore.hasUser(socket.user._id);
+
+    // Add socket
     UserStore.add(socket);
-    io.userStore.add(socket);
-    io.emit("onlineUsers", {
-        onlineUsers: UserStore.list(),
-        new_user: {
-            userId: socket.user?._id,
-            name: socket.user?.name,
-            email: socket.user?.email,
-            role: socket.user?.role
-        }
-    });
 
-    // Handle disconnect
-    socket.on("disconnect", () => {
-        UserStore.remove(socket);
-        io.userStore.remove(socket);
-
-        // TODO: remove from room store if needed
+    // Emit only on first connection
+    if (wasOffline) {
         io.emit("onlineUsers", {
             onlineUsers: UserStore.list(),
             new_user: {
-                userId: socket.user?._id,
-                name: socket.user?.name,
-                email: socket.user?.email,
-                role: socket.user?.role
+                _id: socket.user._id,
+                name: socket.user.name,
+                email: socket.user.email,
+                role: socket.user.role
             }
         });
+    }
+
+    socket.on("disconnect", () => {
+        // Remove socket
+        UserStore.remove(socket);
+
+        // Check AFTER removal
+        const isStillOnline = UserStore.hasUser(socket.user._id);
+
+        // Emit only on last disconnect
+        if (!isStillOnline) {
+            io.emit("onlineUsers", {
+                onlineUsers: UserStore.list(),
+                user_offline: {
+                    _id: socket.user._id,
+                    name: socket.user.name,
+                    email: socket.user.email,
+                    role: socket.user.role
+                }
+            });
+        }
     });
 
     socket.on('replySent', (payload) => {
@@ -39,17 +48,18 @@ module.exports = function connectionHandler(io, socket) {
 
         const recipient = UserStore.findByEmail(payload.to_contact);
         if (recipient) {
-            const recipientSocket = io.sockets.sockets.get(recipient.socketId);
-            if (recipientSocket) recipientSocket.emit('replyReceived', payload);
+            for (const socketId of recipient.sockets) {
+                const s = io.sockets.sockets.get(socketId);
+                if (s) s.emit('replyReceived', payload);
+            }
         }
 
-        // sender always gets their own reply
+        // Sender always receives their own reply
         socket.emit('replyReceived', payload);
     });
 
-    // Update last activity on any event
     socket.onAny(() => {
-        const u = UserStore.findByUserId(socket.user?._id);
+        const u = UserStore.findByUserId(socket.user._id);
         if (u) u.lastActivity = new Date();
     });
 };

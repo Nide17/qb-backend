@@ -149,7 +149,7 @@ exports.createChatRoom = async (req, res) => {
 
         // Build payload explicitly
         const roomPayload = anonymous
-            ? { name, anonymous }
+            ? { name, users, anonymous }
             : { name, users };
 
         const savedRoom = await ChatRoom.create(roomPayload);

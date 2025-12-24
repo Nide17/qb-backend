@@ -22,13 +22,13 @@ exports.getRoomMessages = async (req, res) => {
             const roomMessages = await RoomMessage.find().sort({ createdAt: -1 }).lean();
 
             // Helper function to safely fetch user data
-            const fetchUser = async (userId, context) => {
+            const fetchUser = async (id, context) => {
                 try {
-                    if (!userId) return null;
-                    const user = await User.findById(userId).select('name email -_id');
+                    if (!id) return null;
+                    const user = await User.findById(id).select('name email -_id');
                     return user;
                 } catch (error) {
-                    console.warn(`Failed to fetch ${context} user ${userId}:`, error.message);
+                    console.warn(`Failed to fetch ${context} user ${id}:`, error.message);
                     return null;
                 }
             };
@@ -116,8 +116,8 @@ exports.sendRoomMessage = async (req, res) => {
             anonymous,
         } = req.body;
 
-        if (!content || content.trim().length < 10) {
-            return res.status(400).json({ error: 'Invalid content' });
+        if (typeof content !== 'string' || !content.trim()) {
+            return res.status(400).json({ error: 'Content cannot be empty' });
         }
 
         const isAnonymous = !!anonymous;
@@ -135,16 +135,16 @@ exports.sendRoomMessage = async (req, res) => {
             ]);
 
             const roomKey = [ADMIN_EMAIL, anonymous.email].sort().join('_');
+            const users = [ADMIN_ID]; // Having only admin the users array
 
             const existingRoom = await ChatRoom.findOne({ name: roomKey });
             room = existingRoom
                 ? existingRoom._id
-                : (await createChatRoom({ name: roomKey, anonymous }))._id;
+                : (await createChatRoom({ name: roomKey, users, anonymous }))._id;
         } else {
             validateRequiredFields([{ name: 'roomID', value: roomID }]);
             room = roomID;
         }
-
         const message = await RoomMessage.create({
             sender: sender || null,
             receiver: receiver || ADMIN_ID,
@@ -153,7 +153,6 @@ exports.sendRoomMessage = async (req, res) => {
         });
 
         await cacheManager.invalidatePattern(`rmsg:${room}:*`);
-
         return res.status(201).json(message);
     } catch (err) {
         handleError(res, err);
