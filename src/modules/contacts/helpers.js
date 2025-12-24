@@ -70,7 +70,7 @@ const expandRoomsUsers = async (chatRooms) => {
         if (usersIDs.length > 0) {
             const usersMap = await getBatchedUsersMap(usersIDs);
             chatRooms.forEach(room => {
-                room.users = room.users.map(userId => usersMap.get(userId.toString()));
+                room.users = room.users.map(id => usersMap.get(id.toString()));
             });
         } else {
             chatRooms.forEach(room => {
@@ -91,7 +91,7 @@ const expandOneRoomUsers = async (chatRoom) => {
     try {
         if (usersIDs.length > 0) {
             const usersMap = await getBatchedUsersMap(usersIDs);
-            chatRoom.users = chatRoom.users.map(userId => usersMap.get(userId.toString()));
+            chatRoom.users = chatRoom.users.map(id => usersMap.get(id.toString()));
         } else {
             chatRoom.users = [];
         }
@@ -119,7 +119,7 @@ const createChatRoom = async ({ name, users = [], anonymous = false }) => {
     }
 
     const roomPayload = anonymous
-        ? { name, anonymous }
+        ? { name, users, anonymous }
         : { name, users };
 
     const room = await ChatRoom.create(roomPayload);

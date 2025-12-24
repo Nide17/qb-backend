@@ -124,8 +124,6 @@ exports.getDownloadsByUser = async (req, res) => {
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let downloads = await Download.find({ downloaded_by: req.params.id }).lean();
 
-            if (!downloads || downloads.length === 0) throw { 'message': 'No downloads found for this user', 'status': 404 };
-
             // Expand downloads
             const expandedDownloads = await expandDownloads(downloads);
             downloads = expandedDownloads || downloads;

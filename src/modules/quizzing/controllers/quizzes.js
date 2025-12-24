@@ -12,7 +12,7 @@ const CACHE_KEYS = {
     PAGINATED: (pageNo) => `qz:paginated:${pageNo}`,
     BY_CATEGORY: (categoryId) => `qz:by_category:${categoryId}`,
     BY_COURSE_CATEGORY: (ccID) => `qz:by_course_category:${ccID}`,
-    BY_USER: (userId) => `qz:by_user:${userId}`,
+    BY_USER: (id) => `qz:by_user:${id}`,
     BY_NOTES: (notes) => `qz:by_notes:${notes}`,
     ONE: (id) => `qz:${id}`,
 };

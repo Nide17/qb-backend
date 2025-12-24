@@ -4,7 +4,7 @@ const { getBatchedUsersMap } = require('../users/helpers');
 // Expand array of downloads
 const expandDownloads = async (downloads) => {
 
-    if (!downloads) throw { status: 404, message: 'No downloads found!' };
+    if (!downloads) return null;
 
     try {
         // Extract unique IDs

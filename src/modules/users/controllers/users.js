@@ -127,7 +127,6 @@ exports.loadUser = async (req, res, next) => {
         });
 
         if (!data) return res.status(404).json({ message: 'Invalid email and/or password' });
-        console.log(data)
         res.status(200).json(data);
     } catch (err) {
         console.log(err)
