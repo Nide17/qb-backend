@@ -408,7 +408,7 @@ exports.updateProfile = async (req, res) => {
         const { User } = await getModels('users');
 
         // whitelist profile fields users can update themselves
-        const allowed = ['name', 'image', 'school', 'faculty', 'level', 'interests', 'about'];
+        const allowed = ['name', 'image', 'school', 'faculty', 'level', 'year', 'interests', 'about'];
         const updates = {};
         for (const k of allowed) {
             if (req.body[k] !== undefined) updates[k] = req.body[k];
@@ -434,7 +434,7 @@ exports.updateUser = async (req, res) => {
         const { User } = await getModels('users');
 
         // build update object carefully
-        const adminAllowed = ['role', 'name', 'image', 'school', 'faculty', 'level', 'interests', 'about', 'verified'];
+        const adminAllowed = ['role', 'name', 'image', 'school', 'faculty', 'level', 'year', 'interests', 'about', 'verified'];
         const updates = {};
         for (const k of adminAllowed) {
             if (req.body[k] !== undefined) updates[k] = req.body[k];

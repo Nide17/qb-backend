@@ -82,7 +82,7 @@ exports.getUserChatRooms = async (req, res) => {
             const cacheKey = CACHE_KEYS.USER_PAGINATED(req.params.id, pageNo);
 
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-                let userChatRooms = await ChatRoom.find({ users: req.params.id }, {}, query).lean();
+                let userChatRooms = await ChatRoom.find({ users: req.params.id }, {}, query).sort({ createdAt: -1 }).lean();
                 if (!userChatRooms || userChatRooms.length === 0) throw { 'status': 404, 'message': 'No chatRooms found for user' };
                 // Expand chatRooms
                 const expandedChatRooms = await expandRoomsUsers(userChatRooms);
