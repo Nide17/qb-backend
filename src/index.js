@@ -20,6 +20,7 @@ const isVercel = !!(
     process.env.NOW_REGION
 );
 const isHeroku = !!(process.env.DYNO);
+console.log("🚀 Platform:", isVercel ? "Vercel" : isHeroku ? "Heroku" : "Local");
 const isServerless = isVercel;
 
 // Bootstrap State Management
