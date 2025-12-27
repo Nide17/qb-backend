@@ -111,7 +111,16 @@ exports.createQuestion = async (req, res) => {
 exports.updateQuestion = async (req, res) => {
 
     try {
-        const { questionText, answerOptions, newQuiz, oldQuizID, last_updated_by, duration } = req.body;
+        const body = req.body || {};
+        const {
+            questionText,
+            answerOptions = [],
+            newQuiz,
+            oldQuizID,
+            last_updated_by,
+            duration,
+        } = body;
+
         const qnImage = req.file;
 
         const { Question } = await getModels('quizzing');
@@ -139,7 +148,9 @@ exports.updateQuestion = async (req, res) => {
             const answers = answerOptions.map(a => JSON.parse(a));
 
             // Delete existing image
-            qtn.question_image && await deleteImageFromS3(qtn.question_image);
+            if (qnImage && qtn.question_image) {
+                await deleteImageFromS3(qtn.question_image);
+            }
 
             // Find the question by id and update
             const updatedQuestion = await Question.findByIdAndUpdate({ _id: qtn._id }, {
@@ -159,6 +170,7 @@ exports.updateQuestion = async (req, res) => {
             res.status(200).json(updatedQuestion);
         }
     } catch (err) {
+        console.log(err);
         handleError(res, err);
     }
 };

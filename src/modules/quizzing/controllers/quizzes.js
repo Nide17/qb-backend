@@ -40,7 +40,7 @@ exports.getQuizzes = async (req, res) => {
                 })
                     .sort({ creation_date: -1 })
                     .select('title description slug category questions creation_date')
-                    .populate("category questions", 'title questionText')
+                    .populate("category questions", 'title questionText answerOptions')
                     .limit(limit)
                     .skip(skip);
 
@@ -68,7 +68,7 @@ exports.getQuizzes = async (req, res) => {
                     .limit(PAGE_SIZE)
                     .skip(PAGE_SIZE * (pageNo - 1))
                     .select('title description slug category questions creation_date')
-                    .populate('category questions', 'title questionText')
+                    .populate('category questions', 'title questionText answerOptions')
                     .lean();
 
                 if (!quizzes.length) {
@@ -95,7 +95,7 @@ exports.getQuizzes = async (req, res) => {
             const quizzes = await Quiz.find({})
                 .sort({ creation_date: -1 })
                 .select('title slug category questions creation_date')
-                .populate('category questions', 'title questionText');
+                .populate('category questions', 'title questionText answerOptions');
 
             if (!quizzes.length) {
                 res.set('Cache-Control', 'no-store');
@@ -150,7 +150,7 @@ exports.getQuizzesByCategory = async (req, res) => {
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
             let quizzes = await Quiz.find({ category: req.params.id })
-                .populate('category questions', 'title questionText');
+                .populate('category questions', 'title questionText answerOptions');
 
             if (!quizzes.length) throw { message: 'No quizzes found', status: 404, };
 
@@ -262,26 +262,20 @@ exports.updateQuiz = async (req, res) => {
     try {
         const { Category, Quiz } = await getModels('quizzing');
 
-        const quiz = await Quiz.findById(req.params.id);
-        if (!quiz) throw { message: 'Quiz not found', status: 404 };
-
-        const updated = await Quiz.updateOne(
-            { _id: req.params.id },
-            { $set: req.body }
-        );
-
         // If category changed
-        if (req.body?.oldCategoryID) {
+        if (req.body?.oldCategoryID !== req.body.category) {
             await Category.updateOne(
                 { _id: req.body.oldCategoryID },
-                { $pull: { quizes: quiz._id } }
+                { $pull: { quizes: req.body?.quizID } }
             );
 
             await Category.updateOne(
                 { _id: req.body.category },
-                { $addToSet: { quizes: quiz._id } }
+                { $addToSet: { quizes: req.body?.quizID } }
             );
         }
+
+        const updated = await Quiz.findOneAndUpdate({ _id: req.body?.quizID }, req.body, { new: true });
 
         await cacheManager.invalidatePattern("cat:*");
         await cacheManager.invalidatePattern("qz:*");
