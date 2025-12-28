@@ -212,7 +212,6 @@ exports.addContactReply = async (req, res) => {
         //     },
         //     './template/reply.handlebars'
         // );
-        console.log("updatedMessage: ", updatedMessage);
         await cacheManager.invalidatePattern("ctc:*");
         res.status(200).json(updatedMessage);
     } catch (err) {

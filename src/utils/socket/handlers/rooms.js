@@ -22,7 +22,6 @@ module.exports = function roomsHandler(io, socket) {
     // Send room message
     socket.on("roomMessage", (roomMessage) => {
 
-        console.log("roomMessage: ", roomMessage);
         const { roomID } = roomMessage;
 
         if (!roomID) return;
