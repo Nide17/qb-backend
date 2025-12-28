@@ -263,7 +263,7 @@ exports.createScore = async (req, res) => {
         const { Score } = await getModels('scores');
 
         // Simple validation
-        if (!id || !out_of || !marks || !category || !quiz || !review || !taken_by) throw { status: 400, message: 'Missing required fields!' };
+        if (!id || !out_of || !category || !quiz || !review || !taken_by) throw { status: 400, message: 'Missing required fields!' };
         else {
             // Use Promise.all for parallel queries to improve performance
             const [existingScore, recentScoreExist] = await Promise.all([
