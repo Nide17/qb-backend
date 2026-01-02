@@ -170,7 +170,6 @@ exports.updateQuestion = async (req, res) => {
             res.status(200).json(updatedQuestion);
         }
     } catch (err) {
-        console.log(err);
         handleError(res, err);
     }
 };

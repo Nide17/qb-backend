@@ -9,14 +9,18 @@ const ChatRoomSchema = new Schema({
     },
     users: [{ type: Schema.Types.ObjectId, }],
     anonymous: {
-        name: {
-            type: String,
-            required: true
+        type: {
+            name: {
+                type: String,
+                required: true
+            },
+            email: {
+                type: String,
+                required: true
+            }
         },
-        email: {
-            type: String,
-            required: true
-        }
+        required: false,
+        default: undefined
     }
 }, { timestamps: true });
 

@@ -129,7 +129,6 @@ exports.loadUser = async (req, res, next) => {
         if (!data) return res.status(404).json({ message: 'Invalid email and/or password' });
         res.status(200).json(data);
     } catch (err) {
-        console.log(err)
         next(err);
     }
 };
@@ -227,7 +226,7 @@ exports.register = async (req, res) => {
             await User.findByIdAndUpdate(existing._id, { name, password: hash, otp, otpExpires }, { new: true });
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
             await cacheManager.invalidatePattern('usr:*');
-            console.log(otp);
+            
             return res.status(200).json({ message: 'Verification OTP sent to your email', user: safeUserForResponse(existing.toObject()) });
         }
 

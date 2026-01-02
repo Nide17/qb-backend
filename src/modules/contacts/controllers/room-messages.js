@@ -108,18 +108,12 @@ exports.getOneRoomMessage = async (req, res) => {
 
 exports.sendRoomMessage = async (req, res) => {
     try {
-        const {
-            sender,
-            receiver,
-            content,
-            roomID,
-            anonymous,
-        } = req.body;
+        const { sender, receiver, content, roomID, anonymous, senderEmail } = req.body;
 
         if (typeof content !== 'string' || !content.trim()) {
             return res.status(400).json({ error: 'Content cannot be empty' });
         }
-
+        
         const isAnonymous = !!anonymous;
         const ADMIN_ID = process.env.ADMIN_ID;
         const ADMIN_EMAIL = process.env.EMAIL_USER;
@@ -142,8 +136,22 @@ exports.sendRoomMessage = async (req, res) => {
                 ? existingRoom._id
                 : (await createChatRoom({ name: roomKey, users, anonymous }))._id;
         } else {
-            validateRequiredFields([{ name: 'roomID', value: roomID }]);
-            room = roomID;
+
+            // If user is not anonymous
+            if (!roomID && senderEmail) {
+                const roomKey1 = [ADMIN_EMAIL, senderEmail].sort().join('_');
+
+                // Find user's room
+                const existingRoom = await ChatRoom.findOne({ name: roomKey1 });
+                room = existingRoom
+                    ? existingRoom._id
+                    : (await createChatRoom({ name: roomKey1, users: [ADMIN_ID, sender] }))._id;
+            }
+            else {
+                room = roomID;
+            }
+
+            validateRequiredFields([{ name: 'room', value: room }]);
         }
         const message = await RoomMessage.create({
             sender: sender || null,
@@ -158,7 +166,6 @@ exports.sendRoomMessage = async (req, res) => {
         handleError(res, err);
     }
 };
-
 
 // Ensure updateRoomMessage is defined
 exports.updateRoomMessage = async (req, res) => {
