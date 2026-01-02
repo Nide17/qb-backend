@@ -176,7 +176,7 @@ exports.createContact = async (req, res) => {
         // Notify admins
         // await notifyAdmins(savedContact);
         await cacheManager.invalidatePattern("ctc:*");
-        res.status(200).json(savedContact);
+        res.status(201).json(savedContact);
     } catch (err) {
         handleError(res, err);
     }

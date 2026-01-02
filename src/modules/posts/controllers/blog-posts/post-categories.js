@@ -89,7 +89,7 @@ exports.createPostCategory = async (req, res) => {
 
         if (!savedPostCategory) throw { 'status': 500, 'message': 'Could not save post category, try again!' };
         await cacheManager.invalidatePattern("pc:*");
-        res.status(200).json(savedPostCategory);
+        res.status(201).json(savedPostCategory);
     } catch (err) {
         handleError(res, err);
     }

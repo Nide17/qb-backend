@@ -57,7 +57,7 @@ exports.createSubscribedUser = async (req, res) => {
         // Sending e-mail to subscribed user
         sendSubscriptionEmail(savedSubscriber);
         await cacheManager.invalidatePattern("sub:*");
-        res.status(200).json(savedSubscriber);
+        res.status(201).json(savedSubscriber);
     } catch (err) {
         handleError(res, err);
     }

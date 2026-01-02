@@ -96,7 +96,7 @@ exports.createQuizComment = async (req, res) => {
         if (!savedQuizComment) throw { message: 'Something went wrong while creating.', status: 500 };
 
         await cacheManager.invalidatePattern("qzcmt:*");
-        res.status(200).json(savedQuizComment);
+        res.status(201).json(savedQuizComment);
     } catch (err) {
         handleError(res, err);
     }

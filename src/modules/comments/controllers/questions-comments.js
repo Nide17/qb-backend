@@ -177,7 +177,7 @@ exports.createQuestionComment = async (req, res) => {
         if (!savedQuestionComment) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
 
         await cacheManager.invalidatePattern("qncmt:*");
-        res.status(200).json(savedQuestionComment);
+        res.status(201).json(savedQuestionComment);
     } catch (err) {
         handleError(res, err);
     }

@@ -71,7 +71,7 @@ exports.createBroadcast = async (req, res) => {
         // Notify admins using the generalized utility function
         await notifyAdmins(newBroadcast);
         await cacheManager.invalidatePattern("brd:*");
-        res.status(200).json(savedBroadcast);
+        res.status(201).json(savedBroadcast);
     } catch (err) {
         handleError(res, err);
     }

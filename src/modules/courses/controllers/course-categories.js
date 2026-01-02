@@ -63,7 +63,7 @@ exports.createCategory = async (req, res) => {
         if (!savedCategory) throw { 'message': 'Something went wrong during creation!', 'status': 503 };
 
         await cacheManager.invalidatePattern("cc:*");
-        res.status(200).json(savedCategory);
+        res.status(201).json(savedCategory);
     } catch (err) {
         handleError(res, err);
     }

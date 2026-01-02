@@ -197,7 +197,7 @@ exports.createDownload = async (req, res) => {
         const savedDownload = await newDownload.save();
         if (!savedDownload) throw { 'message': 'Something went wrong during creation!', 'status': 400 };
         await cacheManager.invalidatePattern("dwd:*");
-        res.status(200).json(savedDownload);
+        res.status(201).json(savedDownload);
     } catch (err) {
         handleError(res, err);
     }

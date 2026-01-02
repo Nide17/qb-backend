@@ -120,7 +120,7 @@ exports.createImageUpload = async (req, res) => {
         const savedImgUp = await newImgUp.save();
         if (!savedImgUp) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
         await cacheManager.invalidatePattern("img:*");
-        res.status(200).json(savedImgUp);
+        res.status(201).json(savedImgUp);
     } catch (err) {
         handleError(res, err);
     }

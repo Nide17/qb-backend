@@ -85,7 +85,7 @@ exports.createCategory = async (req, res) => {
         const saved = await new Category(req.body).save();
         const expanded = await expandCategory(saved.toObject());
         await cacheManager.invalidatePattern("cat:*");
-        res.status(200).json(expanded);
+        res.status(201).json(expanded);
 
     } catch (err) {
         handleError(res, err);

@@ -121,7 +121,7 @@ exports.createChapter = async (req, res) => {
         if (!savedChapter) throw { 'message': 'Something went wrong during creation!', 'status': 503 };
 
         await cacheManager.invalidatePattern("cpt:*");
-        res.status(200).json(savedChapter);
+        res.status(201).json(savedChapter);
     } catch (err) {
         handleError(res, err);
     }
