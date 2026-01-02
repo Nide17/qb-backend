@@ -1,7 +1,7 @@
 const { getModels } = require('../../../../utils/db-manager');
 const { scheduledReportMessage } = require('../../helpers');
 const { getBatchedUsersMap } = require('../../../users/helpers');
-const { deleteS3File, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
+const { cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -127,13 +127,14 @@ exports.deleteBlogPostsView = async (req, res) => {
     try {
         const { BlogPostsView } = await getModels('posts');
 
-        const blogPost = await BlogPostsView.findById(req.params.id);
-        if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
-        blogPost.post_image && await deleteS3File(blogPost.post_image);
-        const removedBlogPost = await blogPost.deleteOne();
-        if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
+        const view = await BlogPostsView.findById(req.params.id);
+        if (!view) throw { 'message': 'BlogPost view not found!', 'status': 404 };
+
+        const removedBlogPostView = await view.deleteOne();
+        if (removedBlogPostView.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
+
         await cacheManager.invalidatePattern("bpv:*");
-        res.status(200).json(blogPost);
+        res.status(200).json(view);
     } catch (err) {
         handleError(res, err);
     }

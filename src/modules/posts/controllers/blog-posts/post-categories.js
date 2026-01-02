@@ -97,7 +97,9 @@ exports.createPostCategory = async (req, res) => {
 
 exports.updatePostCategory = async (req, res) => {
     try {
-        const { PostCategory } = await getModels('posts');
+        const { PostCategory, } = await getModels('posts');
+
+        console.log(req.params, req.body)
 
         const updatedPostCategory = await PostCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedPostCategory) throw { status: 404, message: 'PostCategory not found!' };
@@ -110,10 +112,16 @@ exports.updatePostCategory = async (req, res) => {
 
 exports.deletePostCategory = async (req, res) => {
     try {
-        const { PostCategory } = await getModels('posts');
+        const { PostCategory, BlogPost } = await getModels('posts');
 
         const postCategory = await PostCategory.findById(req.params.id);
         if (!postCategory) throw { status: 404, message: 'PostCategory not found!' };
+
+        // Find all blog posts with this category and delete them
+        await Promise.all([
+            BlogPost.deleteMany({ postCategory: postCategory._id }),
+        ]);
+
         await PostCategory.findByIdAndDelete(req.params.id);
         await cacheManager.invalidatePattern("pc:*");
         res.status(200).json(postCategory);
