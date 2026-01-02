@@ -146,7 +146,7 @@ exports.getOneScore = async (req, res) => {
                 score.taken_by = user || score.taken_by;
             }
             if (score.quiz) {
-                const quiz = await Quiz.findById(score.quiz).select('title category').populate('category', 'title').lean();
+                const quiz = await Quiz.findById(score.quiz).select('title category slug').populate('category', 'title').lean();
                 score.quiz = quiz || score.quiz;
                 score.category = quiz?.category || score.category;
             }
