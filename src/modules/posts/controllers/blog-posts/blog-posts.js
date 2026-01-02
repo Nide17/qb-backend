@@ -1,6 +1,6 @@
 const { getModels } = require('../../../../utils/db-manager');
 const { handleError } = require('../../../../utils/error');
-const { deleteImageFromS3, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
+const { deleteS3File, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
 const { getBatchedUsersMap } = require('../../../users/helpers');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -190,7 +190,7 @@ exports.deleteBlogPost = async (req, res) => {
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost is not found!', 'status': 404 };
 
-        blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
+        blogPost.post_image && await deleteS3File(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne();
 
         if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
@@ -209,7 +209,7 @@ exports.deleteBlogPostImage = async (req, res) => {
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
         const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { new: true });
-        await deleteImageFromS3(blogPost.post_image);
+        await deleteS3File(blogPost.post_image);
         await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);
     } catch (err) {

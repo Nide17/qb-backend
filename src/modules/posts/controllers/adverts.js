@@ -1,6 +1,6 @@
 const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
-const { deleteImageFromS3, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
+const { deleteS3File, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -137,7 +137,7 @@ exports.deleteAdvert = async (req, res) => {
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { message: 'Advert not found!', status: 404 };
 
-        advert.advert_image && await deleteImageFromS3(advert.advert_image);
+        advert.advert_image && await deleteS3File(advert.advert_image);
         const removedAdvert = await advert.deleteOne();
         if (removedAdvert.deletedCount === 0) throw { message: 'Something went wrong during deletion!', status: 500 };
         await cacheManager.invalidatePattern("ad:*");
@@ -155,7 +155,7 @@ exports.deleteAdvertImage = async (req, res) => {
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
         const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { new: true });
-        await deleteImageFromS3(advert.advert_image);
+        await deleteS3File(advert.advert_image);
         await cacheManager.invalidatePattern("ad:*");
         res.status(200).json(updatedAdvert);
     } catch (err) {

@@ -16,7 +16,6 @@ const findChapters = async (query, limit = 0) => {
     const { Chapter } = await getModels('courses');
     let chaptersQuery = Chapter
         .find(query)
-        .sort({ createdAt: -1 })
         .select('title description course courseCategory created_by createdAt')
         .populate('course courseCategory', 'title')
         .lean();
@@ -99,8 +98,8 @@ exports.createChapter = async (req, res) => {
         validateRequiredFields([
             { name: 'title', value: title },
             { name: 'description', value: description },
-            { name: 'courseCategory', value: courseCategory },
             { name: 'course', value: course },
+            { name: 'courseCategory', value: courseCategory },
             { name: 'created_by', value: created_by }
         ]);
 
@@ -113,8 +112,8 @@ exports.createChapter = async (req, res) => {
         const newChapter = new Chapter({
             title,
             description,
-            courseCategory,
             course,
+            courseCategory,
             created_by
         });
 

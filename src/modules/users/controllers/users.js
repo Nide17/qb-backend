@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { getModels } = require('../../../utils/db-manager');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
 const { handleError } = require('../../../utils/error');
-const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
+const { deleteS3File, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const { safeUserForResponse, isValidEmail, expandSchoolData, hashPassword, updateUserToken } = require('../helpers');
 
 const CACHE_TTL = 600; // seconds
@@ -385,7 +385,7 @@ exports.updateProfileImage = async (req, res) => {
 
         if (user.image) {
             try {
-                await deleteImageFromS3(user.image);
+                await deleteS3File(user.image);
             } catch (err) {
                 // log but don't fail entire request because S3 deletion might not be critical
                 console.warn('S3 deletion failed', err.message || err);
@@ -469,7 +469,7 @@ exports.deleteUser = async (req, res) => {
         // attempt to remove profile image if any
         if (user.image) {
             try {
-                await deleteImageFromS3(user.image);
+                await deleteS3File(user.image);
             } catch (err) {
                 console.warn('S3 deletion failed', err.message || err);
             }
