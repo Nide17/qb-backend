@@ -286,7 +286,7 @@ exports.createScore = async (req, res) => {
             const savedScore = await newScore.save();
             if (!savedScore) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
             await cacheManager.invalidatePattern("sc:*");
-            res.status(200).json(savedScore);
+            res.status(201).json(savedScore);
         }
     } catch (err) {
         handleError(res, err);

@@ -95,7 +95,7 @@ exports.createAdvert = async (req, res) => {
         const savedAdvert = await newAdvert.save();
         if (!savedAdvert) throw { message: 'Something went wrong during creation!', status: 500 };
         await cacheManager.invalidatePattern("ad:*");
-        res.status(200).json(savedAdvert);
+        res.status(201).json(savedAdvert);
     } catch (err) {
         handleError(res, err);
     }

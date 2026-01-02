@@ -102,7 +102,7 @@ exports.createQuestion = async (req, res) => {
         // Clear cache for keys
         await cacheManager.invalidatePattern("qz:*");
         await cacheManager.invalidatePattern("qn:*");
-        res.status(200).json(savedQuestion);
+        res.status(201).json(savedQuestion);
     } catch (err) {
         handleError(res, err);
     }

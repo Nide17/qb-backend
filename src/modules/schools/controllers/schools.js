@@ -50,7 +50,7 @@ exports.createSchool = async (req, res) => {
         const savedSchool = await newSchool.save();
         if (!savedSchool) throw { 'message': 'Something went wrong during creation!', 'status': 500 };
         await cacheManager.invalidatePattern("skl:*");
-        res.status(200).json(savedSchool);
+        res.status(201).json(savedSchool);
     } catch (err) {
         handleError(res, err);
     }

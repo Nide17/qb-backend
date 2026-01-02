@@ -167,7 +167,7 @@ exports.createNotes = async (req, res) => {
         if (!savedNotes) throw { message: 'Could not save notes, try again!', status: 500 };
 
         await cacheManager.invalidatePattern("nt:*");
-        res.status(200).json(savedNotes);
+        res.status(201).json(savedNotes);
 
     } catch (err) {
         handleError(res, err);

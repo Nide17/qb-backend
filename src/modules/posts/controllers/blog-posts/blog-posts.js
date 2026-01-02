@@ -149,7 +149,7 @@ exports.createBlogPost = async (req, res) => {
         const savedBlogPost = await newBlogPost.save();
         if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! file size should not exceed 1MB', 'status': 500 };
         await cacheManager.invalidatePattern("bp:*");
-        res.status(200).json(savedBlogPost);
+        res.status(201).json(savedBlogPost);
     } catch (err) {
         handleError(res, err);
     }

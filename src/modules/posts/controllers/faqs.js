@@ -78,7 +78,7 @@ exports.createFaq = async (req, res) => {
         const savedFaq = await newFaq.save();
         if (!savedFaq) throw { status: 503, message: 'Something went wrong during creation!' };
         await cacheManager.invalidatePattern("fq:*");
-        res.status(200).json(savedFaq);
+        res.status(201).json(savedFaq);
     } catch (err) {
         handleError(res, err);
     }

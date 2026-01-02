@@ -118,7 +118,7 @@ exports.createCourse = async (req, res) => {
         if (!savedCourse) throw { 'message': 'Could not save course, try again!', 'status': 500 };
 
         await cacheManager.invalidatePattern("crs:*");
-        res.status(200).json(savedCourse);
+        res.status(201).json(savedCourse);
     } catch (err) {
         handleError(res, err);
     }

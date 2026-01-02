@@ -75,7 +75,7 @@ exports.createFaculty = async (req, res) => {
         const savedFaculty = await newFaculty.save();
         if (!savedFaculty) throw { 'status': 503, 'message': 'Something went wrong during creation!' };
         await cacheManager.invalidatePattern("fct:*");
-        res.status(200).json(savedFaculty);
+        res.status(201).json(savedFaculty);
     } catch (err) {
         handleError(res, err);
     }

@@ -215,7 +215,7 @@ exports.createQuiz = async (req, res) => {
         const saved = await newQuiz.save();
         await cacheManager.invalidatePattern("cat:*");
         await cacheManager.invalidatePattern("qz:*");
-        res.status(200).json(saved);
+        res.status(201).json(saved);
 
     } catch (err) {
         handleError(res, err);

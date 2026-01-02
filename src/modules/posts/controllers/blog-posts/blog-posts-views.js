@@ -103,7 +103,7 @@ exports.createBlogPostsView = async (req, res) => {
         const savedBlogPost = await newBlogPostView.save();
         if (!savedBlogPost) throw { 'message': 'Something went wrong during creation! File size should not exceed 1MB', 'status': 503 };
         await cacheManager.invalidatePattern("bpv:*");
-        res.status(200).json(savedBlogPost);
+        res.status(201).json(savedBlogPost);
     } catch (err) {
         handleError(res, err);
     }

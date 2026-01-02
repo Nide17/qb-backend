@@ -74,7 +74,7 @@ exports.createLevel = async (req, res) => {
         const savedLevel = await newLevel.save();
         if (!savedLevel) throw { 'status': 503, 'message': 'Something went wrong during creation!' };
         await cacheManager.invalidatePattern("lvl:*");
-        res.status(200).json(savedLevel);
+        res.status(201).json(savedLevel);
     } catch (err) {
         handleError(res, err);
     }
