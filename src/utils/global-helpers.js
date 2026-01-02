@@ -1,4 +1,4 @@
-const { S3 } = require("@aws-sdk/client-s3");
+const { S3, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const RedisCacheManager = require("./redis-cache");
 
 const cacheManager = new RedisCacheManager();
@@ -73,6 +73,94 @@ const s3Config = new S3({
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     }
 });
+/**
+ * Extract S3 key from full S3 URL
+ * Also handles URL-encoded keys
+ */
+const extractS3Key = (s3Url) => {
+    if (!s3Url || typeof s3Url !== 'string') return null;
+
+    try {
+        const url = new URL(s3Url);
+        let pathname = url.pathname;
+
+        // Remove leading slash
+        pathname = pathname.startsWith('/') ? pathname.substring(1) : pathname;
+
+        // Decode URL encoding (e.g., %20 -> space, %5B -> [, %5D -> ])
+        pathname = decodeURIComponent(pathname);
+
+        console.log(`📝 Extracted S3 Key: ${pathname}`);
+        return pathname;
+    } catch (error) {
+        console.error('Error parsing S3 URL:', error);
+        return null;
+    }
+};
+
+/**
+ * Delete file from S3 - FIXED FOR AWS SDK v3
+ */
+const deleteS3File = async (s3Key) => {
+    if (!s3Key) {
+        console.warn('⚠️  No S3 key provided for deletion');
+        return false;
+    }
+
+    try {
+        console.log(`🗑️  Attempting to delete S3 file from bucket: ${process.env.S3_BUCKET}`);
+        console.log(`🗑️  Key: ${s3Key}`);
+
+        // ✅ CORRECT WAY for AWS SDK v3: Use DeleteObjectCommand
+        const deleteCommand = new DeleteObjectCommand({
+            Bucket: process.env.S3_BUCKET,
+            Key: s3Key,
+        });
+
+        const result = await s3Config.send(deleteCommand);
+
+        console.log(`✅ Successfully deleted S3 file: ${s3Key}`);
+        console.log(`📋 Delete result:`, result);
+
+        return true;
+    } catch (error) {
+        console.error(`❌ Error deleting S3 file ${s3Key}:`, error);
+        console.error(`❌ Error code: ${error.Code || error.name}`);
+        console.error(`❌ Error message: ${error.message}`);
+
+        // Don't throw error - log it but continue with update
+        return false;
+    }
+};
+
+/**
+ * Verify S3 file was deleted (optional but helpful for debugging)
+ */
+const verifyS3FileDeletion = async (s3Key) => {
+    const { HeadObjectCommand } = require("@aws-sdk/client-s3");
+
+    try {
+        const headCommand = new HeadObjectCommand({
+            Bucket: process.env.S3_BUCKET,
+            Key: s3Key,
+        });
+
+        await s3Config.send(headCommand);
+
+        // If we get here, file still exists
+        console.log(`⚠️  File still exists: ${s3Key}`);
+        return false; // File NOT deleted
+    } catch (error) {
+        if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+            // File doesn't exist (successfully deleted)
+            console.log(`✅ Verified file deleted: ${s3Key}`);
+            return true;
+        }
+
+        console.error('Error verifying deletion:', error);
+        return false;
+    }
+};
 
 /**
  * Validate required fields
@@ -121,5 +209,8 @@ module.exports = {
     cacheWrapper,
     cacheManager,
     s3Config,
+    deleteS3File,
+    extractS3Key,
+    verifyS3FileDeletion,
     validateRequiredFields,
 };

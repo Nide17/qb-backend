@@ -1,7 +1,7 @@
 const { getModels } = require('../../../../utils/db-manager');
 const { scheduledReportMessage } = require('../../helpers');
 const { getBatchedUsersMap } = require('../../../users/helpers');
-const { deleteImageFromS3, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
+const { deleteS3File, cacheManager, cacheWrapper } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -129,7 +129,7 @@ exports.deleteBlogPostsView = async (req, res) => {
 
         const blogPost = await BlogPostsView.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
-        blogPost.post_image && await deleteImageFromS3(blogPost.post_image);
+        blogPost.post_image && await deleteS3File(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne();
         if (removedBlogPost.deletedCount === 0) throw { 'message': 'Something went wrong while deleting!', 'status': 500 };
         await cacheManager.invalidatePattern("bpv:*");

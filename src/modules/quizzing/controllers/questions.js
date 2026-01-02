@@ -2,7 +2,7 @@ const { getModels } = require('../../../utils/db-manager');
 const slugify = require('slugify');
 const { handleError } = require('../../../utils/error');
 const { updateQuizQuestions } = require('../helpers');
-const { deleteImageFromS3, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
+const { deleteS3File, validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 3600; // 1 hour
 const CACHE_KEYS = {
@@ -149,7 +149,7 @@ exports.updateQuestion = async (req, res) => {
 
             // Delete existing image
             if (qnImage && qtn.question_image) {
-                await deleteImageFromS3(qtn.question_image);
+                await deleteS3File(qtn.question_image);
             }
 
             // Find the question by id and update
@@ -184,7 +184,7 @@ exports.deleteQuestion = async (req, res) => {
         if (!question) throw { 'message': 'Question not found', 'status': 404 };
 
         // Delete existing image
-        question.question_image && await deleteImageFromS3(question.question_image);
+        question.question_image && await deleteS3File(question.question_image);
 
         // Remove question from questions of the quiz
         await updateQuizQuestions(question.quiz, question._id, 'remove');

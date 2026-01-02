@@ -1,6 +1,6 @@
 const { getModels } = require('../../../../utils/db-manager');
 const { getBatchedUsersMap } = require('../../../users/helpers');
-const { deleteImageFromS3, cacheManager, cacheWrapper, validateRequiredFields } = require('../../../../utils/global-helpers');
+const { deleteS3File, cacheManager, cacheWrapper, validateRequiredFields } = require('../../../../utils/global-helpers');
 const { handleError } = require('../../../../utils/error');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -149,7 +149,7 @@ exports.deleteImageUpload = async (req, res) => {
         const imageUpload = await ImageUpload.findById(req.params.id);
         if (!imageUpload) throw { 'message': 'Image upload is not found!', 'status': 404 };
 
-        imageUpload.uploadImage && await deleteImageFromS3(imageUpload.uploadImage);
+        imageUpload.uploadImage && await deleteS3File(imageUpload.uploadImage);
         const removedImageUpload = await imageUpload.deleteOne();
 
         if (removedImageUpload.deletedCount === 0)

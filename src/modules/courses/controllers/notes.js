@@ -2,7 +2,7 @@ const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
 const { getBatchedUsersMap } = require('../../users/helpers');
 const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
-const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
+const { validateRequiredFields, cacheManager, cacheWrapper, extractS3Key, deleteS3File, verifyS3FileDeletion } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
 const CACHE_KEYS = {
@@ -134,9 +134,9 @@ exports.getOneNotes = async (req, res) => {
 exports.createNotes = async (req, res) => {
 
     try {
-        const not_file = req.file;
+        const newFile = req.file;
 
-        if (!not_file) throw { message: 'Notes file is required!', status: 400 };
+        if (!newFile) throw { message: 'Notes file is required!', status: 400 };
 
         const { title, description, chapter, course, courseCategory, uploaded_by } = req.body;
         validateRequiredFields([
@@ -155,7 +155,8 @@ exports.createNotes = async (req, res) => {
 
         const newNotes = new Notes({
             title,
-            notes_file: not_file && not_file.location,
+            description,
+            notes_file: newFile && newFile.location,
             chapter,
             course,
             courseCategory,
@@ -175,19 +176,69 @@ exports.createNotes = async (req, res) => {
 
 exports.updateNotes = async (req, res) => {
     try {
-        const not_file = req.file;
+        const newFile = req.file;
+        const notesId = req.params.id;
+
         const { Notes } = await getModels('courses');
 
-        const notes = await Notes.findById(req.params.id);
-        if (!notes) throw { 'message': 'Notes not found!', 'status': 404 };
+        const existingNotes = await Notes.findById(notesId);
+        if (!existingNotes) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notes not found!'
+            });
+        }
+
+        console.log(`📄 Existing file URL: ${existingNotes.notes_file}`);
 
         let updates = { ...req.body };
-        if (not_file) updates.notes_file = not_file.location;
 
-        const updatedNotes = await Notes.findByIdAndUpdate(req.params.id, updates, { new: true });
+        // Handle file replacement
+        if (newFile) {
+            // Extract old file key from existing notes
+            const oldFileUrl = existingNotes.notes_file;
+            const oldFileKey = extractS3Key(oldFileUrl);
+
+            if (oldFileKey) {
+                console.log(`🔄 Replacing file. Deleting old file: ${oldFileKey}`);
+
+                // Delete old file from S3
+                const deleteSuccess = await deleteS3File(oldFileKey);
+
+                if (deleteSuccess) {
+                    // Optional: Verify deletion
+                    const verified = await verifyS3FileDeletion(oldFileKey);
+                    if (!verified) {
+                        console.warn(`⚠️  File deletion could not be verified: ${oldFileKey}`);
+                    }
+                } else {
+                    console.warn(`⚠️  Failed to delete old file, but continuing with update`);
+                }
+            } else {
+                console.log(`📝 No valid old file key found, uploading new file only`);
+            }
+
+            // Update with new file location
+            updates.notes_file = newFile.location;
+            updates.file_name = newFile.originalname;
+            updates.file_size = newFile.size;
+            updates.updated_at = new Date();
+
+            console.log(`✅ New file will be set to: ${newFile.location}`);
+        }
+
+        // Update notes in database
+        const updatedNotes = await Notes.findByIdAndUpdate(
+            notesId,
+            updates,
+            { new: true, runValidators: true }
+        );
+
+        // Invalidate cache
         await cacheManager.invalidatePattern("nt:*");
         res.status(200).json(updatedNotes);
     } catch (err) {
+        console.error('❌ Error updating notes:', err);
         handleError(res, err);
     }
 };
