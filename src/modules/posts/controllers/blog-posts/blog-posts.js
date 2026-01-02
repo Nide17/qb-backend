@@ -186,9 +186,14 @@ exports.updateBlogPostStatus = async (req, res) => {
 exports.deleteBlogPost = async (req, res) => {
 
     try {
-        const { BlogPost } = await getModels('posts');
+        const { BlogPost, BlogPostsView } = await getModels('posts');
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost is not found!', 'status': 404 };
+
+        // Remove views
+        await Promise.all([
+            BlogPostsView.deleteMany({ blogPost: blogPost._id }),
+        ]);
 
         blogPost.post_image && await deleteS3File(blogPost.post_image);
         const removedBlogPost = await blogPost.deleteOne();
