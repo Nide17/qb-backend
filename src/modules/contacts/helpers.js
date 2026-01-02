@@ -63,10 +63,10 @@ const validateRoomMessageData = (data) => {
 // Helper function to expand users in chat rooms
 const expandRoomsUsers = async (chatRooms) => {
 
-    const ids = chatRooms.map(room => room.users).flat();
-    const usersIDs = [...new Set(ids)].filter(id => id);
-
     try {
+        const ids = chatRooms.map(room => room.users).flat();
+        const usersIDs = [...new Set(ids)].filter(id => id);
+
         if (usersIDs.length > 0) {
             const usersMap = await getBatchedUsersMap(usersIDs);
             chatRooms.forEach(room => {
@@ -86,9 +86,9 @@ const expandRoomsUsers = async (chatRooms) => {
 
 const expandOneRoomUsers = async (chatRoom) => {
 
-    const usersIDs = [...new Set(chatRoom.users)].filter(id => id);
-    
     try {
+        const usersIDs = [...new Set(chatRoom.users)].filter(id => id);
+
         if (usersIDs.length > 0) {
             const usersMap = await getBatchedUsersMap(usersIDs);
             chatRoom.users = chatRoom.users.map(id => usersMap.get(id.toString()));
@@ -102,35 +102,36 @@ const expandOneRoomUsers = async (chatRoom) => {
     }
 };
 
-const createChatRoom = async ({ name, users = [], anonymous = false }) => {
-    
-    const { ChatRoom } = await getModels('contacts');
+const createChatRoom = async ({ name, users = [], anonymous = null }) => {
 
-    validateRequiredFields([
-        { name: 'name', value: name }
-    ]);
+    try {
+        const { ChatRoom } = await getModels('contacts');
 
-    if (!anonymous) {
-        if (!Array.isArray(users) || users.length < 2) {
-            const error = new Error('Room must contain at least two users');
-            error.status = 400;
+        validateRequiredFields([
+            { name: 'name', value: name }
+        ]);
+
+        if (!anonymous) {
+            if (!Array.isArray(users) || users.length < 2) {
+                const error = new Error('Room must contain at least two users');
+                error.status = 400;
+                throw error;
+            }
+        }
+
+        const room = await ChatRoom.create({ name, users, anonymous });
+
+        if (!room) {
+            const error = new Error('Failed to create chat room');
+            error.status = 500;
             throw error;
         }
+
+        return room;
+    } catch (error) {
+        console.log("error: ", error);
+        return null;
     }
-
-    const roomPayload = anonymous
-        ? { name, users, anonymous }
-        : { name, users };
-
-    const room = await ChatRoom.create(roomPayload);
-
-    if (!room) {
-        const error = new Error('Failed to create chat room');
-        error.status = 500;
-        throw error;
-    }
-
-    return room;
 };
 
 module.exports = {

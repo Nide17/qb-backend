@@ -99,8 +99,6 @@ exports.updatePostCategory = async (req, res) => {
     try {
         const { PostCategory, } = await getModels('posts');
 
-        console.log(req.params, req.body)
-
         const updatedPostCategory = await PostCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!updatedPostCategory) throw { status: 404, message: 'PostCategory not found!' };
         await cacheManager.invalidatePattern("pc:*");
