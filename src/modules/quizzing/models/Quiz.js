@@ -31,10 +31,6 @@ const QuizSchema = new Schema({
   },
   last_updated_by: {
     type: Schema.Types.ObjectId,
-    validate: {
-      validator: mongoose.Types.ObjectId.isValid,
-      message: props => `${props.value} is not a valid ObjectId`
-    }
   },
   creation_date: {
     type: Date,
