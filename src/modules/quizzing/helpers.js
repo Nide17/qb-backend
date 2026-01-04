@@ -18,7 +18,7 @@ const updateQuizQuestions = async (quizId, questionId, action) => {
         await quiz.save();
         return true;
     } catch (err) {
-        console.log(err.name);
+        console.log(err);
         throw { 'message': 'Error updating quiz questions!', 'status': 500 };
     }
 };
