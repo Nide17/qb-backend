@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
 const { getModels } = require('../../../utils/db-manager');
 const { expandScores } = require('../helpers');
@@ -158,24 +159,97 @@ exports.getOneScore = async (req, res) => {
     }
 };
 
+// exports.getQuizRanking = async (req, res) => {
+//     try {
+//         const cacheKey = CACHE_KEYS.QUIZ_RANKING(req.params.id);
+//         const { Score } = await getModels('scores');
+
+//         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+//             let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).lean();
+//             if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores to display' };
+
+//             // Expand scores
+//             const result = await expandScores(scores) || scores;
+//             return result;
+//         })
+//         res.status(200).json(data);
+//     } catch (err) {
+//         handleError(res, err);
+//     }
+// };
+
 exports.getQuizRanking = async (req, res) => {
     try {
+        const quizId = new mongoose.Types.ObjectId(req.params.id);
         const cacheKey = CACHE_KEYS.QUIZ_RANKING(req.params.id);
+
         const { Score } = await getModels('scores');
+        const { User } = await getModels('users');
 
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            let scores = await Score.find({ quiz: req.params.id }).sort({ marks: -1 }).limit(20).lean();
-            if (!scores || scores.length === 0) throw { 'status': 404, 'message': 'No scores to display' };
+        const rankings = await cacheWrapper.wrap(
+            cacheKey,
+            CACHE_TTL,
+            async () => {
+                const rawScores = await Score.aggregate([
+                    // 1. Only this quiz
+                    { $match: { quiz: quizId } },
 
-            // Expand scores
-            const result = await expandScores(scores) || scores;
-            return result;
-        })
-        res.status(200).json(data);
+                    // 2. Earliest attempt first
+                    { $sort: { test_date: 1 } },
+
+                    // 3. First attempt per user
+                    {
+                        $group: {
+                            _id: "$taken_by",
+                            marks: { $first: "$marks" },
+                            out_of: { $first: "$out_of" },
+                            test_date: { $first: "$test_date" }
+                        }
+                    },
+
+                    // 4. Rank by score
+                    { $sort: { marks: -1 } },
+
+                    // 5. Top 20
+                    { $limit: 20 }
+                ]);
+
+                if (!rawScores.length) {
+                    return [];
+                }
+
+                // 6. Fetch users from another connection
+                const userIds = rawScores.map(s => s._id);
+
+                const users = await User.find({ _id: { $in: userIds } })
+                    .select('name email image school')
+                    .lean();
+
+                const userMap = Object.fromEntries(
+                    users.map(u => [u._id.toString(), u])
+                );
+
+                // 7. Merge data
+                return rawScores.map(score => ({
+                    userId: score._id,
+                    marks: score.marks,
+                    out_of: score.out_of,
+                    test_date: score.test_date,
+                    taken_by: userMap[score._id.toString()] || null
+                }));
+            }
+        );
+
+        if (!rankings.length) {
+            return res.status(404).json({ message: "No scores to display" });
+        }
+
+        res.status(200).json(rankings);
     } catch (err) {
         handleError(res, err);
     }
 };
+
 
 exports.getPopularQuizzes = async (req, res) => {
 
