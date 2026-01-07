@@ -1,9 +1,6 @@
 const { getModels } = require('../../../utils/db-manager');
 const { sendEmail } = require('../../../utils/emails/sendEmail');
-// const { convertFromRaw } = require('draft-js');
-// const { stateToHTML } = require('draft-js-export-html');
 const { handleError } = require('../../../utils/error');
-// const { notifyAdmins } = require('../helpers');
 const { cacheManager, cacheWrapper, validateRequiredFields } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
