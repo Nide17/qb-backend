@@ -209,9 +209,6 @@ exports.getQuizRanking = async (req, res) => {
 
                     // 4. Rank by score
                     { $sort: { marks: -1 } },
-
-                    // 5. Top 20
-                    { $limit: 20 }
                 ]);
 
                 if (!rawScores.length) {
