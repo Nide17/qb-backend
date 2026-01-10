@@ -124,7 +124,7 @@ exports.getCreatedBy = async (req, res) => {
 
 exports.createBlogPost = async (req, res) => {
 
-    const bp_image = req.file ? req.file : null;
+    const bpImage = req.file ? req.file : null;
     const { title, markdown, postCategory, creator, bgColor } = req.body;
 
     try {
@@ -139,7 +139,7 @@ exports.createBlogPost = async (req, res) => {
 
         const newBlogPost = new BlogPost({
             title,
-            post_image: bp_image && bp_image.location,
+            post_image: bpImage && bpImage.location,
             markdown,
             postCategory,
             creator,
@@ -157,11 +157,22 @@ exports.createBlogPost = async (req, res) => {
 
 exports.updateBlogPost = async (req, res) => {
     try {
+
+        const bpImage = req.file ? req.file : null;
+
         const { BlogPost } = await getModels('posts');
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
-        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        // Delete existing image
+        if (bpImage && blogPost.post_image) {
+            await deleteS3File(blogPost.post_image);
+        }
+        const updateData = { ...req.body };
+        if (bpImage) {
+            updateData.post_image = bpImage.location;
+        }
+        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, updateData, { new: true });
         await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);
     } catch (err) {

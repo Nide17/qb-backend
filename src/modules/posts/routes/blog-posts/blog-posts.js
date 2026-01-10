@@ -1,5 +1,12 @@
 const express = require('express');
-const { getBlogPosts, getOneBlogPost, getBlogPostsByCategory, createBlogPost, updateBlogPost, deleteBlogPost } = require('../../controllers/blog-posts/blog-posts');
+const {
+    getBlogPosts,
+    getOneBlogPost,
+    getBlogPostsByCategory,
+    createBlogPost,
+    updateBlogPost,
+    deleteBlogPost
+} = require('../../controllers/blog-posts/blog-posts');
 const { authRole } = require('../../../../middlewares/auth');
 const { blogPostUpload } = require('../../../../middlewares/blogPostUpload');
 
@@ -13,8 +20,8 @@ router.get('/:id', getOneBlogPost);  // Special case - handles both slug and Obj
 // POST routes
 router.post('/', authRole(['Creator', 'Admin', 'SuperAdmin']), blogPostUpload.single('post_image'), createBlogPost);
 
-// PUT routes
-router.put('/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), updateBlogPost);
+// PUT routes - UPDATED to include image upload middleware
+router.put('/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), blogPostUpload.single('post_image'), updateBlogPost);
 
 // DELETE routes
 router.delete('/:id', authRole(['Creator', 'Admin', 'SuperAdmin']), deleteBlogPost);
