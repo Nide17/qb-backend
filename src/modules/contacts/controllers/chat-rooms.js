@@ -24,6 +24,32 @@ const findingQuery = (req) => {
     return { query, pageNo, PAGE_SIZE };
 }
 
+const convertAnonymousRooms = async (anonymousRooms, userId) => {
+
+    const { ChatRoom } = await getModels('contacts');
+
+    const convertedRooms = await Promise.all(
+        anonymousRooms.map(async (room) => {
+            await ChatRoom.findByIdAndUpdate(
+                room._id,
+                {
+                    $unset: { anonymous: "" }, // Remove anonymous field
+                    $addToSet: { users: { $each: [userId] } } // Add both user and admin IDs (avoiding duplicates)
+                }
+            );
+
+            // Return updated room
+            return {
+                ...room,
+                users: [...new Set([...(room.users || []), userId])], // Merge and deduplicate for immediate use
+                anonymous: undefined
+            };
+        })
+    );
+
+    return convertedRooms;
+};
+
 exports.getChatRooms = async (req, res) => {
 
     try {
@@ -70,20 +96,41 @@ exports.getChatRooms = async (req, res) => {
 };
 
 exports.getUserChatRooms = async (req, res) => {
-
     try {
         const { ChatRoom } = await getModels('contacts');
+        const { User } = await getModels('users');
+        const usr = await User.findById(req.params.id);
+
+        if (!usr) throw { 'status': 404, 'message': 'User not found' };
 
         // Pagination - ENFORCE pagination to prevent memory exhaustion
-        const totalChatRooms = await ChatRoom.countDocuments({ users: req.params.id });
+        const totalChatRooms = await ChatRoom.countDocuments({ users: usr._id });
         const { query, pageNo, PAGE_SIZE } = findingQuery(req);
 
         if (pageNo && pageNo > 0) {
-            const cacheKey = CACHE_KEYS.USER_PAGINATED(req.params.id, pageNo);
+            const cacheKey = CACHE_KEYS.USER_PAGINATED(usr._id, pageNo);
 
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-                let userChatRooms = await ChatRoom.find({ users: req.params.id }, {}, query).sort({ createdAt: -1 }).lean();
-                if (!userChatRooms || userChatRooms.length === 0) throw { 'status': 404, 'message': 'No chatRooms found for user' };
+                let userChatRooms = await ChatRoom.find({ users: usr._id }, {}, query)
+                    .sort({ createdAt: -1 })
+                    .lean();
+
+                if (!userChatRooms || userChatRooms.length === 0) {
+                    // Find if anonymously sent to admin
+                    let anonymousRooms = await ChatRoom.find({
+                        'anonymous.email': usr.email
+                    }, {}, query)
+                        .sort({ createdAt: -1 })
+                        .lean();
+
+                    if (!anonymousRooms || anonymousRooms.length === 0) {
+                        throw { 'status': 404, 'message': 'No chatRooms found for user' };
+                    }
+
+                    // For each anonymous room, remove anonymous entry and add the user id to users list along with admin id
+                    userChatRooms = await convertAnonymousRooms(anonymousRooms, usr._id);
+                }
+
                 // Expand chatRooms
                 const expandedChatRooms = await expandRoomsUsers(userChatRooms);
                 const result = {
@@ -97,11 +144,18 @@ exports.getUserChatRooms = async (req, res) => {
             });
             res.status(200).json(data);
         } else {
-            const cacheKey = CACHE_KEYS.USER_ALL(req.params.id);
+            const cacheKey = CACHE_KEYS.USER_ALL(usr._id);
             const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+                let userChatRooms = await ChatRoom.find({ users: usr._id }).lean();
 
-                let userChatRooms = await ChatRoom.find({ users: req.params.id }).lean();
-                if (!userChatRooms || userChatRooms.length === 0) throw { 'status': 404, 'message': 'No chatRooms found for user' };
+                if (!userChatRooms || userChatRooms.length === 0) {
+                    // Check anonymous rooms for non-paginated case too
+                    let anonymousRooms = await ChatRoom.find({ 'anonymous.email': usr.email }).lean();
+                    if (!anonymousRooms || anonymousRooms.length === 0) {
+                        throw { 'status': 404, 'message': 'No chatRooms found for user' };
+                    }
+                    userChatRooms = await convertAnonymousRooms(anonymousRooms, usr._id);
+                }
 
                 // Expand chatRooms
                 const expandedChatRooms = await expandRoomsUsers(userChatRooms);
