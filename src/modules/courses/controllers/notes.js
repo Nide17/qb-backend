@@ -189,8 +189,6 @@ exports.updateNotes = async (req, res) => {
             });
         }
 
-        console.log(`📄 Existing file URL: ${existingNotes.notes_file}`);
-
         let updates = { ...req.body };
 
         // Handle file replacement
@@ -200,7 +198,6 @@ exports.updateNotes = async (req, res) => {
             const oldFileKey = extractS3Key(oldFileUrl);
 
             if (oldFileKey) {
-                console.log(`🔄 Replacing file. Deleting old file: ${oldFileKey}`);
 
                 // Delete old file from S3
                 const deleteSuccess = await deleteS3File(oldFileKey);
@@ -223,8 +220,6 @@ exports.updateNotes = async (req, res) => {
             updates.file_name = newFile.originalname;
             updates.file_size = newFile.size;
             updates.updated_at = new Date();
-
-            console.log(`✅ New file will be set to: ${newFile.location}`);
         }
 
         // Update notes in database

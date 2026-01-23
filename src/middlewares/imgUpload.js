@@ -9,7 +9,6 @@ const fileFilter = (req, file, callback) => {
     if (allowedFileTypes.includes(file.mimetype)) {
         callback(null, true);
     } else {
-        console.log('File type not allowed:', file.mimetype);
         callback(null, false);
     }
 };
