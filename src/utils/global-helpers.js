@@ -2,6 +2,10 @@ const { S3, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const RedisCacheManager = require("./redis-cache");
 
 const cacheManager = new RedisCacheManager();
+const CACHE_MISS = Symbol("CACHE_MISS");
+const NEGATIVE_CACHE_SENTINEL = Object.freeze({ __qbCacheNull: true });
+const DEFAULT_NEGATIVE_CACHE_TTL = 30;
+const inFlightFetches = new Map();
 
 /**
  * Wrapper: Safely get from Redis cache
@@ -9,21 +13,32 @@ const cacheManager = new RedisCacheManager();
 const getCachedData = async (key) => {
     try {
         if (cacheManager.isReady()) {
-            const cached = await cacheManager.get(key);
+            const entry = await cacheManager.getEntry(key);
 
-            if (cached !== undefined && cached !== null) {
-                console.log(`📦 Redis HIT → "${key}"`);
-                return cached;
+            if (!entry.hit) {
+                console.log(`📦 Redis MISS → "${key}"`);
+                return CACHE_MISS;
             }
 
-            console.log(`📦 Redis MISS → "${key}"`);
-            return null;
+            if (
+                entry.value &&
+                typeof entry.value === "object" &&
+                entry.value.__qbCacheNull === true
+            ) {
+                console.log(`📦 Redis HIT (negative) → "${key}"`);
+                return null;
+            }
+
+            if (entry.value !== undefined) {
+                console.log(`📦 Redis HIT → "${key}"`);
+                return entry.value;
+            }
         }
 
-        return null;
+        return CACHE_MISS;
     } catch (err) {
         console.error("Redis get error:", err.message || err);
-        return null;
+        return CACHE_MISS;
     }
 };
 
@@ -31,19 +46,6 @@ function isCacheable(value) {
     if (value === undefined) return false;
     if (value === null) return false;
     if (typeof value === "number" && isNaN(value)) return false;
-
-    // Empty primitives
-    if (typeof value === "string" && value.trim() === "") return false;
-
-    // Arrays
-    if (Array.isArray(value) && value.length === 0) return false;
-
-    // Objects
-    if (typeof value === "object") {
-        if (value.constructor === Object && Object.keys(value).length === 0) return false;
-        if (value instanceof Map && value.size === 0) return false;
-        if (value instanceof Set && value.size === 0) return false;
-    }
 
     return true;
 }
@@ -177,25 +179,47 @@ const validateRequiredFields = (fields) => {
 
 // --- Cache wrapper -------------------------------------------------------------
 const cacheWrapper = {
-    async wrap(key, ttl, fetchFn) {
+    async wrap(key, ttl, fetchFn, options = {}) {
+        const negativeTTL = options.negativeTTL ?? DEFAULT_NEGATIVE_CACHE_TTL;
+
         try {
             // 1️⃣ Try Redis
             const cached = await getCachedData(key);
-            // if (cached !== undefined && cached !== null) console.log("cached", cached);
-            if (cached !== undefined && cached !== null) return cached;
+            if (cached !== CACHE_MISS) return cached;
 
-            // 2️⃣ Cache MISS → Fetch from DB
-            const fresh = await fetchFn();
-
-            // 3️⃣ Only cache if valid
-            if (isCacheable(fresh)) {
-                await setCachedData(key, fresh, ttl);
-            } else {
-                console.log(`⚠️ Skipped caching invalid/empty data for key "${key}"`);
+            if (inFlightFetches.has(key)) {
+                return inFlightFetches.get(key);
             }
 
-            return fresh;
+            const fetchPromise = (async () => {
+                // 2️⃣ Cache MISS → Fetch from DB
+                const fresh = await fetchFn();
 
+                // 3️⃣ Cache null responses briefly to prevent repeated misses
+                if (fresh === null) {
+                    await setCachedData(key, NEGATIVE_CACHE_SENTINEL, negativeTTL);
+                    return fresh;
+                }
+
+                // 4️⃣ Only cache if valid
+                if (isCacheable(fresh)) {
+                    await setCachedData(key, fresh, ttl);
+                } else {
+                    console.log(`⚠️ Skipped caching invalid data for key "${key}"`);
+                }
+
+                return fresh;
+            })();
+
+            inFlightFetches.set(key, fetchPromise);
+
+            try {
+                return await fetchPromise;
+            } finally {
+                if (inFlightFetches.get(key) === fetchPromise) {
+                    inFlightFetches.delete(key);
+                }
+            }
         } catch (e) {
             console.error("Cache wrap error:", e);
             return fetchFn(); // fallback to DB
