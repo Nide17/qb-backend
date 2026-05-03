@@ -46,6 +46,7 @@ build/Release
 .history/
 *.prettierrc
 *.eslintrc.cjs
+.codex
 
 # MongoDB
 *.lock
