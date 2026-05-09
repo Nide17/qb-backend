@@ -31,7 +31,7 @@ const getBatchedQuizzesMap = async (quizzesIds) => {
 
         const { Quiz } = await getModels('quizzing');
 
-        const quizzes = await Quiz.find({ _id: { $in: quizzesIds } }).populate('category questions', 'title questionText').select('title slug');
+        const quizzes = await Quiz.find({ _id: { $in: quizzesIds } }).populate('category questions', 'title questionText').select('title slug created_by creation_date');
         if (!quizzes.length) throw { 'message': 'No quizzes found!', 'status': 404 };
 
         const quizzesMap = new Map();
@@ -120,6 +120,20 @@ const expandCategory = async (category) => {
     }
 };
 
+const safeQuizForResponseNoID = (quizObj) => {
+    if (!quizObj) return null;
+
+    // Select only safe/public fields to return (and to cache)
+    const { title, category, questions, creation_date } = quizObj;
+    return {
+        title,
+        category: category?.title || '',
+        questions: questions?.length || 0,
+        creation_date: creation_date ? new Date(creation_date).toLocaleString() : null,
+    };
+};
+
+
 module.exports = {
     updateQuizQuestions,
     getBatchedQuestionsMap,
@@ -127,4 +141,5 @@ module.exports = {
     expandQuizzes,
     expandCategories,
     expandCategory,
+    safeQuizForResponseNoID,
 };

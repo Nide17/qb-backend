@@ -1,6 +1,6 @@
 const { getModels } = require('../../../utils/db-manager');
 const { handleError } = require('../../../utils/error');
-const { sendSubscriptionEmail } = require('../helpers');
+const { sendSubscriptionEmail, isValidEmail } = require('../helpers');
 const { validateRequiredFields, cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 
 const CACHE_TTL = 600; // 10 minutes
@@ -45,6 +45,8 @@ exports.createSubscribedUser = async (req, res) => {
             { name: 'name', value: name },
             { name: 'email', value: email },
         ]);
+        if (!(await isValidEmail(email))) throw { status: 400, message: 'Please provide a valid email' };
+        
         const { SubscribedUser } = await getModels('users');
         const subscriber = await SubscribedUser.findOne({ email });
         if (subscriber) {

@@ -19,7 +19,7 @@ exports.getBlogPostsViews = async (req, res) => {
         const cacheKey = CACHE_KEYS.ALL;
         const { BlogPostsView } = await getModels('posts');
 
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, 60 * 60 * 24, async () => {
             // Extract unique IDs
             let blogPostsViews = await BlogPostsView.find().populate('blogPost', 'title slug').sort({ createdAt: -1 }).select('-__v');
             if (!blogPostsViews) throw { 'message': 'No blog Posts Views found!', 'status': 404 };
@@ -31,7 +31,12 @@ exports.getBlogPostsViews = async (req, res) => {
             // Map blogPostsViews to expanded objects
             const expandedBlogPostsViews = blogPostsViews.map(bpv => {
                 const viewer = usersMap.get(bpv.viewer?.toString()) || bpv.viewer;
-                return { ...bpv, viewer };
+                return { 
+                    blogPost: bpv?.blogPost?.title || bpv?.blogPost?.slug || '',
+                    country: bpv?.country || '',
+                    device: bpv?.device || '',
+                    viewer: viewer?.name || viewer?.email || ''
+                };
             });
             const result = expandedBlogPostsViews || blogPostsViews;
             return result;
@@ -80,7 +85,12 @@ exports.getRecentTenViews = async (req, res) => {
             // Map recentTenViews to expanded objects
             const expandedRecentTenViews = recentTenViews.map(bpv => {
                 const viewer = usersMap.get(bpv.viewer?.toString()) || bpv.viewer;
-                return { ...bpv, viewer };
+                return { 
+                    blogPost: bpv?.blogPost?.title || bpv?.blogPost?.slug || '',
+                    country: bpv?.country || '',
+                    device: bpv?.device || '',
+                    viewer: viewer?.name || viewer?.email || ''
+                };
             });
             const result = expandedRecentTenViews || recentTenViews;
             return result;

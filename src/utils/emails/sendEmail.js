@@ -42,7 +42,7 @@ const sendWithRetry = async (transporter, mailOptions, retries = 3) => {
   for (let i = 0; i < retries; i++) {
     try {
       const info = await transporter.sendMail(mailOptions);
-      console.log("📧 Email sent:", info.messageId);
+      console.log("📧 Email sent:", mailOptions.to);
       return info;
     } catch (error) {
       console.error(`❌ Email attempt ${i + 1} failed:`, error.message);

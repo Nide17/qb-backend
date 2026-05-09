@@ -151,7 +151,7 @@ exports.login = async (req, res) => {
             const otpExpires = Date.now() + (10 * 60 * 1000); // 10 minutes
             await User.findOneAndUpdate({ email }, { otp, otpExpires });
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name: user.name, otp }, './template/otp.handlebars');
-            throw { status: 400, message: 'Account not verified yet, check your email for OTP!' };
+            throw { status: 400, message: `Account not verified, OTP sent to ${email} for verification!` };
         }
 
         // Check current_token validity synchronously (jwt.verify returns payload or throws)
@@ -208,7 +208,7 @@ exports.register = async (req, res) => {
     try {
         const { name, email, password } = req.body;
         if (!name || !email || !password) throw { status: 400, message: 'Please fill all fields' };
-        if (!isValidEmail(email)) throw { status: 400, message: 'Please provide a valid email' };
+        if (!(await isValidEmail(email))) throw { status: 400, message: 'Please provide a valid email' };
 
         const { User } = await getModels('users');
         const existing = await User.findOne({ email })
@@ -226,8 +226,8 @@ exports.register = async (req, res) => {
             await User.findByIdAndUpdate(existing._id, { name, password: hash, otp, otpExpires }, { new: true });
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
             await cacheManager.invalidatePattern('usr:*');
-            
-            return res.status(200).json({ message: 'Verification OTP sent to your email', user: safeUserForResponse(existing.toObject()) });
+
+            return res.status(200).json({ message: `Provide OTP code sent to ${email}`, user: safeUserForResponse(existing.toObject()) });
         }
 
         // New user flow
@@ -239,7 +239,7 @@ exports.register = async (req, res) => {
         await cacheManager.invalidatePattern('usr:*');
 
         // Respond with safe info only (don't return password or otp)
-        res.status(201).json({ message: 'User created. Verification OTP sent to your email', user: safeUserForResponse(saved.toObject()) });
+        res.status(201).json({ message: `Registered. Verify OTP sent to ${email}`, user: safeUserForResponse(saved.toObject()) });
     } catch (err) {
         handleError(res, err);
     }
@@ -279,7 +279,7 @@ exports.resendOTP = async (req, res) => {
         if (!email) throw { status: 400, message: 'Email is required' };
 
         // Validate email
-        if (!isValidEmail(email)) throw { status: 400, message: 'Please provide a valid email: ' + email + '.' };
+        if (!(await isValidEmail(email))) throw { status: 400, message: 'Please provide a valid email: ' + email + '.' };
 
         const { User } = await getModels('users');
         const user = await User.findOne({ email });
@@ -291,7 +291,7 @@ exports.resendOTP = async (req, res) => {
         await User.findOneAndUpdate({ email }, { otp, otpExpires });
         await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name: user.name, otp }, './template/otp.handlebars');
 
-        res.status(200).json({ message: 'New verification OTP sent to your email', user: safeUserForResponse(user.toObject()) });
+        res.status(200).json({ message: `New OTP code is sent to ${email}`, user: safeUserForResponse(user.toObject()) });
     } catch (err) {
         handleError(res, err);
     }

@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "lint": "eslint . --ext .js"
   },
   "author": "Niyomwungeri Parmenide Ishimwe",
   "license": "MIT",

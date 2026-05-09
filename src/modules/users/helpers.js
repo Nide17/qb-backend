@@ -18,12 +18,86 @@ const safeUserForResponse = (userObj) => {
     };
 };
 
-// simple email validation (permissive but practical)
-const isValidEmail = (email) => {
-    if (!email) return false;
-    // as a pragmatic check allow valid patterns (avoid rejecting long new TLDs)
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const safeUserForResponseNoID = (userObj) => {
+    if (!userObj) return null;
+
+    // Select only safe/public fields to return (and to cache)
+    const { name, email, role, image, school, faculty, level, year, interests, about, register_date, } = userObj;
+    return {
+        name,
+        email,
+        role,
+        image: image || '',
+        school: school?.title || '',
+        faculty: faculty?.title || '',
+        level: level?.title || '',
+        year: year || '',
+        interests: interests?.length < 1 ? '' : interests.map((i) => i.favorite).join(', ') || '',
+        about: about || '',
+        register_date: register_date ? new Date(register_date).toLocaleString() : null,
+    };
 };
+
+// Email validation: syntax + MX record presence (best-practice for deliverability)
+const mxCache = new Map();
+const MX_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+const isValidEmail = async (email) => {
+    if (!email) return false;
+
+    // Syntax check (pragmatic)
+    const syntaxOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!syntaxOk) return false;
+
+    const domainRaw = String(email).split('@')[1];
+    if (!domainRaw) {
+        console.error('Invalid domain:', domainRaw);
+        return false;
+    }
+    // IDN -> punycode (avoid dns failures for non-ASCII domains)
+    let domain = domainRaw;
+    try {
+        // Node >= 16: punycode is available via 'punycode/' module
+        const punycode = require('punycode/');
+        domain = punycode.toASCII(domainRaw);
+    } catch {
+        // ignore and use raw domain
+        domain = domainRaw;
+    }
+
+    // Basic DNS domain safety
+    domain = domain.trim().toLowerCase();
+    if (!domain || domain.length > 253) {
+        console.error('Invalid domain:', domain);
+        return false;
+    }
+    const cached = mxCache.get(domain);
+    if (cached && (Date.now() - cached.ts) < MX_CACHE_TTL_MS) {
+        return cached.valid;
+    }
+
+    const dns = require('dns/promises');
+
+    // Timeout wrapper so we don't hang request processing
+    const timeoutMs = 2000;
+    const resolveMxPromise = dns.resolveMx(domain);
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('DNS MX lookup timeout')), timeoutMs);
+    });
+
+    try {
+        const records = await Promise.race([resolveMxPromise, timeoutPromise]);
+        const valid = Array.isArray(records) && records.length > 0;
+        mxCache.set(domain, { valid, ts: Date.now() });
+        return valid;
+    } catch {
+        // If MX lookup fails (NXDOMAIN, no records, timeout, etc.) treat as invalid.
+        console.error('MX lookup failed');
+        mxCache.set(domain, { valid: false, ts: Date.now() });
+        return false;
+    }
+};
+
 
 const updateUserToken = async (user) => {
 
@@ -135,6 +209,7 @@ module.exports = {
     generateToken,
     updateUserToken,
     safeUserForResponse,
+    safeUserForResponseNoID,
     isValidEmail,
     sendOtpEmail,
     hashPassword,

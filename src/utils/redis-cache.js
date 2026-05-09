@@ -36,7 +36,7 @@ class RedisCacheManager {
             });
 
             this.redis.on("ready", () => {
-                console.log("✅ Redis ready");
+                console.log(`✅ Redis at ${this.redisUrl} ready`);
                 this.isConnected = true;
             });
 

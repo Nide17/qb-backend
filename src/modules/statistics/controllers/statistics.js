@@ -5,13 +5,13 @@ const { getEventLoopLag, getCpuUsagePercent } = require('../helpers');
 const { cacheManager, cacheWrapper } = require('../../../utils/global-helpers');
 const { getDB } = require('../../../utils/db-manager');
 
-const { getBatchedUsersMap } = require('../../users/helpers');
-const { getBatchedQuizzesMap } = require('../../quizzing/helpers');
+const { getBatchedUsersMap, expandSchoolData, safeUserForResponseNoID } = require('../../users/helpers');
+const { getBatchedQuizzesMap, safeQuizForResponseNoID } = require('../../quizzing/helpers');
 const { getBatchedNotesMap } = require('../../courses/helpers');
 
 const { getModels } = require('../../../utils/db-manager');
 
-const CACHE_TTL = 300; // 5 minutes
+const CACHE_TTL = 60 * 60 * 24; // 1 day
 const CACHE_KEYS = {
     SUMMARY_STATS: "st:summary-stats",
     SYSTEM_METRICS: "st:system-metrics",
@@ -22,6 +22,17 @@ const CACHE_KEYS = {
     NOTES_STATS: (key) => `st:notes:${key}`,
     LIVE: "st:liveAnalytics"
 };
+
+const preparedUsersOutput = async (users) => {
+
+    // Add school data to each user
+    for (let i = 0; i < users.length; i++) {
+        await expandSchoolData(users[i]);
+    }
+
+    // Select only safe/public fields to return
+    return users.map((user) => safeUserForResponseNoID(user));
+}
 
 // ===================================================================
 // SYSTEM METRICS CONTROLLER
@@ -319,7 +330,11 @@ exports.get50NewUsers = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({}).sort({ register_date: -1 }).limit(50).lean();
+            let users = await User.find({})
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login')
+                .sort({ register_date: -1 }).limit(50).lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -334,7 +349,11 @@ exports.getAllUsers = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({}).lean();
+            let users = await User
+                .find({})
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -349,7 +368,11 @@ exports.getUsersWithImage = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({ image: { $exists: true, $ne: '' } }).lean();
+            let users = await User
+                .find({ image: { $exists: true, $ne: '' } })
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -362,8 +385,12 @@ exports.getUsersWithSchool = async (req, res) => {
         const cacheKey = CACHE_KEYS.USERS_STATS('school');
         const { User } = await getModels('users');
 
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({ school: { $exists: true, $ne: null } }).lean();
+        let data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            let users = await User
+                .find({ school: { $exists: true, $ne: null } })
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -377,7 +404,11 @@ exports.getUsersWithLevel = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({ level: { $exists: true, $ne: null } }).lean();
+            let users = await User
+                .find({ level: { $exists: true, $ne: null } })
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -391,7 +422,11 @@ exports.getUsersWithFaculty = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({ faculty: { $exists: true, $ne: null } }).lean();
+            let users = await User
+                .find({ faculty: { $exists: true, $ne: null } })
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -405,7 +440,11 @@ exports.getUsersWithYear = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({ year: { $exists: true, $ne: null } }).lean();
+            let users = await User
+                .find({ year: { $exists: true, $ne: null } })
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -419,7 +458,11 @@ exports.getUsersWithInterests = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({ interests: { $exists: true, $ne: [] } }).lean();
+            let users = await User
+                .find({ interests: { $exists: true, $ne: [] } })
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -433,7 +476,11 @@ exports.getUsersWithAbout = async (req, res) => {
         const { User } = await getModels('users');
 
         const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            return await User.find({ about: { $exists: true, $ne: '' } }).lean();
+            let users = await User
+                .find({ about: { $exists: true, $ne: '' } })
+                .select('-password -__v -verified -otp -otpExpires -current_token -last_login').lean();
+
+            return await preparedUsersOutput(users);
         });
         res.status(200).json(data);
     } catch (err) {
@@ -447,7 +494,7 @@ exports.getTop10QuizzingUsers = async (req, res) => {
         const cacheKey = CACHE_KEYS.USERS_STATS('top10quizzing');
         const { Score } = await getModels('scores');
 
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, 300, async () => {
 
             let topUsers = await Score.aggregate([
                 { $group: { _id: '$taken_by', totalQuizzes: { $sum: 1 }, avgMarks: { $avg: '$marks' } } },
@@ -458,7 +505,15 @@ exports.getTop10QuizzingUsers = async (req, res) => {
             if (topUsers.length > 0) {
                 const usersIDs = topUsers.map(u => u._id.toString());
                 const usersMap = await getBatchedUsersMap(usersIDs);
-                topUsers = topUsers.map(usr => usersMap?.get(usr?._id.toString()) || {});
+                topUsers = topUsers.map(usr => {
+                    let user = usersMap?.get(usr?._id.toString()) || {}
+                    return {
+                        name: user?.name || '',
+                        email: user?.email || '',
+                        totalQuizzes: usr.totalQuizzes,
+                        avgMarks: usr.avgMarks.toFixed(0)
+                    };
+                })
             }
 
             return topUsers;
@@ -473,7 +528,7 @@ exports.getTop10Quizzes = async (req, res) => {
 
     try {
         const cacheKey = CACHE_KEYS.QUIZZES_STATS('top10');
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, 300, async () => {
 
             // Get top quizzes
             let topQuizzes = [];
@@ -481,15 +536,20 @@ exports.getTop10Quizzes = async (req, res) => {
             const { Score } = await getModels('scores');
 
             const topQuizzesData = await Score.aggregate([
-                { $group: { _id: '$quiz', totalTaken: { $sum: 1 } } },
-                { $sort: { totalTaken: -1 } },
+                { $group: { _id: '$quiz', times_taken: { $sum: 1 } } },
+                { $sort: { times_taken: -1 } },
                 { $limit: 10 }
             ]).exec();
 
             if (topQuizzesData.length > 0) {
                 const quizzesIDs = topQuizzesData.map(q => q._id.toString());
                 const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
-                topQuizzes = topQuizzesData.map(qz => quizzesMap?.get(qz?._id.toString()) || {});
+                topQuizzes = topQuizzesData.map(qz => {
+                    let quiz = quizzesMap?.get(qz?._id.toString()) || {}
+                    quiz = safeQuizForResponseNoID(quiz)
+                    quiz.times_taken = qz.times_taken;
+                    return quiz;
+                })
             }
 
             return topQuizzes;
@@ -506,7 +566,7 @@ exports.getTop10Downloaders = async (req, res) => {
         const cacheKey = CACHE_KEYS.DOWNLOADS_STATS('top10');
         const { Download } = await getModels('downloads');
 
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, 300, async () => {
 
             // Get top downloaders aggregation
             let topDownloaders = await Download.aggregate([
@@ -523,8 +583,7 @@ exports.getTop10Downloaders = async (req, res) => {
                 topDownloaders = topDownloaders.map(usr => {
                     const user = usersMap.get(usr._id.toString()) || {};
                     return {
-                        _id: usr._id,
-                        name: user?.name || 'Unknown User',
+                        name: user?.name || '',
                         email: user?.email || '',
                         totalDownloads: usr.totalDownloads
                     };
@@ -544,7 +603,7 @@ exports.getTop10Notes = async (req, res) => {
         const cacheKey = CACHE_KEYS.NOTES_STATS('top10');
         const { Download } = await getModels('downloads');
 
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, 300, async () => {
 
             // Get top notes aggregation
             const topNotesData = await Download.aggregate([
@@ -563,10 +622,8 @@ exports.getTop10Notes = async (req, res) => {
                 topNotes = topNotesData.map(nt => {
                     const note = notesMap?.get(nt._id.toString()) || {};
                     return {
-                        _id: nt._id,
-                        title: note.title || 'Unknown Note',
-                        courseCategory: note.courseCategory || 'Uncategorized',
-                        slug: note.slug || '',
+                        title: note.title || '',
+                        courseCategory: note?.courseCategory?.title || '',
                         totalDownloaded: nt.totalDownloaded
                     };
                 });

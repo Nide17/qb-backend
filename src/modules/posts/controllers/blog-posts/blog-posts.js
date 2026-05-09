@@ -17,7 +17,7 @@ exports.getBlogPosts = async (req, res) => {
         const cacheKey = CACHE_KEYS.ALL;
         const { BlogPost } = await getModels('posts');
 
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+        const data = await cacheWrapper.wrap(cacheKey, 60 * 60 * 24, async () => {
             let blogPosts = await BlogPost.find().sort({ createdAt: -1 }).populate('postCategory', 'title').lean();
             if (!blogPosts || blogPosts.length === 0) throw { 'message': 'No blog posts found', 'status': 404 };
 
