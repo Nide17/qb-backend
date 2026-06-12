@@ -104,7 +104,10 @@ exports.getRecentTenViews = async (req, res) => {
 exports.createBlogPostsView = async (req, res) => {
 
     const { blogPost, viewer, device, country } = req.body;
-    if (!blogPost) throw { 'message': 'Cannot create view. Blog post does not exist.', 'status': 400 };
+    if (!blogPost) {
+        console.log(req.body);
+        throw { 'message': 'Cannot create view. Blog post missing.', 'status': 400 };
+    }
 
     try {
         const { BlogPostsView } = await getModels('posts');
