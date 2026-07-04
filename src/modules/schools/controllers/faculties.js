@@ -88,7 +88,7 @@ exports.updateFaculty = async (req, res) => {
         const faculty = await Faculty.findById(req.params.id);
         if (!faculty) throw { 'status': 404, 'message': 'Faculty not found!' };
 
-        const updatedFaculty = await Faculty.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedFaculty = await Faculty.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("fct:*");
         res.status(200).json(updatedFaculty);
     } catch (err) {

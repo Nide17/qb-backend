@@ -84,7 +84,7 @@ exports.updateBroadcast = async (req, res) => {
         const broadcast = await Broadcast.findById(req.params.id);
         if (!broadcast) return;
 
-        const updatedBroadcast = await Broadcast.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedBroadcast = await Broadcast.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("brd:*");
         res.status(200).json(updatedBroadcast);
     } catch (err) {

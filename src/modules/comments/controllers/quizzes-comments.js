@@ -109,7 +109,7 @@ exports.updateQuizComment = async (req, res) => {
         const quizComment = await QuizComment.findById(req.params.id);
         if (!quizComment) throw { message: 'QuizComment not found!', status: 404 };
 
-        const updatedQuizComment = await QuizComment.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedQuizComment = await QuizComment.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
 
         await cacheManager.invalidatePattern("qzcmt:*");
         res.status(200).json(updatedQuizComment);
@@ -128,7 +128,7 @@ exports.approveRejectComment = async (req, res) => {
         const quizComment = await QuizComment.findById(commentID);
         if (!quizComment) throw { message: 'QuizComment not found!', status: 404 };
 
-        const updatedQuizComment = await QuizComment.findByIdAndUpdate(commentID, { status: req.body.status }, { new: true });
+        const updatedQuizComment = await QuizComment.findByIdAndUpdate(commentID, { status: req.body.status }, { returnDocument: 'after' });
 
         await cacheManager.invalidatePattern("qzcmt:*");
         res.status(200).json(updatedQuizComment);

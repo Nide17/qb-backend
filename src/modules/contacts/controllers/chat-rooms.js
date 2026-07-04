@@ -253,7 +253,7 @@ exports.updateChatRoom = async (req, res) => {
     try {
         const { ChatRoom } = await getModels('contacts');
 
-        const updatedChatRoom = await ChatRoom.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedChatRoom = await ChatRoom.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!updatedChatRoom) throw { message: 'Something went wrong during update!', status: 500 };
         await cacheManager.invalidatePattern("crm:*");
         res.status(200).json(updatedChatRoom);

@@ -173,7 +173,7 @@ exports.updateRoomMessage = async (req, res) => {
         validateRoomMessageData(req.body);
         const { RoomMessage } = await getModels('contacts');
 
-        const updatedRoomMessage = await RoomMessage.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedRoomMessage = await RoomMessage.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!updatedRoomMessage) throw { message: 'Something went wrong during update!', status: 500 };
         await cacheManager.invalidatePattern("rmsg:*");
         res.status(200).json(updatedRoomMessage);

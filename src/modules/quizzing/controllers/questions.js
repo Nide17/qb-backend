@@ -134,7 +134,7 @@ exports.updateQuestion = async (req, res) => {
             const updatedQuestion = await Question.findByIdAndUpdate({ _id: qtn._id }, {
                 quiz: newQuiz,
                 last_updated_by,
-            }, { new: true });
+            }, { returnDocument: 'after' });
 
             // Delete Question in old quiz
             await updateQuizQuestions(oldQuizID, qtn._id, 'remove');
@@ -160,7 +160,7 @@ exports.updateQuestion = async (req, res) => {
                 answerOptions: answers,
                 last_updated_by,
                 duration,
-            }, { new: true });
+            }, { returnDocument: 'after' });
 
             if (!updatedQuestion) throw { 'message': 'Something went wrong while updating!', 'status': 500 };
 

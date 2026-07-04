@@ -131,7 +131,7 @@ exports.updateChapter = async (req, res) => {
     try {
         const { Chapter } = await getModels('courses');
 
-        const updatedChapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedChapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!updatedChapter) throw { 'message': 'Chapter not found!', 'status': 404 };
 
         await cacheManager.invalidatePattern("cpt:*");

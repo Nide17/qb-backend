@@ -108,7 +108,7 @@ exports.updateAdvert = async (req, res) => {
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
-        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("ad:*");
         res.status(200).json(updatedAdvert);
     } catch (err) {
@@ -122,7 +122,7 @@ exports.updateAdvertStatus = async (req, res) => {
 
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
-        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { status: req.body.status }, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("ad:*");
         res.status(200).json(updatedAdvert);
     } catch (err) {
@@ -154,7 +154,7 @@ exports.deleteAdvertImage = async (req, res) => {
         const advert = await Advert.findById(req.params.id);
         if (!advert) throw { 'message': 'Advert not found!', 'status': 404 };
 
-        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { new: true });
+        const updatedAdvert = await Advert.findByIdAndUpdate(req.params.id, { advert_image: '' }, { returnDocument: 'after' });
         await deleteS3File(advert.advert_image);
         await cacheManager.invalidatePattern("ad:*");
         res.status(200).json(updatedAdvert);

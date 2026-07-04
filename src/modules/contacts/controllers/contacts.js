@@ -191,7 +191,7 @@ exports.addContactReply = async (req, res) => {
         const updatedMessage = await Contact.findOneAndUpdate(
             { '_id': req.params.id },
             { $push: { 'replies': req.body } },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!updatedMessage) {

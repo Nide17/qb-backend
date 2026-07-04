@@ -193,7 +193,7 @@ exports.approveRejectComment = async (req, res) => {
         const questionComment = await QuestionComment.findById(commentID);
         if (!questionComment) handleError(res, { status: 404, message: 'QuestionComment not found!' });
 
-        const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(commentID, { status: req.body.status }, { new: true });
+        const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(commentID, { status: req.body.status }, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("qncmt:*");
         res.status(200).json(updatedQuestionComment);
     } catch (err) {
@@ -208,7 +208,7 @@ exports.updateQuestionComment = async (req, res) => {
         const questionComment = await QuestionComment.findById(req.params.id);
         if (!questionComment) handleError(res, { status: 404, message: 'QuestionComment not found!' });
 
-        const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedQuestionComment = await QuestionComment.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("qncmt:*");
         res.status(200).json(updatedQuestionComment);
     } catch (err) {

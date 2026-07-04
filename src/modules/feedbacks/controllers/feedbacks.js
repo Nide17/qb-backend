@@ -100,7 +100,7 @@ exports.updateFeedback = async (req, res) => {
     try {
         const { Feedback } = await getModels('feedbacks');
 
-        const updatedFeedback = await Feedback.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedFeedback = await Feedback.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!updatedFeedback) throw { 'message': 'Feedback not found!', 'status': 404 };
 
         await cacheManager.invalidatePattern("fdb:*");

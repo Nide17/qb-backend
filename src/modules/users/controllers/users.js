@@ -192,7 +192,7 @@ exports.logout = async (req, res) => {
         const loggedOutUser = await User.findByIdAndUpdate(
             userId,
             { $set: { current_token: null } },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!loggedOutUser) throw { status: 404, message: 'User not found' };
@@ -223,7 +223,7 @@ exports.register = async (req, res) => {
 
         // If user exists but not verified -> update fields and send OTP once
         if (existing) {
-            await User.findByIdAndUpdate(existing._id, { name, password: hash, otp, otpExpires }, { new: true });
+            await User.findByIdAndUpdate(existing._id, { name, password: hash, otp, otpExpires }, { returnDocument: 'after' });
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name, otp }, './template/otp.handlebars');
             await cacheManager.invalidatePattern('usr:*');
 
@@ -391,7 +391,7 @@ exports.updateProfileImage = async (req, res) => {
             }
         }
 
-        const updatedUser = await User.findByIdAndUpdate(userId, { image: imgFile.location }, { new: true }).lean();
+        const updatedUser = await User.findByIdAndUpdate(userId, { image: imgFile.location }, { returnDocument: 'after' }).lean();
         await expandSchoolData(updatedUser);
 
         await invalidateAllUserCaches();
@@ -415,7 +415,7 @@ exports.updateProfile = async (req, res) => {
 
         if (Object.keys(updates).length === 0) throw { status: 400, message: 'No valid fields to update' };
 
-        let user = await User.findByIdAndUpdate(userId, updates, { new: true }).lean();
+        let user = await User.findByIdAndUpdate(userId, updates, { returnDocument: 'after' }).lean();
         if (!user) throw { status: 404, message: 'User not found' };
         await expandSchoolData(user);
 
@@ -444,7 +444,7 @@ exports.updateUser = async (req, res) => {
             throw { status: 403, message: 'Insufficient permissions to change role/verified' };
         }
 
-        const user = await User.findByIdAndUpdate(userId, updates, { new: true }).lean();
+        const user = await User.findByIdAndUpdate(userId, updates, { returnDocument: 'after' }).lean();
         if (!user) throw { status: 404, message: 'User not found' };
 
         await invalidateAllUserCaches();

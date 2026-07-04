@@ -128,7 +128,7 @@ exports.updateBlogPostsView = async (req, res) => {
 
         let blogPostsView = await BlogPostsView.findById(req.params.id);
         if (!blogPostsView) throw { 'message': 'BlogPostsView not found!', 'status': 404 };
-        const updatedBlogPostsView = await BlogPostsView.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedBlogPostsView = await BlogPostsView.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("bpv:*");
         res.status(200).json(updatedBlogPostsView);
     } catch (err) {

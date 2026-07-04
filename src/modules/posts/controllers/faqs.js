@@ -15,7 +15,7 @@ const handleFindByIdAndUpdate = async (id, update) => {
     const faq = await Faq.findById(id);
     if (!faq) throw { status: 404, message: 'Faq not found!' };
 
-    const updatedFaq = await Faq.updateOne({ _id: id }, update, { new: true });
+    const updatedFaq = await Faq.updateOne({ _id: id }, update, { returnDocument: 'after' });
     return updatedFaq;
 };
 

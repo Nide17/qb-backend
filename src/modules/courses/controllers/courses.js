@@ -131,7 +131,7 @@ exports.updateCourse = async (req, res) => {
         let course = await Course.findById(req.params.id);
         if (!course) throw { 'message': 'Course not found!', 'status': 404 };
 
-        const updatedCourse = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedCourse = await Course.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!updatedCourse) throw { 'message': 'Something went wrong while updating!', 'status': 503 };
 
         await cacheManager.invalidatePattern("crs:*");
