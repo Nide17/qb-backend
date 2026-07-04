@@ -252,7 +252,7 @@ exports.addQuizToNotes = async (req, res) => {
         const notes = await Notes.findOneAndUpdate(
             { '_id': req.params.id },
             { $push: { 'quizes': req.body.quizID } },
-            { new: true }
+            { returnDocument: 'after' }
         );
         await cacheManager.invalidatePattern("nt:*");
         res.status(200).json(notes);

@@ -60,7 +60,7 @@ exports.updateSchool = async (req, res) => {
     try {
         const { School } = await getModels('schools');
 
-        const updatedSchool = await School.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedSchool = await School.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("skl:*");
         res.status(200).json(updatedSchool);
     } catch (err) {

@@ -100,7 +100,7 @@ exports.updateCategory = async (req, res) => {
         const updated = await Category.findByIdAndUpdate(
             req.params.id,
             req.body,
-            { new: true }
+            { returnDocument: 'after' }
         ).lean();
 
         if (!updated)

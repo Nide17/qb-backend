@@ -172,7 +172,7 @@ exports.updateBlogPost = async (req, res) => {
         if (bpImage) {
             updateData.post_image = bpImage.location;
         }
-        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, updateData, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);
     } catch (err) {
@@ -186,7 +186,7 @@ exports.updateBlogPostStatus = async (req, res) => {
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
-        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true });
+        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { status: req.body.status }, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);
     } catch (err) {
@@ -224,7 +224,7 @@ exports.deleteBlogPostImage = async (req, res) => {
         const blogPost = await BlogPost.findById(req.params.id);
         if (!blogPost) throw { 'message': 'BlogPost not found!', 'status': 404 };
 
-        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { new: true });
+        const updatedBlogPost = await BlogPost.findByIdAndUpdate(req.params.id, { blogPost_image: '' }, { returnDocument: 'after' });
         await deleteS3File(blogPost.post_image);
         await cacheManager.invalidatePattern("bp:*");
         res.status(200).json(updatedBlogPost);

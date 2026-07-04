@@ -76,7 +76,7 @@ exports.updateCategory = async (req, res) => {
         const category = await CourseCategory.findById(req.params.id);
         if (!category) throw { 'message': 'Category not found!', 'status': 404 };
 
-        const updatedCategory = await CourseCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedCategory = await CourseCategory.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         if (!updatedCategory) throw { 'message': 'Something went wrong while updating!', 'status': 503 };
 
         await cacheManager.invalidatePattern("cc:*");

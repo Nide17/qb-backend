@@ -106,7 +106,7 @@ const updateUserToken = async (user) => {
     const { User } = await getModels('users');
     const { Faculty } = await getModels('schools');
 
-    const usr = await User.findByIdAndUpdate({ _id: user._id }, { $set: { current_token: token } }, { new: true });
+    const usr = await User.findByIdAndUpdate({ _id: user._id }, { $set: { current_token: token } }, { returnDocument: 'after' });
     const userObj = usr.toObject();
     if (userObj && userObj.school && userObj.level && userObj.faculty) {
 

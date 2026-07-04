@@ -133,7 +133,7 @@ exports.updateImageUpload = async (req, res) => {
         const imageUpload = await ImageUpload.findById(req.params.id);
         if (!imageUpload) throw { 'message': 'Image upload not found!', 'status': 404 };
 
-        const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedImageUpload = await ImageUpload.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         await cacheManager.invalidatePattern("img:*");
         res.status(200).json(updatedImageUpload);
     } catch (err) {

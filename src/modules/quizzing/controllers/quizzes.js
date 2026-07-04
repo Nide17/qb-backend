@@ -207,7 +207,7 @@ exports.createQuiz = async (req, res) => {
         const categoryUpdate = await Category.findByIdAndUpdate(
             category,
             { $addToSet: { quizes: newQuiz._id } },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!categoryUpdate) throw { message: 'Cannot update category!', status: 400 };
@@ -275,7 +275,7 @@ exports.updateQuiz = async (req, res) => {
             );
         }
 
-        const updated = await Quiz.findOneAndUpdate({ _id: req.body?.quizID }, req.body, { new: true });
+        const updated = await Quiz.findOneAndUpdate({ _id: req.body?.quizID }, req.body, { returnDocument: 'after' });
 
         await cacheManager.invalidatePattern("cat:*");
         await cacheManager.invalidatePattern("qz:*");

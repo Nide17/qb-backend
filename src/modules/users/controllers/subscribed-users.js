@@ -68,7 +68,7 @@ exports.createSubscribedUser = async (req, res) => {
 exports.updateSubscribedUser = async (req, res) => {
     try {
         const { SubscribedUser } = await getModels('users');
-        const updatedSubscribedUser = await SubscribedUser.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updatedSubscribedUser = await SubscribedUser.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
         res.status(200).json(updatedSubscribedUser);
         await cacheManager.invalidatePattern("sub:*");
     } catch (err) {
