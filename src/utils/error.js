@@ -1,5 +1,23 @@
+/**
+ * Normalize different error types into a consistent structure.
+ */
+function normalizeError(err) {
+    if (err instanceof Error) return err;
+    if (typeof err === "object") {
+        const normalized = new Error(err.name || err.message || "Unknown error");
+        normalized.status = err.status || 500;
+        normalized.message = err.message;
+        if (err.code) normalized.code = err.code;
+        normalized.name = err.name || "Undefined error";
+        if (err.email) normalized.email = err.email;
+        return normalized;
+    }
+    const normalized = new Error(String(err));
+    normalized.status = 500;
+    return normalized;
+}
+
 const handleError = (res, err, statusOverride) => {
-    // console.error("🔥 ERROR:", err);
 
     const timestamp = new Date().toISOString();
 
@@ -69,6 +87,7 @@ const handleError = (res, err, statusOverride) => {
             timestamp
         });
     }
+
     if (normalized.name === "JsonWebTokenError") {
         return res.status(401).json({
             success: false,
@@ -83,6 +102,18 @@ const handleError = (res, err, statusOverride) => {
             success: false,
             message: "Login expired. Please authenticate again.",
             code: "TOKEN_EXPIRED",
+            timestamp
+        });
+    }
+
+    // NOT_VERIFIED account error
+    if (normalized.code === "NOT_VERIFIED") {
+        return res.status(401).json({
+            success: false,
+            name: normalized.name || "Account not verified",
+            message: normalized.message,
+            code: "NOT_VERIFIED",
+            email: normalized.email,
             timestamp
         });
     }
@@ -123,31 +154,15 @@ const handleError = (res, err, statusOverride) => {
     }
 
     // Default Fallback
-    return res.status(status).json({
-        success: false,
-        message: normalized.message || "Internal server error",
-        code: normalized.code || "INTERNAL_ERROR",
-        timestamp
-    });
+    let defaultError;
+    if (normalized.name) defaultError = { name: normalized.name };
+    if (normalized.code) defaultError.code = normalized.code;
+    if (normalized.message) defaultError.message = normalized.message;
+    if (normalized.timestamp) defaultError.timestamp = normalized.timestamp;
+    if (normalized.email) defaultError.email = normalized.email;
+    if (normalized.errors) defaultError.errors = normalized.errors;
+    return res.status(status).json(defaultError);
 };
-
-/**
- * Normalize different error types into a consistent structure.
- */
-function normalizeError(err) {
-    if (err instanceof Error) return err;
-    if (typeof err === "object") {
-        const normalized = new Error(err.message || "Unknown error");
-        normalized.status = err.status || 500;
-        normalized.code = err.code || "INTERNAL_ERROR";
-        normalized.name = err.name || "Error";
-        return normalized;
-    }
-    const normalized = new Error(String(err));
-    normalized.status = 500;
-    normalized.code = "INTERNAL_ERROR";
-    return normalized;
-}
 
 /**
  * Handle axios-specific errors

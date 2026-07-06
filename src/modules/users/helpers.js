@@ -12,9 +12,9 @@ const generateToken = (user) => {
 const safeUserForResponse = (userObj) => {
     if (!userObj) return null;
     // Select only safe/public fields to return (and to cache)
-    const { _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date, } = userObj;
+    const { _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date, verified} = userObj;
     return {
-        _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date,
+        _id, name, email, role, image, school, faculty, level, year, interests, about, current_token, register_date, verified
     };
 };
 
