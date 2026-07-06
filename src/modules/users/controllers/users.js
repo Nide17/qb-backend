@@ -112,27 +112,6 @@ exports.getOneUser = async (req, res) => {
     }
 };
 
-exports.loadUser = async (req, res, next) => {
-    try {
-        const userId = req?.user?._id;
-        if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-
-        const cacheKey = CACHE_KEYS.CURRENT(userId);
-        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
-            const { User } = await getModels('users');
-            let user = await User.findById(userId).select('-password -__v -otp -otpExpires -register_date -last_login').lean();
-            if (!user) return null;
-            await expandSchoolData(user);
-            return safeUserForResponse(user);
-        });
-
-        if (!data) return res.status(404).json({ message: 'Invalid email and/or password' });
-        res.status(200).json(data);
-    } catch (err) {
-        next(err);
-    }
-};
-
 exports.login = async (req, res) => {
     try {
         const { email, password, confirmLogin } = req.body;
@@ -145,13 +124,19 @@ exports.login = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) throw { status: 400, message: 'Invalid email and/or password' };
 
-        // If account unverified and registered after a date, send OTP
-        if (!user.verified && new Date(user.register_date) > new Date('2024-12-09')) {
+        // If account unverified, send OTP
+        if (!user.verified) {
             const otp = Math.floor(100000 + Math.random() * 900000).toString();
             const otpExpires = Date.now() + (10 * 60 * 1000); // 10 minutes
             await User.findOneAndUpdate({ email }, { otp, otpExpires });
             await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name: user.name, otp }, './template/otp.handlebars');
-            throw { status: 400, message: `Account not verified, OTP sent to ${email} for verification!` };
+            throw {
+                status: 400,
+                name: 'Account not verified',
+                message: `Account not verified, to verify, provide OTP sent to ${email}!`,
+                code: 'NOT_VERIFIED',
+                email
+            };
         }
 
         // Check current_token validity synchronously (jwt.verify returns payload or throws)
@@ -168,18 +153,63 @@ exports.login = async (req, res) => {
 
         if (tokenValid && !confirmLogin) {
             // already logged in somewhere else
-            throw { status: 401, message: 'Already logged in. Log out from other device or confirm login.', code: 'CONFIRM_ERR' };
+            throw {
+                status: 401,
+                name: 'Already logged in',
+                message: 'Already logged in. Log out from other device or confirm login.',
+                code: 'CONFIRM_ERR'
+            };
         }
 
         // issue new token and return user object
         const updatedUserObj = await updateUserToken(user);
-        if (!updatedUserObj) throw { status: 500, message: 'Could not log you in, try again later!' };
+        if (!updatedUserObj) throw {
+            name: 'Could not log you in',
+            status: 500,
+            message: 'Could not log you in, try again later!'
+        };
 
         // Invalidate current user caches so other consumers see changes
         await cacheManager.invalidatePattern(`usr:current:${user._id}`);
-        res.status(200).json(updatedUserObj);
+        res.status(200).json(safeUserForResponse(updatedUserObj));
     } catch (err) {
         handleError(res, err);
+    }
+};
+
+exports.loadUser = async (req, res, next) => {
+    try {
+        const {_id, email} = req?.user;
+        if (!_id) return res.status(401).json({ message: 'Unauthorized' });
+
+        const cacheKey = CACHE_KEYS.CURRENT(_id);
+        const data = await cacheWrapper.wrap(cacheKey, CACHE_TTL, async () => {
+            const { User } = await getModels('users');
+            let user = await User.findById(_id).select('-password -__v -otp -otpExpires -register_date -last_login').lean();
+            if (!user) return null;
+            await expandSchoolData(user);
+
+            if (!user.verified) {
+                const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                const otpExpires = Date.now() + (10 * 60 * 1000); // 10 minutes
+                await User.findOneAndUpdate({ email }, { otp, otpExpires });
+                await sendEmail(email, 'One Time Password (OTP) verification for Quiz Blog account', { name: user.name, otp }, './template/otp.handlebars');
+                throw {
+                    status: 400,
+                    name: 'Account not verified',
+                    message: `Account not verified, to verify, provide OTP sent to ${email}!`,
+                    code: 'NOT_VERIFIED',
+                    email
+                };
+            }
+
+            return safeUserForResponse(user);
+        });
+
+        if (!data) return res.status(404).json({ message: 'Invalid email and/or password' });
+        res.status(200).json(data);
+    } catch (err) {
+        next(err);
     }
 };
 
@@ -264,10 +294,10 @@ exports.verifyOTP = async (req, res) => {
         if (!updatedUser) throw { status: 500, message: 'Could not verify user' };
 
         // mark as verified
-        await User.findByIdAndUpdate(usr._id, { verified: true, otp: null, otpExpires: null });
+        const verifiedUser = await User.findOneAndUpdate({ email }, { verified: true, otp: null, otpExpires: null }, { returnDocument: 'after' });
 
         await cacheManager.invalidatePattern('usr:*');
-        res.status(200).json(safeUserForResponse(updatedUser));
+        res.status(200).json(safeUserForResponse(verifiedUser));
     } catch (err) {
         handleError(res, err);
     }
