@@ -56,7 +56,6 @@ const UserSchema = new Schema({
   },
   otpExpires: {
     type: Date,
-    default: Date.now,
     expires: 900  // 15 minutes
   },
   verified: {

@@ -179,7 +179,7 @@ exports.login = async (req, res) => {
 
 exports.loadUser = async (req, res, next) => {
     try {
-        const {_id, email} = req?.user;
+        const {_id, email} = req?.user ?? {};
         if (!_id) return res.status(401).json({ message: 'Unauthorized' });
 
         const cacheKey = CACHE_KEYS.CURRENT(_id);
@@ -294,7 +294,14 @@ exports.verifyOTP = async (req, res) => {
         if (!updatedUser) throw { status: 500, message: 'Could not verify user' };
 
         // mark as verified
-        const verifiedUser = await User.findOneAndUpdate({ email }, { verified: true, otp: null, otpExpires: null }, { returnDocument: 'after' });
+        const verifiedUser = await User.findOneAndUpdate(
+            { email },
+            {
+                $set: { verified: true },
+                $unset: { otp: "", otpExpires: "" }
+            },
+            { returnDocument: 'after' }
+        );
 
         await cacheManager.invalidatePattern('usr:*');
         res.status(200).json(safeUserForResponse(verifiedUser));
