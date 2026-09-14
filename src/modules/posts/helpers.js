@@ -8,11 +8,8 @@ const { sendHtmlEmail } = require('../../utils/emails/sendEmail');
 // const _from = 'whatsapp:+14155238886'; // Twilio WhatsApp Sandbox number
 // const _numbers = ['whatsapp:+250786791577', 'whatsapp:+250738140795'];
 
-const getDailyReport = async () => {
+const getDailyBlogViewsReport = async (todayDate) => {
     try {
-        const today = new Date();
-        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
         const { BlogPostsView } = await getModels('posts');
 
         const result = await BlogPostsView.aggregate([
@@ -28,9 +25,59 @@ const getDailyReport = async () => {
 
         return processReportData(result);
     } catch (err) {
-        console.error(err?.message);
+        console.error('Error fetching daily blog views report:', err?.message);
         return null;
     }
+};
+
+const getDailyDownloadsReport = async (todayDate) => {
+    try {
+        const { Download } = await getModels('downloads');
+
+        return await Download.aggregate([
+            { $match: { createdAt: { $gte: todayDate } } },
+            { $lookup: { from: 'notes', localField: 'notes', foreignField: '_id', as: 'note' } },
+            { $unwind: { path: '$note', preserveNullAndEmptyArrays: true } },
+            { $group: { _id: '$notes', title: { $first: '$note.title' }, count: { $sum: 1 } } },
+            { $project: { _id: 0, note: '$_id', title: { $ifNull: ['$title', 'Unknown Note'] }, count: 1 } },
+            { $sort: { count: -1 } }
+        ]).exec();
+    } catch (err) {
+        console.error('Error fetching daily downloads report:', err?.message);
+        return [];
+    }
+};
+
+const getDailyQuizReport = async (todayDate) => {
+    try {
+        const { Score } = await getModels('scores');
+
+        return await Score.aggregate([
+            { $match: { test_date: { $gte: todayDate } } },
+            { $lookup: { from: 'quizzes', localField: 'quiz', foreignField: '_id', as: 'quizDoc' } },
+            { $unwind: { path: '$quizDoc', preserveNullAndEmptyArrays: true } },
+            { $group: { _id: '$quiz', title: { $first: '$quizDoc.title' }, attempts: { $sum: 1 }, avgMarks: { $avg: '$marks' }, avgOutOf: { $avg: '$out_of' } } },
+            { $project: { _id: 0, quiz: '$_id', title: { $ifNull: ['$title', 'Unknown Quiz'] }, attempts: 1, avgMarks: 1, avgOutOf: 1 } },
+            { $sort: { attempts: -1 } }
+        ]).exec();
+    } catch (err) {
+        console.error('Error fetching daily quiz report:', err?.message);
+        return [];
+    }
+};
+
+const getDailyReport = async (todayDate) => {
+    const [blogViews, downloads, quizzes] = await Promise.all([
+        getDailyBlogViewsReport(todayDate),
+        getDailyDownloadsReport(todayDate),
+        getDailyQuizReport(todayDate)
+    ]);
+
+    return {
+        blogViews: blogViews || { totalViewsCount: 0, uniqueCountriesCount: [], uniqueDevicesCount: [], blogPostsViews: [] },
+        downloads: downloads || [],
+        quizzes: quizzes || []
+    };
 };
 
 const processReportData = (result) => {
@@ -64,30 +111,75 @@ const processReportData = (result) => {
 };
 
 const generateReportMessage = (report, currentDate) => {
-    let reportMessage = `*TODAY, ${currentDate} REPORT FOR BLOG POSTS VIEWS* \n\n`;
-    reportMessage += `*Total Views:* ${report?.totalViewsCount} \n\n`;
+    const blogViews = report?.blogViews || {};
+    const downloads = report?.downloads || [];
+    const quizzes = report?.quizzes || [];
+    const totalDownloads = downloads.reduce((sum, item) => sum + item.count, 0);
+    const totalQuizAttempts = quizzes.reduce((sum, item) => sum + item.attempts, 0);
+
+    let reportMessage = `*TODAY, ${currentDate} DAILY ACTIVITY REPORT* \n\n`;
+    reportMessage += '*BLOG POSTS VIEWS* \n';
+    reportMessage += `*Total Views:* ${blogViews.totalViewsCount || 0} \n`;
     reportMessage += '*Unique Countries:* \n';
-    report?.uniqueCountriesCount.forEach(country => reportMessage += `${country.country}: ${country.count} \n`);
-    reportMessage += '\n*Unique Devices:* \n';
-    report?.uniqueDevicesCount.forEach(device => reportMessage += `${device.device}: ${device.count} \n`);
-    reportMessage += '\n*Blog Posts Views:* \n';
-    report?.blogPostsViews.forEach(blogPost => reportMessage += `${blogPost.blogPost}: ${blogPost.count} \n`);
+    (blogViews.uniqueCountriesCount || []).forEach(country => reportMessage += `${country.country}: ${country.count} \n`);
+    reportMessage += '*Unique Devices:* \n';
+    (blogViews.uniqueDevicesCount || []).forEach(device => reportMessage += `${device.device}: ${device.count} \n`);
+    reportMessage += '*Blog Posts Views:* \n';
+    (blogViews.blogPostsViews || []).forEach(blogPost => reportMessage += `${blogPost.blogPost}: ${blogPost.count} \n`);
+
+    reportMessage += '\n*DOWNLOADS REPORT* \n';
+    reportMessage += `*Total Downloads:* ${totalDownloads} \n`;
+    if (downloads.length === 0) {
+        reportMessage += 'No downloads today \n';
+    } else {
+        downloads.forEach(item => reportMessage += `${item.title}: ${item.count} \n`);
+    }
+
+    reportMessage += '\n*QUIZ TAKING REPORT* \n';
+    reportMessage += `*Total Attempts:* ${totalQuizAttempts} \n`;
+    if (quizzes.length === 0) {
+        reportMessage += 'No quiz attempts today \n';
+    } else {
+        quizzes.forEach(item => {
+            const avgScore = item.avgOutOf ? `${(item.avgMarks || 0).toFixed(1)}/${item.avgOutOf}` : (item.avgMarks || 0).toFixed(1);
+            reportMessage += `${item.title}: ${item.attempts} attempt${item.attempts === 1 ? '' : 's'} (avg score: ${avgScore}) \n`;
+        });
+    }
 
     return reportMessage;
 };
 
 const generateReportEmail = (report, currentDate) => {
+    const blogViews = report?.blogViews || {};
+    const downloads = report?.downloads || [];
+    const quizzes = report?.quizzes || [];
+    const totalDownloads = downloads.reduce((sum, item) => sum + item.count, 0);
+    const totalQuizAttempts = quizzes.reduce((sum, item) => sum + item.attempts, 0);
+
     return {
-        subject: `TODAY, ${currentDate} REPORT BLOG POSTS VIEWS`,
+        subject: `TODAY, ${currentDate} DAILY ACTIVITY REPORT`,
         html: `
-            <h3 style="color: blue"><u>Report for ${currentDate}</u></h3>
-            <h4><u>Total Views:</u> ${report?.totalViewsCount}</h4>
-            <h4><u>Unique Countries:</u></h4>
-            <ul>${report?.uniqueCountriesCount.map(country => `<li>${country.country}: ${country.count}</li>`).join('')}</ul>
-            <h4><u>Unique Devices:</u></h4>
-            <ul>${report?.uniqueDevicesCount.map(device => `<li>${device.device}: ${device.count}</li>`).join('')}</ul>
-            <h4><u>Blog Posts Views:</u></h4>
-            <ul>${report?.blogPostsViews.map(blogPost => `<li>${blogPost.blogPost}: ${blogPost.count}</li>`).join('')}</ul>
+            <h3 style="color: blue"><u>Daily Activity Report for ${currentDate}</u></h3>
+
+            <h4><u>Blog Posts Views</u></h4>
+            <p><strong>Total Views:</strong> ${blogViews.totalViewsCount || 0}</p>
+            <h5>Unique Countries:</h5>
+            <ul>${(blogViews.uniqueCountriesCount || []).map(country => `<li>${country.country}: ${country.count}</li>`).join('')}</ul>
+            <h5>Unique Devices:</h5>
+            <ul>${(blogViews.uniqueDevicesCount || []).map(device => `<li>${device.device}: ${device.count}</li>`).join('')}</ul>
+            <h5>Blog Posts Views:</h5>
+            <ul>${(blogViews.blogPostsViews || []).map(blogPost => `<li>${blogPost.blogPost}: ${blogPost.count}</li>`).join('')}</ul>
+
+            <h4><u>Downloads</u></h4>
+            <p><strong>Total Downloads:</strong> ${totalDownloads}</p>
+            ${downloads.length > 0 ? `<ul>${downloads.map(item => `<li>${item.title}: ${item.count}</li>`).join('')}</ul>` : '<p>No downloads today</p>'}
+
+            <h4><u>Quiz Taking</u></h4>
+            <p><strong>Total Attempts:</strong> ${totalQuizAttempts}</p>
+            ${quizzes.length > 0 ? `<ul>${quizzes.map(item => {
+                const avgScore = item.avgOutOf ? `${(item.avgMarks || 0).toFixed(1)}/${item.avgOutOf}` : (item.avgMarks || 0).toFixed(1);
+                return `<li>${item.title}: ${item.attempts} attempt${item.attempts === 1 ? '' : 's'} (avg score: ${avgScore})</li>`;
+            }).join('')}</ul>` : '<p>No quiz attempts today</p>'}
         `
     };
 };
@@ -98,7 +190,14 @@ const sendReport = async (reportMessage, reportMessageEmail, adminsEmails) => {
     //         .then(message => console.log(message.sid))
     //         .catch(error => console.error(error));
     // });
-    adminsEmails && adminsEmails.forEach(admEmail => sendHtmlEmail(admEmail, reportMessageEmail.subject, reportMessageEmail.html));
+    if (!adminsEmails || adminsEmails.length === 0) {
+        console.log('No admin emails found for report');
+        return;
+    }
+    adminsEmails.forEach(admEmail => {
+        const email = typeof admEmail === 'string' ? admEmail : admEmail.email;
+        if (email) sendHtmlEmail(email, reportMessageEmail.subject, reportMessageEmail.html);
+    });
 };
 
 const fetchAdminEmails = async () => {
@@ -110,10 +209,10 @@ const fetchAdminEmails = async () => {
 
     while (attempts < maxAttempts) {
         try {
-            const adminEmails = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email').maxTimeMS(60000);
+            const adminEmails = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email').lean().maxTimeMS(60000);
 
             if (adminEmails && adminEmails.length > 0) {
-                return adminEmails;
+                return adminEmails.map(admin => admin.email).filter(Boolean);
             } else {
                 return [];
             }
@@ -131,29 +230,35 @@ const fetchAdminEmails = async () => {
 
 const scheduledReportMessage = async () => {
     try {
-        const report = await getDailyReport();
-        const adminsEmails = await fetchAdminEmails();
-
-        const date = new Date();
-        const currentDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
-        const scheduleDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-
-        const reportMessage = generateReportMessage(report, currentDate);
-        const reportMessageEmail = generateReportEmail(report, currentDate);
-
-        const interval = setInterval(async () => {
-            try {
-                const now = new Date();
-                if (now >= scheduleDate) {
-                    console.log('Sending scheduled report...');
-                    await sendReport(reportMessage, reportMessageEmail, adminsEmails);
-                    clearInterval(interval);
-                }
-            } catch (error) {
-                console.log('Error in scheduled report interval:', error.message);
-                clearInterval(interval); // Stop the interval if there's an error
+        const scheduleNextSend = () => {
+            const now = new Date();
+            const scheduleDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+            if (now >= scheduleDate) {
+                scheduleDate.setDate(scheduleDate.getDate() + 1);
             }
-        }, 1000);
+            const delay = scheduleDate - now;
+            console.log(`Next daily report scheduled for ${scheduleDate.toLocaleString()}`);
+
+            setTimeout(async () => {
+                try {
+                    console.log('Sending scheduled report...');
+                    const sendDate = new Date();
+                    const todayDate = new Date(sendDate.getFullYear(), sendDate.getMonth(), sendDate.getDate());
+                    const currentDate = `${sendDate.getMonth() + 1}/${sendDate.getDate()}/${sendDate.getFullYear()}`;
+                    const report = await getDailyReport(todayDate);
+                    const reportMessage = generateReportMessage(report, currentDate);
+                    const reportMessageEmail = generateReportEmail(report, currentDate);
+                    const adminsEmails = await fetchAdminEmails();
+                    await sendReport(reportMessage, reportMessageEmail, adminsEmails);
+                } catch (error) {
+                    console.log('Error sending scheduled report:', error.message);
+                } finally {
+                    scheduleNextSend();
+                }
+            }, delay);
+        };
+
+        scheduleNextSend();
     } catch (error) {
         console.log('Error setting up scheduled report:', error.message);
     }
