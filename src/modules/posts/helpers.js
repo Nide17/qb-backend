@@ -96,17 +96,42 @@ const getDailyQuizReport = async (todayDate) => {
     }
 };
 
+const getDailyUserActivityReport = async (todayDate) => {
+    try {
+        const { User } = await getModels('users');
+
+        const [newUsers, newVerifiedUsers, existingVerifiedUsers, uniqueLogins] = await Promise.all([
+            User.find({ register_date: { $gte: todayDate } }).select('name').sort({ register_date: -1 }).lean(),
+            User.find({ register_date: { $gte: todayDate }, verified_date: { $gte: todayDate }, verified: true }).select('name').sort({ verified_date: -1 }).lean(),
+            User.find({ register_date: { $lt: todayDate }, verified_date: { $gte: todayDate }, verified: true }).select('name').sort({ verified_date: -1 }).lean(),
+            User.countDocuments({ last_login: { $gte: todayDate } })
+        ]);
+
+        return {
+            newUsers,
+            newVerifiedUsers,
+            existingVerifiedUsers,
+            uniqueLogins
+        };
+    } catch (err) {
+        console.error('Error fetching daily user activity report:', err?.message);
+        return null;
+    }
+};
+
 const getDailyReport = async (todayDate) => {
-    const [blogViews, downloads, quizzes] = await Promise.all([
+    const [blogViews, downloads, quizzes, userActivity] = await Promise.all([
         getDailyBlogViewsReport(todayDate),
         getDailyDownloadsReport(todayDate),
-        getDailyQuizReport(todayDate)
+        getDailyQuizReport(todayDate),
+        getDailyUserActivityReport(todayDate)
     ]);
 
     return {
         blogViews: blogViews || { totalViewsCount: 0, uniqueCountriesCount: [], uniqueDevicesCount: [], blogPostsViews: [] },
         downloads: downloads || [],
-        quizzes: quizzes || []
+        quizzes: quizzes || [],
+        userActivity: userActivity || { newUsers: [], newVerifiedUsers: [], existingVerifiedUsers: [], uniqueLogins: 0 }
     };
 };
 
@@ -144,11 +169,31 @@ const generateReportMessage = (report, currentDate) => {
     const blogViews = report?.blogViews || {};
     const downloads = report?.downloads || [];
     const quizzes = report?.quizzes || [];
+    const userActivity = report?.userActivity || {};
+    const newUsers = userActivity.newUsers || [];
+    const newVerifiedUsers = userActivity.newVerifiedUsers || [];
+    const existingVerifiedUsers = userActivity.existingVerifiedUsers || [];
+    const uniqueLogins = userActivity.uniqueLogins || 0;
     const totalDownloads = downloads.reduce((sum, item) => sum + item.count, 0);
     const totalQuizAttempts = quizzes.reduce((sum, item) => sum + item.attempts, 0);
 
     let reportMessage = `*TODAY, ${currentDate} DAILY ACTIVITY REPORT* \n\n`;
-    reportMessage += '*BLOG POSTS VIEWS* \n';
+    reportMessage += '*USER ACTIVITY REPORT* \n';
+    reportMessage += `*New Users Registered:* ${newUsers.length} \n`;
+    if (newUsers.length > 0) {
+        newUsers.forEach(user => reportMessage += `- ${user.name} \n`);
+    }
+    reportMessage += `*New Users Registered & Verified via OTP:* ${newVerifiedUsers.length} \n`;
+    if (newVerifiedUsers.length > 0) {
+        newVerifiedUsers.forEach(user => reportMessage += `- ${user.name} \n`);
+    }
+    reportMessage += `*Existing Users Verified via OTP:* ${existingVerifiedUsers.length} \n`;
+    if (existingVerifiedUsers.length > 0) {
+        existingVerifiedUsers.forEach(user => reportMessage += `- ${user.name} \n`);
+    }
+    reportMessage += `*Total Unique User Logins:* ${uniqueLogins} \n`;
+
+    reportMessage += '\n*BLOG POSTS VIEWS* \n';
     reportMessage += `*Total Views:* ${blogViews.totalViewsCount || 0} \n`;
     reportMessage += '*Unique Countries:* \n';
     (blogViews.uniqueCountriesCount || []).forEach(country => reportMessage += `${country.country}: ${country.count} \n`);
@@ -183,6 +228,11 @@ const generateReportEmail = (report, currentDate) => {
     const blogViews = report?.blogViews || {};
     const downloads = report?.downloads || [];
     const quizzes = report?.quizzes || [];
+    const userActivity = report?.userActivity || {};
+    const newUsers = userActivity.newUsers || [];
+    const newVerifiedUsers = userActivity.newVerifiedUsers || [];
+    const existingVerifiedUsers = userActivity.existingVerifiedUsers || [];
+    const uniqueLogins = userActivity.uniqueLogins || 0;
     const totalDownloads = downloads.reduce((sum, item) => sum + item.count, 0);
     const totalQuizAttempts = quizzes.reduce((sum, item) => sum + item.attempts, 0);
 
@@ -190,6 +240,15 @@ const generateReportEmail = (report, currentDate) => {
         subject: `TODAY, ${currentDate} DAILY ACTIVITY REPORT`,
         html: `
             <h3 style="color: blue"><u>Daily Activity Report for ${currentDate}</u></h3>
+
+            <h4><u>User Activity</u></h4>
+            <p><strong>New Users Registered:</strong> ${newUsers.length}</p>
+            ${newUsers.length > 0 ? `<ul>${newUsers.map(user => `<li>${user.name}</li>`).join('')}</ul>` : '<p>No new users registered today</p>'}
+            <p><strong>New Users Registered &amp; Verified via OTP:</strong> ${newVerifiedUsers.length}</p>
+            ${newVerifiedUsers.length > 0 ? `<ul>${newVerifiedUsers.map(user => `<li>${user.name}</li>`).join('')}</ul>` : '<p>No new users verified via OTP today</p>'}
+            <p><strong>Existing Users Verified via OTP:</strong> ${existingVerifiedUsers.length}</p>
+            ${existingVerifiedUsers.length > 0 ? `<ul>${existingVerifiedUsers.map(user => `<li>${user.name}</li>`).join('')}</ul>` : '<p>No existing users verified via OTP today</p>'}
+            <p><strong>Total Unique User Logins:</strong> ${uniqueLogins}</p>
 
             <h4><u>Blog Posts Views</u></h4>
             <p><strong>Total Views:</strong> ${blogViews.totalViewsCount || 0}</p>
