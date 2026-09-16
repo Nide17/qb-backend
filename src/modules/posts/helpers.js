@@ -4,6 +4,8 @@
 
 const { getModels } = require('../../utils/db-manager');
 const { sendHtmlEmail } = require('../../utils/emails/sendEmail');
+const { getBatchedNotesMap } = require('../courses/helpers');
+const { getBatchedQuizzesMap } = require('../quizzing/helpers');
 
 // const _from = 'whatsapp:+14155238886'; // Twilio WhatsApp Sandbox number
 // const _numbers = ['whatsapp:+250786791577', 'whatsapp:+250738140795'];
@@ -34,14 +36,27 @@ const getDailyDownloadsReport = async (todayDate) => {
     try {
         const { Download } = await getModels('downloads');
 
-        return await Download.aggregate([
+        const downloads = await Download.aggregate([
             { $match: { createdAt: { $gte: todayDate } } },
-            { $lookup: { from: 'notes', localField: 'notes', foreignField: '_id', as: 'note' } },
-            { $unwind: { path: '$note', preserveNullAndEmptyArrays: true } },
-            { $group: { _id: '$notes', title: { $first: '$note.title' }, count: { $sum: 1 } } },
-            { $project: { _id: 0, note: '$_id', title: { $ifNull: ['$title', 'Unknown Note'] }, count: 1 } },
+            { $group: { _id: '$notes', count: { $sum: 1 } } },
             { $sort: { count: -1 } }
         ]).exec();
+
+        const notesIDs = [...new Set(downloads
+            .map(item => item._id)
+            .filter(Boolean)
+            .map(id => id.toString()))];
+        const notesMap = await getBatchedNotesMap(notesIDs);
+
+        return downloads.map(item => {
+            const noteId = item._id?.toString();
+            const note = noteId ? notesMap.get(noteId) : null;
+            return {
+                note: item._id,
+                title: note?.title || 'Unknown Note',
+                count: item.count
+            };
+        });
     } catch (err) {
         console.error('Error fetching daily downloads report:', err?.message);
         return [];
@@ -52,14 +67,29 @@ const getDailyQuizReport = async (todayDate) => {
     try {
         const { Score } = await getModels('scores');
 
-        return await Score.aggregate([
+        const quizzes = await Score.aggregate([
             { $match: { test_date: { $gte: todayDate } } },
-            { $lookup: { from: 'quizzes', localField: 'quiz', foreignField: '_id', as: 'quizDoc' } },
-            { $unwind: { path: '$quizDoc', preserveNullAndEmptyArrays: true } },
-            { $group: { _id: '$quiz', title: { $first: '$quizDoc.title' }, attempts: { $sum: 1 }, avgMarks: { $avg: '$marks' }, avgOutOf: { $avg: '$out_of' } } },
-            { $project: { _id: 0, quiz: '$_id', title: { $ifNull: ['$title', 'Unknown Quiz'] }, attempts: 1, avgMarks: 1, avgOutOf: 1 } },
+            { $group: { _id: '$quiz', attempts: { $sum: 1 }, avgMarks: { $avg: '$marks' }, avgOutOf: { $avg: '$out_of' } } },
             { $sort: { attempts: -1 } }
         ]).exec();
+
+        const quizzesIDs = [...new Set(quizzes
+            .map(item => item._id)
+            .filter(Boolean)
+            .map(id => id.toString()))];
+        const quizzesMap = await getBatchedQuizzesMap(quizzesIDs);
+
+        return quizzes.map(item => {
+            const quizId = item._id?.toString();
+            const quiz = quizId ? quizzesMap.get(quizId) : null;
+            return {
+                quiz: item._id,
+                title: quiz?.title || 'Unknown Quiz',
+                attempts: item.attempts,
+                avgMarks: item.avgMarks,
+                avgOutOf: item.avgOutOf
+            };
+        });
     } catch (err) {
         console.error('Error fetching daily quiz report:', err?.message);
         return [];
