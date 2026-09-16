@@ -62,9 +62,15 @@ const UserSchema = new Schema({
     type: Boolean,
     default: false
   },
+  verified_date: {
+    type: Date
+  },
   register_date: {
     type: Date,
     default: Date.now
+  },
+  last_login: {
+    type: Date
   }
 });
 

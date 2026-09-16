@@ -59,10 +59,9 @@ const isValidEmail = async (email) => {
     try {
         // Node >= 16: punycode is available via 'punycode/' module
         const punycode = require('punycode/');
-        domain = punycode.toASCII(domainRaw);
+        domain = punycode.toASCII(domain);
     } catch {
         // ignore and use raw domain
-        domain = domainRaw;
     }
 
     // Basic DNS domain safety

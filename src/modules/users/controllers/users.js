@@ -169,6 +169,8 @@ exports.login = async (req, res) => {
             message: 'Could not log you in, try again later!'
         };
 
+        await User.findByIdAndUpdate(user._id, { $set: { last_login: new Date() } });
+
         // Invalidate current user caches so other consumers see changes
         await cacheManager.invalidatePattern(`usr:current:${user._id}`);
         res.status(200).json(safeUserForResponse(updatedUserObj));
@@ -297,7 +299,7 @@ exports.verifyOTP = async (req, res) => {
         const verifiedUser = await User.findOneAndUpdate(
             { email },
             {
-                $set: { verified: true },
+                $set: { verified: true, verified_date: new Date() },
                 $unset: { otp: "", otpExpires: "" }
             },
             { returnDocument: 'after' }

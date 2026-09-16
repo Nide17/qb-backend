@@ -99,5 +99,8 @@ commands.md
 # ignore env variants
 .env*
 
+# Kilo Agent Manager state
+.kilo/
+
 # Don't push
 secrets
