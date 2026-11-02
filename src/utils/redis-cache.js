@@ -1,4 +1,8 @@
 const Redis = require("ioredis");
+const zlib = require("zlib");
+const { promisify } = require("util");
+const gzipAsync = promisify(zlib.gzip);
+const gunzipAsync = promisify(zlib.gunzip);
 const { createTransporter, sendWithRetry } = require("./emails/sendEmail");
 
 class RedisCacheManager {
@@ -15,6 +19,7 @@ class RedisCacheManager {
         this.lastEmailSentAt = 0;
         this.emailCooldownMs = 5 * 60 * 60 * 1000; // 5 hours
         this.lastAlertSignature = null;
+        this.pausedUntil = 0;
     }
 
     // -------------------------------------
@@ -27,7 +32,10 @@ class RedisCacheManager {
         if (!this.redis) {
             this.redis = new Redis(this.redisUrl, {
                 lazyConnect: true,
-                retryStrategy(times) {
+                retryStrategy: (times) => {
+                    if (this.pausedUntil && Date.now() < this.pausedUntil) {
+                        return 600000;
+                    }
                     return Math.min(times * 200, 2000);
                 },
                 maxRetriesPerRequest: 1,
@@ -47,6 +55,11 @@ class RedisCacheManager {
             this.redis.on("error", async (err) => {
                 console.error("❌ Redis error:", err.name, err.message);
                 this.isConnected = false;
+
+                if (/plan limits|max daily request|max request limit/i.test(err && err.message ? err.message : "")) {
+                    this.pausedUntil = Date.now() + 10 * 60 * 1000;
+                    console.warn("Redis paused until", new Date(this.pausedUntil).toISOString());
+                }
 
                 await this.sendAlert(
                     "Redis Error",
@@ -133,6 +146,7 @@ class RedisCacheManager {
     }
 
     isReady() {
+        if (this.pausedUntil && Date.now() < this.pausedUntil) return false;
         return this.redis && this.isConnected && this.redis.status === "ready";
     }
 
@@ -153,15 +167,28 @@ class RedisCacheManager {
         }
 
         try {
-            const raw = await this.redis.get(key);
+            const buf = await this.redis.getBuffer(key);
 
-            if (raw === null) {
+            if (buf === null || !buf || buf.length === 0) {
                 return { hit: false, value: null };
             }
 
-            return { hit: true, value: JSON.parse(raw) };
+            let text;
+            const first = buf[0];
+            if (first === 0) {
+                text = buf.slice(1).toString("utf8");
+            } else if (first === 1) {
+                const dec = await gunzipAsync(buf.slice(1));
+                text = dec.toString("utf8");
+            } else {
+                text = buf.toString("utf8");
+            }
+
+            const value = JSON.parse(text);
+            return { hit: true, value };
         } catch (err) {
             console.error(`Redis GET error for key "${key}":`, err.message);
+            try { await this.redis.del(key); } catch (e) {}
             return { hit: false, value: null };
         }
     }
@@ -180,8 +207,16 @@ class RedisCacheManager {
             const json = JSON.stringify(value);
             const normalizedTTL = this.normalizeTTL(ttl);
 
-            if (normalizedTTL > 0) await this.redis.setex(key, normalizedTTL, json);
-            else await this.redis.set(key, json);
+            const raw = Buffer.from(json, "utf8");
+            let payload;
+            if (raw.length < 1024) {
+                payload = Buffer.concat([Buffer.from([0]), raw]);
+            } else {
+                payload = Buffer.concat([Buffer.from([1]), await gzipAsync(raw)]);
+            }
+
+            if (normalizedTTL > 0) await this.redis.setex(key, normalizedTTL, payload);
+            else await this.redis.set(key, payload);
             return true;
         } catch (err) {
             console.error(`Redis SET error for key "${key}":`, err.message);
