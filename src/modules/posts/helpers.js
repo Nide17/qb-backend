@@ -317,7 +317,12 @@ const fetchAdminEmails = async () => {
     }
 };
 
+let reportSchedulerStarted = false;
+let lastReportSentDate = null;
+
 const scheduledReportMessage = async () => {
+    if (reportSchedulerStarted) return;
+    reportSchedulerStarted = true;
     try {
         const scheduleNextSend = () => {
             const now = new Date();
@@ -330,9 +335,12 @@ const scheduledReportMessage = async () => {
 
             setTimeout(async () => {
                 try {
-                    console.log('Sending scheduled report...');
                     const sendDate = new Date();
+                    const dateKey = sendDate.toISOString().slice(0,10);
+                    if (lastReportSentDate === dateKey) return;
+                    lastReportSentDate = dateKey;
                     const todayDate = new Date(sendDate.getFullYear(), sendDate.getMonth(), sendDate.getDate());
+                    console.log('Sending scheduled report...');
                     const currentDate = `${sendDate.getMonth() + 1}/${sendDate.getDate()}/${sendDate.getFullYear()}`;
                     const report = await getDailyReport(todayDate);
                     const reportMessage = generateReportMessage(report, currentDate);
