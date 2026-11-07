@@ -266,30 +266,30 @@ const generateReportEmail = (report, currentDate) => {
             <h4><u>Quiz Taking</u></h4>
             <p><strong>Total Attempts:</strong> ${totalQuizAttempts}</p>
             ${quizzes.length > 0 ? `<ul>${quizzes.map(item => {
-                const avgScore = item.avgOutOf ? `${(item.avgMarks || 0).toFixed(1)}/${item.avgOutOf}` : (item.avgMarks || 0).toFixed(1);
-                return `<li>${item.title}: ${item.attempts} attempt${item.attempts === 1 ? '' : 's'} (avg score: ${avgScore})</li>`;
-            }).join('')}</ul>` : '<p>No quiz attempts today</p>'}
+            const avgScore = item.avgOutOf ? `${(item.avgMarks || 0).toFixed(1)}/${item.avgOutOf}` : (item.avgMarks || 0).toFixed(1);
+            return `<li>${item.title}: ${item.attempts} attempt${item.attempts === 1 ? '' : 's'} (avg score: ${avgScore})</li>`;
+        }).join('')}</ul>` : '<p>No quiz attempts today</p>'}
         `
     };
 };
 
-const sendReport = async (reportMessage, reportMessageEmail, adminsEmails) => {
+const sendReport = async (reportMessage, reportMessageEmail, superAdminsEmails) => {
     // numbers.forEach(to => {
     //     client.messages.create({ from, to, body: reportMessage })
     //         .then(message => console.log(message.sid))
     //         .catch(error => console.error(error));
     // });
-    if (!adminsEmails || adminsEmails.length === 0) {
-        console.log('No admin emails found for report');
+    if (!superAdminsEmails || superAdminsEmails.length === 0) {
+        console.log('No super admin emails found for report');
         return;
     }
-    adminsEmails.forEach(admEmail => {
-        const email = typeof admEmail === 'string' ? admEmail : admEmail.email;
+    superAdminsEmails.forEach(superAdmEmail => {
+        const email = typeof superAdmEmail === 'string' ? superAdmEmail : superAdmEmail.email;
         if (email) sendHtmlEmail(email, reportMessageEmail.subject, reportMessageEmail.html);
     });
 };
 
-const fetchAdminEmails = async () => {
+const fetchSuperAdminEmails = async () => {
     let attempts = 0;
     const maxAttempts = 2;
     const retryDelay = 60000; // 1 minute in ms
@@ -298,16 +298,16 @@ const fetchAdminEmails = async () => {
 
     while (attempts < maxAttempts) {
         try {
-            const adminEmails = await User.find({ role: { $in: ['Admin', 'SuperAdmin'] } }).select('email').lean().maxTimeMS(60000);
+            const superAdminEmails = await User.find({ role: { $in: ['SuperAdmin'] } }).select('email').lean().maxTimeMS(60000);
 
-            if (adminEmails && adminEmails.length > 0) {
-                return adminEmails.map(admin => admin.email).filter(Boolean);
+            if (superAdminEmails && superAdminEmails.length > 0) {
+                return superAdminEmails.map(superAdmin => superAdmin.email).filter(Boolean);
             } else {
                 return [];
             }
         } catch (error) {
             attempts++;
-            console.log(`Failed to fetch admin emails for report (attempt ${attempts}):`, error);
+            console.log(`Failed to fetch super admin emails for report (attempt ${attempts}):`, error);
             if (attempts < maxAttempts) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
             } else {
@@ -336,7 +336,7 @@ const scheduledReportMessage = async () => {
             setTimeout(async () => {
                 try {
                     const sendDate = new Date();
-                    const dateKey = sendDate.toISOString().slice(0,10);
+                    const dateKey = sendDate.toISOString().slice(0, 10);
                     if (lastReportSentDate === dateKey) return;
                     lastReportSentDate = dateKey;
                     const todayDate = new Date(sendDate.getFullYear(), sendDate.getMonth(), sendDate.getDate());
@@ -345,8 +345,8 @@ const scheduledReportMessage = async () => {
                     const report = await getDailyReport(todayDate);
                     const reportMessage = generateReportMessage(report, currentDate);
                     const reportMessageEmail = generateReportEmail(report, currentDate);
-                    const adminsEmails = await fetchAdminEmails();
-                    await sendReport(reportMessage, reportMessageEmail, adminsEmails);
+                    const superAdminsEmails = await fetchSuperAdminEmails();
+                    await sendReport(reportMessage, reportMessageEmail, superAdminsEmails);
                 } catch (error) {
                     console.log('Error sending scheduled report:', error.message);
                 } finally {
